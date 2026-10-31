@@ -1,0 +1,63 @@
+---
+import type { PostCard as PostCardData } from "../lib/db/queries";
+import { formatCount, localizePath, useTranslations } from "../lib/i18n";
+import type { Locale } from "../lib/i18n/config";
+import { searchHref } from "../lib/search-url";
+import Breadcrumb from "./Breadcrumb.astro";
+import PageHeader from "./PageHeader.astro";
+import PostList from "./PostList.astro";
+
+interface Props {
+	locale: Locale;
+	year: number;
+	count: number;
+	posts: PostCardData[];
+	page: number;
+	totalPages: number;
+	prevHref?: string;
+	nextHref?: string;
+}
+
+const { locale, year, count, posts, page, totalPages, prevHref, nextHref } = Astro.props;
+const t = useTranslations(locale);
+const homeHref = localizePath("/", locale);
+---
+
+<PageHeader
+	locale={locale}
+	icon="calendar"
+	title={t("year.heading", { year })}
+	description={t("year.description", {
+		year,
+		count: formatCount(locale, "articles", count),
+	})}
+/>
+
+<div class="year-breadcrumb">
+	<Breadcrumb
+		locale={locale}
+		items={[
+			{ label: t("breadcrumb.home"), href: homeHref },
+			{ label: String(year) },
+		]}
+	/>
+</div>
+
+<PostList
+	locale={locale}
+	posts={posts}
+	heading={t("year.latest")}
+	emptyTitle={t("list.empty")}
+	emptyBody={t("search.noQuery.body")}
+	filterHref={searchHref(locale, { year, has_code: true })}
+	page={page}
+	totalPages={totalPages}
+	prevHref={prevHref}
+	nextHref={nextHref}
+/>
+
+<style>
+	.year-breadcrumb {
+		margin-block: 0.9rem 1.5rem;
+	}
+</style>

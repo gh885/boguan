@@ -393,6 +393,8 @@ async function processItem(
         publishedAt: normalized.publishedAt,
         publishedAtRaw: normalized.publishedAtRaw,
         publishedYear: normalized.publishedYear,
+        readingMinutes: normalized.readingMinutes,
+        hasCode: normalized.hasCode,
         coverUrl: normalized.coverUrl,
         contentHash: hash,
       })
@@ -416,6 +418,8 @@ async function processItem(
         lastSeenAt: now,
         publishedAt: existing.publishedAt ?? normalized.publishedAt,
         publishedYear: existing.publishedYear ?? normalized.publishedYear,
+        readingMinutes: existing.readingMinutes ?? normalized.readingMinutes,
+        hasCode: normalized.hasCode ?? existing.hasCode,
       })
       .where(eq(posts.id, existing.id))
       .run();
@@ -435,6 +439,8 @@ async function processItem(
       publishedAt: normalized.publishedAt,
       publishedAtRaw: normalized.publishedAtRaw,
       publishedYear: normalized.publishedYear,
+      readingMinutes: normalized.readingMinutes ?? existing.readingMinutes,
+      hasCode: normalized.hasCode ?? existing.hasCode,
       coverUrl: normalized.coverUrl,
       contentHash: hash,
       lastSeenAt: now,

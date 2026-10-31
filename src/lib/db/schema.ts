@@ -97,6 +97,10 @@ export const posts = sqliteTable(
     publishedAtRaw: text("published_at_raw"),
     /** 派生列：按 sources.timezone 取的年份，/year/[year] 直接命中索引 */
     publishedYear: integer("published_year"),
+    /** 按正文估算的阅读分钟数；没有正文时为 NULL。派生元数据，不是正文 */
+    readingMinutes: integer("reading_minutes"),
+    /** 详情页是否含代码块；列表页还没拿到正文时为 NULL（不知道就不显示） */
+    hasCode: integer("has_code", { mode: "boolean" }),
     coverUrl: text("cover_url"),
     /** sha256(title + summary + 正文)，未变则不重写正文与 FTS */
     contentHash: text("content_hash").notNull(),
@@ -112,6 +116,7 @@ export const posts = sqliteTable(
     check("posts_summary_length", sql`length(${t.summary}) <= 200`),
     index("posts_published_idx").on(t.publishedAt),
     index("posts_year_idx").on(t.publishedYear),
+    index("posts_code_idx").on(t.hasCode),
     index("posts_company_published_idx").on(t.companyId, t.publishedAt),
     index("posts_source_idx").on(t.sourceId),
     // 跨源去重的查找键：同公司 + 同归一标题（±3 天在 SQL 里用 published_at 过滤）

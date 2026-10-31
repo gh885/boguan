@@ -1,0 +1,82 @@
+---
+import { useTranslations } from "../lib/i18n";
+import type { Locale } from "../lib/i18n/config";
+import { site } from "../lib/site";
+
+interface Props {
+	locale: Locale;
+	href: string;
+}
+
+const { locale, href } = Astro.props;
+const t = useTranslations(locale);
+---
+
+<a class="brand" href={href} aria-label={t("nav.brandHome")}>
+	<span class="brand__mark" aria-hidden="true">
+		<span></span>
+		<span></span>
+		<span></span>
+	</span>
+	<span class="brand__name">{site.name}</span>
+</a>
+
+<style>
+	.brand {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		min-width: 0;
+		color: var(--color-text-primary);
+		text-decoration: none;
+	}
+
+	.brand:hover {
+		color: var(--color-text-primary);
+		text-decoration: none;
+		opacity: 0.85;
+	}
+
+	.brand__mark {
+		display: flex;
+		align-items: flex-end;
+		justify-content: center;
+		gap: 2.5px;
+		width: 26px;
+		height: 22px;
+		padding: 4px 5px;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+	}
+
+	.brand__mark span {
+		display: block;
+		width: 3px;
+		border-radius: var(--radius-full);
+		background-color: var(--color-accent);
+	}
+
+	.brand__mark span:nth-child(1) {
+		height: 45%;
+		opacity: 0.45;
+	}
+
+	.brand__mark span:nth-child(2) {
+		height: 100%;
+		opacity: 0.72;
+	}
+
+	.brand__mark span:nth-child(3) {
+		height: 68%;
+		opacity: 1;
+	}
+
+	.brand__name {
+		overflow: hidden;
+		font-size: var(--text-sm);
+		font-weight: var(--weight-semibold);
+		letter-spacing: 0.01em;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+</style>

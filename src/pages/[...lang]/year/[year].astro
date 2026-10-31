@@ -1,0 +1,56 @@
+---
+import type { GetStaticPaths } from "astro";
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import YearView from "../../../components/YearView.astro";
+import { openWebDatabase, postYears, postsByYear } from "../../../lib/db/queries";
+import { localizePath, localeRoutes, useTranslations } from "../../../lib/i18n";
+import type { Locale } from "../../../lib/i18n/config";
+import { PAGE_SIZE, pageCount, pagePath } from "../../../lib/pagination";
+import { collectionJsonLd } from "../../../lib/structured-data";
+import { site } from "../../../lib/site";
+
+interface Props {
+	locale: Locale;
+}
+
+export const getStaticPaths = (() => {
+	const years = postYears(openWebDatabase());
+	return years.flatMap((entry) => localeRoutes({ year: String(entry.year) }));
+}) satisfies GetStaticPaths;
+
+const { locale } = Astro.props;
+const t = useTranslations(locale);
+const db = openWebDatabase();
+const year = Number(Astro.params.year);
+const yearRow = postYears(db).find((entry) => entry.year === year);
+
+if (!yearRow) throw new Error(`年份不存在：${year}`);
+
+const { items, total } = postsByYear(db, year, { limit: PAGE_SIZE });
+const totalPages = pageCount(total);
+const title = t("meta.year.title", { year });
+const description = t("meta.year.description", { year });
+---
+
+<BaseLayout
+	locale={locale}
+	title={title}
+	description={description}
+	nextHref={totalPages > 1 ? localizePath(pagePath(`/year/${year}`, 2), locale) : undefined}
+	jsonLd={collectionJsonLd({
+		name: title,
+		description,
+		url: new URL(localizePath(`/year/${year}`, locale), site.url).href,
+		items,
+	})}
+>
+	<YearView
+		locale={locale}
+		year={year}
+		count={yearRow.count}
+		posts={items}
+		page={1}
+		totalPages={totalPages}
+		nextHref={totalPages > 1 ? localizePath(pagePath(`/year/${year}`, 2), locale) : undefined}
+	/>
+</BaseLayout>

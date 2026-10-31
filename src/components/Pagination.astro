@@ -1,0 +1,91 @@
+---
+import { useTranslations } from "../lib/i18n";
+import type { Locale } from "../lib/i18n/config";
+import Icon from "./Icon.astro";
+
+interface Props {
+	locale: Locale;
+	page: number;
+	totalPages: number;
+	prevHref?: string;
+	nextHref?: string;
+}
+
+const { locale, page, totalPages, prevHref, nextHref } = Astro.props;
+const t = useTranslations(locale);
+---
+
+{
+	totalPages > 1 && (
+		<nav class="pagination" aria-label={t("pagination.label")}>
+			{prevHref ? (
+				<a class="pagination__link" href={prevHref} rel="prev">
+					<Icon name="arrow-left" size={14} />
+					<span>{t("pagination.previous")}</span>
+				</a>
+			) : (
+				<span class="pagination__link is-disabled" aria-disabled="true">
+					<Icon name="arrow-left" size={14} />
+					<span>{t("pagination.previous")}</span>
+				</span>
+			)}
+			<span class="pagination__status">
+				{t("pagination.pageOf", { page, total: totalPages })}
+			</span>
+			{nextHref ? (
+				<a class="pagination__link" href={nextHref} rel="next">
+					<span>{t("pagination.next")}</span>
+					<Icon name="arrow-right" size={14} />
+				</a>
+			) : (
+				<span class="pagination__link is-disabled" aria-disabled="true">
+					<span>{t("pagination.next")}</span>
+					<Icon name="arrow-right" size={14} />
+				</span>
+			)}
+		</nav>
+	)
+}
+
+<style>
+	.pagination {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-sm);
+		margin-block-start: 1.5rem;
+		padding-block-start: 1.25rem;
+		border-block-start: 1px solid var(--color-border);
+	}
+
+	.pagination__link {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		min-height: 2rem;
+		padding: 0.3rem 0.65rem;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		color: var(--color-text-primary);
+		font-size: var(--text-xs);
+		text-decoration: none;
+		transition: background-color var(--transition-fast), border-color var(--transition-fast);
+	}
+
+	.pagination__link:hover {
+		background-color: var(--color-surface-muted);
+		text-decoration: none;
+	}
+
+	.pagination__link.is-disabled {
+		color: var(--color-text-secondary);
+		opacity: 0.5;
+	}
+
+	.pagination__status {
+		color: var(--color-text-secondary);
+		font-size: var(--text-xs);
+		font-variant-numeric: tabular-nums;
+	}
+
+</style>

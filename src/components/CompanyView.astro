@@ -1,0 +1,148 @@
+---
+import type { CompanyCard, PostCard as PostCardData, TagCard } from "../lib/db/queries";
+import { formatCount, formatList, localizePath, useTranslations } from "../lib/i18n";
+import { companyDisplayName } from "../lib/i18n/company";
+import type { Locale } from "../lib/i18n/config";
+import { searchHref } from "../lib/search-url";
+import Breadcrumb from "./Breadcrumb.astro";
+import Icon from "./Icon.astro";
+import PageHeader from "./PageHeader.astro";
+import PostList from "./PostList.astro";
+
+interface Props {
+	locale: Locale;
+	company: CompanyCard;
+	topTags: TagCard[];
+	posts: PostCardData[];
+	page: number;
+	totalPages: number;
+	prevHref?: string;
+	nextHref?: string;
+}
+
+const { locale, company, topTags, posts, page, totalPages, prevHref, nextHref } = Astro.props;
+const t = useTranslations(locale);
+const name = companyDisplayName(company, locale);
+
+const topics = formatList(
+	locale,
+	topTags.slice(0, 3).map((tag) => tag.name),
+);
+const description = topics
+	? t("company.description", { name, topics })
+	: t("company.descriptionPlain", { name });
+const count = formatCount(locale, "articles", company.count);
+const homeHref = localizePath("/", locale);
+---
+
+<PageHeader
+	locale={locale}
+	title={t("company.heading", { name })}
+	description={description}
+	meta={t("company.meta", { count })}
+	logo={{ name, slug: company.slug, logoUrl: company.logoUrl }}
+/>
+
+<div class="company-breadcrumb">
+	<Breadcrumb
+		locale={locale}
+		items={[
+			{ label: t("breadcrumb.home"), href: homeHref },
+			{ label: name },
+		]}
+	/>
+</div>
+
+{
+	topTags.length > 0 && (
+		<section class="technologies">
+			<h2>
+				<Icon name="sparkles" size={17} />
+				<span>{t("company.topTechnologies")}</span>
+			</h2>
+			<ul>
+				{topTags.map((tag) => (
+					<li>
+						<a href={localizePath(`/tag/${tag.slug}`, locale)}>
+							<Icon name="hash" size={11} />
+							<span>{tag.name}</span>
+							<span class="technologies__count">({tag.count})</span>
+						</a>
+					</li>
+				))}
+			</ul>
+		</section>
+	)
+}
+
+<div class="company-latest">
+	<PostList
+		locale={locale}
+		posts={posts}
+		heading={t("company.latest")}
+		emptyTitle={t("company.empty")}
+		emptyBody={t("search.noQuery.body")}
+		filterHref={searchHref(locale, { company: company.slug, has_code: true })}
+		page={page}
+		totalPages={totalPages}
+		prevHref={prevHref}
+		nextHref={nextHref}
+	/>
+</div>
+
+<style>
+	.company-breadcrumb {
+		margin-block: 0.9rem 1.5rem;
+	}
+
+	.technologies {
+		margin-block-end: 2rem;
+		padding: 1.1rem 1.25rem 1.25rem;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-lg);
+		background-color: var(--color-surface);
+	}
+
+	.technologies h2 {
+		display: flex;
+		align-items: center;
+		gap: 0.45rem;
+		margin-block-end: 0.9rem;
+		font-size: var(--text-base);
+		font-weight: var(--weight-semibold);
+	}
+
+	.technologies ul {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.technologies a {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		min-height: 1.9rem;
+		padding: 0.25rem 0.65rem;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-full);
+		color: var(--color-text-primary);
+		font-size: var(--text-xs);
+		text-decoration: none;
+		transition: background-color var(--transition-fast), border-color var(--transition-fast);
+	}
+
+	.technologies a:hover {
+		border-color: color-mix(in oklab, var(--color-border) 55%, var(--color-text-secondary));
+		background-color: var(--color-surface-muted);
+		text-decoration: none;
+	}
+
+	.technologies__count {
+		color: var(--color-text-secondary);
+		font-variant-numeric: tabular-nums;
+	}
+</style>

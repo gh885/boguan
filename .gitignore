@@ -33,3 +33,6 @@ pnpm-debug.log*
 .env.*
 !.env.example
 .tmp/
+
+# 设计探索的临时工作区（taste-skill 生成物）
+.taste-skill/

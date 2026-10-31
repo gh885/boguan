@@ -89,6 +89,7 @@ vpr db:init              # 建库 / 应用未执行的迁移（幂等）
 vpr db:seed              # 写入公司 / 渠道 / 规则标签（幂等）
 vpr db:fixture           # 造构建用最小数据集 data/fixture.db（CI 用，不碰真实库）
 vpr db:check             # 对账：FTS、孤正文文件、被挡住的源；--fix / --prune
+vpr db:metrics           # 从 crawler 私有正文回填阅读时长 / 含代码
 vpr crawl                # 抓取（默认增量）；--dry-run / --mode=backfill / --source=
 vpx scripts/...          # 运行脚本，替代 tsx
 ```
@@ -127,6 +128,7 @@ vpr dev stop           # 停止
 /tags               标签索引
 /tag/[slug]         标签页
 /year/[year]        年份归档
+/page/[n]           首页分页（公司 / 标签 / 年份下的分页同构）
 /search             站内搜索（noindex）
 ```
 

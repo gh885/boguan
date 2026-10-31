@@ -18,6 +18,8 @@ export interface ListItem {
   tags?: TagRef[];
   /** RSS 这类列表页就带全文的源，正文不用再进详情页 */
   body?: string;
+  /** 列表页原始 HTML 里是否含 <pre>/<code>；拿不到 HTML 时不传 */
+  hasCode?: boolean;
   coverUrl?: string;
 }
 
@@ -27,5 +29,7 @@ export interface Detail {
   author?: string;
   tags?: TagRef[];
   body?: string;
+  /** 详情页正文容器里是否含 <pre>/<code> */
+  hasCode?: boolean;
   coverUrl?: string;
 }

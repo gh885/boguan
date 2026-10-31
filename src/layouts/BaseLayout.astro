@@ -1,6 +1,9 @@
 ---
 import LanguageSwitch from "../components/LanguageSwitch.astro";
-import ThemeToggle from "../components/ThemeToggle.astro";
+import Icon from "../components/Icon.astro";
+import SiteLogo from "../components/SiteLogo.astro";
+import SiteSidebar from "../components/SiteSidebar.astro";
+import { companyCards, openWebDatabase, tagIndex } from "../lib/db/queries";
 import { alternateLinks, localizePath, resolveLocale, useTranslations } from "../lib/i18n";
 import { defaultLocale, locales, ogLocales, type Locale } from "../lib/i18n/config";
 import { site } from "../lib/site";
@@ -20,6 +23,18 @@ interface Props {
 	 * 在这里收窄，否则 hreflang 与语言切换都会指向 404。
 	 */
 	alternateLocales?: readonly Locale[];
+	/** 首页、公司索引、标签索引顶部的「缺少公司」提示条。 */
+	showNotice?: boolean;
+	/** 分页页的上一页 / 下一页，输出成 <link rel="prev/next">。 */
+	prevHref?: string;
+	nextHref?: string;
+	/** 结构化数据；由页面传入，layout 只负责序列化。 */
+	jsonLd?: Record<string, unknown>;
+	/**
+	 * 页面外壳。`bare` 用于关于页这类整页排版的页面：仍由 layout 统一维护 head，
+	 * 但不渲染侧栏与移动端栏，页面自己提供导航。默认 `default`。
+	 */
+	chrome?: "default" | "bare";
 }
 
 const {
@@ -28,15 +43,26 @@ const {
 	noindex = false,
 	locale = resolveLocale(Astro.currentLocale),
 	alternateLocales = locales,
+	showNotice = false,
+	prevHref,
+	nextHref,
+	jsonLd,
+	chrome = "default",
 } = Astro.props;
 
+const isBare = chrome === "bare";
+
 const t = useTranslations(locale);
-const pageTitle = `${title} · ${site.name}`;
+const db = isBare ? null : openWebDatabase();
+const tags = db ? tagIndex(db) : [];
+const companies = db ? companyCards(db) : [];
+const pageTitle = title.endsWith(site.name) ? title : `${title} · ${site.name}`;
 const pathname = Astro.url.pathname;
 const canonical = new URL(pathname, site.url).href;
 const alternates = alternateLinks(pathname, alternateLocales);
 const xDefault = alternates.find((alternate) => alternate.locale === defaultLocale);
 const robots = noindex ? "noindex, follow" : "index, follow";
+const homeHref = localizePath("/", locale);
 ---
 
 <!doctype html>
@@ -82,12 +108,19 @@ const robots = noindex ? "noindex, follow" : "index, follow";
 			title={t("feed.title")}
 			href={new URL(localizePath("/rss.xml", locale), site.url).href}
 		/>
+		{prevHref && <link rel="prev" href={new URL(prevHref, site.url).href} />}
+		{nextHref && <link rel="next" href={new URL(nextHref, site.url).href} />}
 		<meta name="robots" content={robots} />
 		<meta property="og:type" content="website" />
 		<meta property="og:site_name" content={site.name} />
 		<meta property="og:title" content={pageTitle} />
 		<meta property="og:description" content={description} />
 		<meta property="og:url" content={canonical} />
+		<meta property="og:image" content={`${site.url}/og.png`} />
+		<meta property="og:image:type" content="image/png" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta property="og:image:alt" content={t("meta.ogAlt")} />
 		<meta property="og:locale" content={ogLocales[locale]} />
 		{
 			alternates
@@ -96,78 +129,274 @@ const robots = noindex ? "noindex, follow" : "index, follow";
 					<meta property="og:locale:alternate" content={ogLocales[alternate.locale]} />
 				))
 		}
-		<meta name="twitter:card" content="summary" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content={pageTitle} />
+		<meta name="twitter:description" content={description} />
+		<meta name="twitter:image" content={`${site.url}/og.png`} />
+		<meta name="twitter:image:alt" content={t("meta.ogAlt")} />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<link rel="icon" href="/favicon.ico" />
 		<meta name="generator" content={Astro.generator} />
+		{jsonLd && (
+			<script
+				type="application/ld+json"
+				set:html={JSON.stringify(jsonLd).replace(/</g, "\\u003c")}
+			/>
+		)}
 	</head>
 
 	<body>
 		<a class="skip-link" href="#main">{t("nav.skipToContent")}</a>
 
-		<header class="site-header">
-			<div class="page site-header__inner">
-				<a class="site-brand" href={localizePath("/", locale)}>{site.name}</a>
-				<div class="site-actions">
-					<LanguageSwitch locale={locale} />
-					<ThemeToggle locale={locale} />
+		{!isBare && <input class="nav-toggle" type="checkbox" id="nav-toggle" />}
+		<div class:list={["app", { "app--bare": isBare }]}>
+			{!isBare && (
+				<div class="sidebar-wrap">
+					<SiteSidebar locale={locale} pathname={pathname} tags={tags} companies={companies} />
 				</div>
-			</div>
-		</header>
+			)}
 
-		<main id="main" class="page">
-			<slot />
-		</main>
+			<div class="main-col">
+				{!isBare && (
+					<header class="mobile-bar">
+						<label class="menu-button" for="nav-toggle">
+							<span class="menu-open" aria-hidden="true"><Icon name="menu" size={18} /></span>
+							<span class="menu-close" aria-hidden="true"><Icon name="close" size={18} /></span>
+							<span class="visually-hidden">{t("nav.menu")}</span>
+						</label>
+						<SiteLogo locale={locale} href={homeHref} />
+						<LanguageSwitch locale={locale} />
+					</header>
+				)}
 
-		<footer class="site-footer">
-			<div class="page">
-				<p>{t("footer.note")}</p>
+				{!isBare && showNotice && (
+					<div class="notice">
+						<span>{t("notice.text")}</span>
+						<a href={site.issues} target="_blank" rel="noopener noreferrer">
+							{t("notice.action")}
+						</a>
+					</div>
+				)}
+
+				<main id="main" class:list={["main", { "main--bare": isBare }]}>
+					<div class:list={["main-inner", { "main-inner--bare": isBare }]}>
+						<slot />
+					</div>
+				</main>
 			</div>
-		</footer>
+		</div>
+
+		{!isBare && (
+			<>
+				<label class="nav-backdrop" for="nav-toggle" aria-hidden="true"></label>
+				<script is:inline>
+					document.addEventListener("keydown", (event) => {
+						if (event.key !== "Escape") return;
+						const toggle = document.getElementById("nav-toggle");
+						if (toggle instanceof HTMLInputElement) toggle.checked = false;
+					});
+					document.querySelectorAll("[data-nav-close]").forEach((element) => {
+						element.addEventListener("click", () => {
+							const toggle = document.getElementById("nav-toggle");
+							if (!(toggle instanceof HTMLInputElement)) return;
+							toggle.checked = false;
+							toggle.focus();
+						});
+					});
+				</script>
+			</>
+		)}
 	</body>
 </html>
 
 <style>
-	.site-header {
+	.app {
+		display: grid;
+		grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+		min-height: 100dvh;
+	}
+
+	.app--bare {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.sidebar-wrap {
+		position: sticky;
+		inset-block-start: 0;
+		z-index: 20;
+		height: 100dvh;
+	}
+
+	.main-col {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+		background-color: var(--color-bg);
+	}
+
+	.main {
+		flex: 1;
+		width: 100%;
+		padding: 1.5rem var(--gutter) 3rem;
+	}
+
+	.main-inner {
+		width: 100%;
+		max-width: var(--width-page);
+		margin-inline: auto;
+	}
+
+	.main.main--bare {
+		padding: 0;
+	}
+
+	.main-inner--bare {
+		max-width: none;
+	}
+
+	.mobile-bar {
+		display: none;
+	}
+
+	.nav-toggle {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		opacity: 0;
+	}
+
+	.nav-backdrop {
+		display: none;
+	}
+
+	.notice {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: center;
+		gap: 0.35rem;
+		padding: 0.55rem var(--gutter);
 		border-block-end: 1px solid var(--color-border);
-		background-color: var(--color-surface);
-	}
-
-	.site-header__inner {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: var(--space-md);
-		min-height: 3.5rem;
-	}
-
-	.site-brand {
-		color: var(--color-text-primary);
-		font-size: var(--text-lg);
-		font-weight: var(--weight-semibold);
-		text-decoration: none;
-		letter-spacing: 0.02em;
-	}
-
-	.site-brand:hover {
-		color: var(--color-accent);
-	}
-
-	.site-actions {
-		display: flex;
-		align-items: center;
-		gap: var(--space-sm);
-	}
-
-	.site-footer {
-		border-block-start: 1px solid var(--color-border);
-		padding-block: var(--space-lg);
+		background-color: color-mix(in oklab, var(--color-accent) 9%, var(--color-surface));
 		color: var(--color-text-secondary);
 		font-size: var(--text-xs);
+		text-align: center;
 	}
 
-	.site-footer p {
-		margin: 0;
-		max-width: var(--width-measure);
+	.notice a {
+		color: var(--color-accent);
+		text-decoration: underline;
+		text-underline-offset: 0.18em;
+	}
+
+	@media (max-width: 767px) {
+		.app {
+			grid-template-columns: minmax(0, 1fr);
+		}
+
+		.sidebar-wrap {
+			position: fixed;
+			inset-block: 0;
+			inset-inline-start: 0;
+			z-index: 40;
+			width: min(17rem, 86vw);
+			transform: translateX(-100%);
+			visibility: hidden;
+			transition: transform 180ms ease, visibility 0s linear 180ms;
+		}
+
+		.nav-toggle:checked ~ .app .sidebar-wrap {
+			transform: translateX(0);
+			visibility: visible;
+			transition-delay: 0s;
+		}
+
+		:global(body:has(.nav-toggle:checked)) {
+			overflow: hidden;
+		}
+
+		.nav-toggle:focus-visible ~ .app .menu-button {
+			outline: var(--focus-ring-width) solid var(--color-accent);
+			outline-offset: var(--focus-ring-offset);
+		}
+
+		.mobile-bar {
+			position: sticky;
+			inset-block-start: 0;
+			z-index: 15;
+			display: flex;
+			align-items: center;
+			gap: var(--space-sm);
+			min-height: 3.25rem;
+			padding: 0.5rem var(--gutter);
+			border-block-end: 1px solid var(--color-border);
+			background-color: var(--color-surface);
+		}
+
+		.mobile-bar > :global(.language-switch) {
+			margin-inline-start: auto;
+		}
+
+		.menu-button {
+			display: inline-flex;
+			flex-shrink: 0;
+			align-items: center;
+			justify-content: center;
+			width: 2.75rem;
+			height: 2.75rem;
+			border-radius: var(--radius-sm);
+			color: var(--color-text-secondary);
+			cursor: pointer;
+		}
+
+		.menu-button:hover {
+			background-color: var(--color-surface-muted);
+			color: var(--color-text-primary);
+		}
+
+		.menu-button :global(svg) {
+			width: 1.1rem;
+			height: 1.1rem;
+		}
+
+		.menu-close {
+			display: none;
+		}
+
+		.nav-toggle:checked ~ .app .menu-open {
+			display: none;
+		}
+
+		.nav-toggle:checked ~ .app .menu-close {
+			display: inline-flex;
+		}
+
+		.nav-toggle:checked ~ .app .mobile-bar {
+			visibility: hidden;
+		}
+
+		.nav-backdrop {
+			position: fixed;
+			inset: 0;
+			z-index: 30;
+			display: block;
+			background-color: color-mix(in oklab, var(--color-text-primary) 38%, transparent);
+			opacity: 0;
+			pointer-events: none;
+			transition: opacity 180ms ease;
+		}
+
+		.nav-toggle:checked ~ .nav-backdrop {
+			opacity: 1;
+			pointer-events: auto;
+		}
+
+		.main {
+			padding: 1rem var(--gutter) 2.5rem;
+		}
+
+		.notice {
+			font-size: var(--text-xs);
+		}
 	}
 </style>

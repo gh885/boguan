@@ -14,10 +14,12 @@
     "db:init": "vpx scripts/db/init.ts",
     "db:seed": "vpx scripts/db/seed.ts",
     "db:check": "vpx scripts/db/check.ts",
+    "db:metrics": "vpx scripts/db/metrics.ts",
     "crawl": "vpx scripts/crawler/cli.ts",
     "db:fixture": "vpx scripts/db/fixture.ts"
   },
   "dependencies": {
+    "@astrojs/node": "11.1.9",
     "@astrojs/rss": "^4.0.19",
     "@astrojs/sitemap": "^3.7.4",
     "astro": "^7.4.4",

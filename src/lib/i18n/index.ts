@@ -60,6 +60,35 @@ export function useTranslations(locale: Locale) {
   return (key: MessageKey, params?: MessageParams): string => translate(locale, key, params);
 }
 
+const pluralRules = new Map<Locale, Intl.PluralRules>();
+
+/** 英文单复数走 Intl.PluralRules；中文两种形式文案相同，读起来也自然。 */
+export type CountUnit = "articles" | "companies" | "tags";
+
+export function formatCount(locale: Locale, unit: CountUnit, count: number): string {
+  let rules = pluralRules.get(locale);
+  if (!rules) {
+    rules = new Intl.PluralRules(locale);
+    pluralRules.set(locale, rules);
+  }
+  const form = rules.select(count) === "one" ? "one" : "other";
+  const key = `count.${unit}.${form}` as MessageKey;
+  return translate(locale, key, { count });
+}
+
+const listFormatters = new Map<Locale, Intl.ListFormat>();
+
+/** 把公司名/标签名连成一句；中文顿号、英文牛津逗号交给 Intl。 */
+export function formatList(locale: Locale, items: readonly string[]): string {
+  if (items.length === 0) return "";
+  let formatter = listFormatters.get(locale);
+  if (!formatter) {
+    formatter = new Intl.ListFormat(locale, { style: "long", type: "conjunction" });
+    listFormatters.set(locale, formatter);
+  }
+  return formatter.format(items);
+}
+
 const dateFormatters = new Map<Locale, Intl.DateTimeFormat>();
 
 /** 入库时间是 UTC，展示一律按北京时间。 */
@@ -68,7 +97,7 @@ export function formatDate(value: Date | string, locale: Locale): string {
   let formatter = dateFormatters.get(locale);
   if (!formatter) {
     formatter = new Intl.DateTimeFormat(locale, {
-      dateStyle: "long",
+      dateStyle: "medium",
       timeZone: displayTimeZone,
     });
     dateFormatters.set(locale, formatter);

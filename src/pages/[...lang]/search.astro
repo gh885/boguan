@@ -1,0 +1,183 @@
+---
+export const prerender = false;
+
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import EmptyState from "../../components/EmptyState.astro";
+import FilterBar from "../../components/FilterBar.astro";
+import Icon from "../../components/Icon.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import Pagination from "../../components/Pagination.astro";
+import PostCard from "../../components/PostCard.astro";
+import { listPosts, openWebDatabase, searchPosts, type PostCard as PostCardData } from "../../lib/db/queries";
+import { formatCount, resolveLocale, useTranslations } from "../../lib/i18n";
+import { PAGE_SIZE, pageCount, pageOffset } from "../../lib/pagination";
+import { searchHref } from "../../lib/search-url";
+
+const locale = resolveLocale(Astro.currentLocale);
+const t = useTranslations(locale);
+const db = openWebDatabase();
+const params = Astro.url.searchParams;
+
+const q = (params.get("q") ?? "").trim().slice(0, 120);
+const companySlug = params.get("company") ?? undefined;
+const tagSlug = params.get("tag") ?? undefined;
+const yearParam = params.get("year");
+const year = yearParam && /^\d{4}$/.test(yearParam) ? Number(yearParam) : undefined;
+const hasCode = params.get("has_code") === "1";
+const page = Math.max(1, Number(params.get("page") ?? "1") || 1);
+
+const hasFilters = Boolean(companySlug || tagSlug || year !== undefined || hasCode);
+const filters = { companySlug, tagSlug, year, hasCode: hasCode ? true : undefined };
+const hidden: Record<string, string> = {};
+if (companySlug) hidden.company = companySlug;
+if (tagSlug) hidden.tag = tagSlug;
+if (year !== undefined) hidden.year = String(year);
+if (hasCode) hidden.has_code = "1";
+
+let posts: PostCardData[] = [];
+let total = 0;
+
+if (q) {
+	const result = searchPosts(db, { q, ...filters, limit: PAGE_SIZE, offset: pageOffset(page) });
+	posts = result.hits;
+	total = result.total;
+} else if (hasFilters) {
+	const result = listPosts(db, filters, { limit: PAGE_SIZE, offset: pageOffset(page) });
+	posts = result.items;
+	total = result.total;
+}
+
+const totalPages = pageCount(total);
+const description = q
+	? t("search.description", { query: q })
+	: hasFilters
+		? t("search.descriptionFiltered")
+		: t("search.descriptionEmpty");
+const title = q ? `${t("meta.search.title")}: ${q}` : t("meta.search.title");
+const count = formatCount(locale, "articles", total);
+
+const clearSearchHref = searchHref(locale, {
+	company: companySlug,
+	tag: tagSlug,
+	year,
+	has_code: hasCode,
+});
+const toggleCodeHref = searchHref(locale, {
+	q,
+	company: companySlug,
+	tag: tagSlug,
+	year,
+	has_code: !hasCode,
+});
+const prevHref =
+	page > 1
+		? searchHref(locale, {
+				q,
+				company: companySlug,
+				tag: tagSlug,
+				year,
+				has_code: hasCode,
+				page: page - 1,
+			})
+		: undefined;
+const nextHref =
+	page < totalPages
+		? searchHref(locale, {
+				q,
+				company: companySlug,
+				tag: tagSlug,
+				year,
+				has_code: hasCode,
+				page: page + 1,
+			})
+		: undefined;
+
+const showEmpty = posts.length === 0;
+---
+
+<BaseLayout
+	locale={locale}
+	title={title}
+	description={description}
+	noindex
+	prevHref={prevHref}
+	nextHref={nextHref}
+>
+	<PageHeader
+		locale={locale}
+		icon="search"
+		title={t("search.title")}
+		description={description}
+		searchValue={q}
+		searchHidden={hidden}
+		searchClearHref={clearSearchHref}
+	/>
+
+	<div class="search-page">
+		<div class="search-toolbar">
+			<span class="search-count">
+				<Icon name="filter" size={12} />
+				<span>{q || hasFilters ? t("search.results", { count }) : t("search.descriptionEmpty")}</span>
+			</span>
+			<FilterBar
+				locale={locale}
+				href={toggleCodeHref}
+				active={hasCode}
+				clearHref={hasCode ? toggleCodeHref : undefined}
+			/>
+		</div>
+
+		{
+			showEmpty ? (
+				<EmptyState
+					title={q || hasFilters ? t("search.empty.title") : t("search.noQuery.title")}
+					body={q || hasFilters ? t("search.empty.body") : t("search.noQuery.body")}
+					icon={q || hasFilters ? "search" : "hash"}
+				/>
+			) : (
+				<div class="search-results">
+					{posts.map((post) => (
+						<PostCard post={post} locale={locale} />
+					))}
+				</div>
+			)
+		}
+
+		<Pagination
+			locale={locale}
+			page={page}
+			totalPages={totalPages}
+			prevHref={prevHref}
+			nextHref={nextHref}
+		/>
+	</div>
+</BaseLayout>
+
+<style>
+	.search-page {
+		margin-block-start: 1rem;
+	}
+
+	.search-toolbar {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-sm);
+		margin-block-end: 1rem;
+	}
+
+	.search-count {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		color: var(--color-text-secondary);
+		font-size: var(--text-xs);
+	}
+
+	.search-results {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+</style>

@@ -1,5 +1,6 @@
 import { load, type Cheerio, type CheerioAPI } from "cheerio";
 import type { Element } from "domhandler";
+import { hasCodeInHtml } from "../../../src/lib/domain/code";
 import { firstTextNode, htmlToText } from "../extract";
 import type { Detail, ListItem, TagRef } from "../types";
 import type { SourceAdapter } from "./types";
@@ -104,13 +105,15 @@ export const youzanAdapter: SourceAdapter = {
     const content = $(".post-content").first();
     if (content.length === 0) throw new Error(`详情页缺少 .post-content：${url}`);
 
-    const body = htmlToText(content.html() ?? "");
+    const contentHtml = content.html() ?? "";
+    const body = htmlToText(contentHtml);
     if (body.length < MIN_BODY_CHARS) {
       throw new Error(`详情页正文只有 ${body.length} 字，选择器可能失效：${url}`);
     }
 
     return {
       body,
+      hasCode: hasCodeInHtml(contentHtml),
       author: $(".post-author a").first().text().trim() || undefined,
       publishedAtRaw: firstTextNode($(".post-date").get(0)),
       tags: tagsFromClass($("article.post").first().attr("class"), tagNameMap($)),

@@ -1,0 +1,273 @@
+---
+import type { GetStaticPaths } from "astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import "../../styles/about.css";
+import {
+	companyCards,
+	openWebDatabase,
+	postYears,
+	siteStats,
+	tagIndex,
+} from "../../lib/db/queries";
+import { formatCount, localizePath, localeLabels, localeRoutes, useTranslations } from "../../lib/i18n";
+import { companyDisplayName } from "../../lib/i18n/company";
+import { locales, type Locale } from "../../lib/i18n/config";
+import { site } from "../../lib/site";
+
+export const getStaticPaths = (() => localeRoutes()) satisfies GetStaticPaths;
+
+interface Props {
+	locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = useTranslations(locale);
+
+const db = openWebDatabase();
+const stats = siteStats(db);
+const years = postYears(db);
+const teams = companyCards(db).filter((company) => company.count > 0);
+const topics = tagIndex(db);
+const topTeams = teams.slice(0, 6);
+const topTopics = topics.slice(0, 6);
+const yearRange =
+	years.length > 0 ? `${years[years.length - 1]!.year}–${years[0]!.year}` : "—";
+
+const homeHref = localizePath("/", locale);
+const aboutHref = localizePath("/about", locale);
+const companiesHref = localizePath("/companies", locale);
+const tagsHref = localizePath("/tags", locale);
+const searchHref = localizePath("/search", locale);
+const rssHref = localizePath("/rss.xml", locale);
+
+const status = t("about.status", {
+	articles: formatCount(locale, "articles", stats.posts),
+	companies: formatCount(locale, "companies", stats.companies),
+});
+
+const languageLinks = locales.map((language) => ({
+	locale: language,
+	label: localeLabels[language],
+	href: localizePath("/about", language),
+}));
+
+const navItems = [
+	{ href: "#scope", label: t("about.navScope") },
+	{ href: "#policy", label: t("about.navPolicy") },
+	{ href: "#sources", label: t("about.navSources") },
+	{ href: "#subscribe", label: t("about.navSubscribe") },
+];
+---
+
+<BaseLayout
+	locale={locale}
+	title={t("meta.about.title")}
+	description={t("meta.about.description")}
+	chrome="bare"
+>
+	<div class="about-page">
+		<div class="about-layout">
+			<aside class="about-stage">
+				<div class="about-stage__media">
+					<img
+						src="/about/spectacle-reef-lighthouse-1200.webp"
+						srcset="/about/spectacle-reef-lighthouse-800.webp 800w, /about/spectacle-reef-lighthouse-1200.webp 1200w"
+						sizes="(min-width: 1120px) 50vw, 100vw"
+						width="1200"
+						height="1619"
+						alt={t("about.imageAlt")}
+						fetchpriority="high"
+						decoding="async"
+					/>
+				</div>
+				<div class="about-stage__bar">
+					<a class="about-wordmark" href={homeHref} aria-label={t("nav.brandHome")}>博观</a>
+					<nav class="about-nav" aria-label={t("nav.primary")}>
+						{navItems.map((item) => <a href={item.href}>{item.label}</a>)}
+					</nav>
+				</div>
+			</aside>
+
+			<div class="about-content">
+				<header class="about-masthead">
+					<p class="about-kicker">{t("about.title")}</p>
+					<h1>
+						{t("about.heroLine1")}<br />
+						{t("about.heroLine2")}
+					</h1>
+					<p class="about-standfirst">{t("about.intro")}</p>
+
+					<div class="about-finder">
+						<label class="about-finder__label" for="about-search">{t("about.searchLabel")}</label>
+						<form class="about-finder__box" action={searchHref} method="get" role="search">
+							<input
+								id="about-search"
+								name="q"
+								type="search"
+								placeholder={t("search.placeholder")}
+								autocomplete="off"
+								spellcheck="false"
+								aria-describedby="about-status"
+							/>
+							<button type="submit">{t("about.searchAction")}</button>
+						</form>
+						<p class="about-status" id="about-status">{status}</p>
+					</div>
+				</header>
+
+				<section class="about-section" id="scope">
+					<h2>{t("about.scopeTitle")}</h2>
+					<p class="about-lede">{t("about.scopeBody")}</p>
+
+					<div class="about-figures">
+						<div class="about-figure">
+							<strong>{stats.posts}</strong>
+							<span>{t("about.figurePosts")}</span>
+						</div>
+						<div class="about-figure">
+							<strong>{stats.companies}</strong>
+							<span>{t("about.figureCompanies")}</span>
+						</div>
+						<div class="about-years">
+							<strong>{yearRange}</strong>
+							<span>{t("about.figureYears")}</span>
+						</div>
+					</div>
+
+					<div class="about-directory">
+						<div>
+							<h3>{t("tags.title")}</h3>
+							<ul>
+								{
+									topTopics.map((topic) => (
+										<li>
+											<a href={localizePath(`/tag/${topic.slug}`, locale)}>
+												<span>{topic.name}</span>
+												<span>{topic.count}</span>
+											</a>
+										</li>
+									))
+								}
+							</ul>
+						</div>
+						<div>
+							<h3>{t("companies.title")}</h3>
+							<ul>
+								{
+									topTeams.map((company) => (
+										<li>
+											<a href={localizePath(`/company/${company.slug}`, locale)}>
+												<span>{companyDisplayName(company, locale)}</span>
+												<span>{company.count}</span>
+											</a>
+										</li>
+									))
+								}
+							</ul>
+						</div>
+					</div>
+
+					<div class="about-more">
+						<a href={companiesHref}>{t("nav.viewAllCompanies")}</a>
+						<span aria-hidden="true">·</span>
+						<a href={tagsHref}>{t("nav.viewAllTags")}</a>
+					</div>
+				</section>
+
+				<section class="about-section" id="policy">
+					<h2>{t("about.policyTitle")}</h2>
+					<div class="about-prose">
+						<p>{t("about.policy")}</p>
+					</div>
+				</section>
+
+				<section class="about-section" id="sources">
+					<h2>{t("about.sourcesTitle")}</h2>
+					<div class="about-prose">
+						<p>{t("about.sources")}</p>
+					</div>
+				</section>
+
+				<section class="about-section" id="contact">
+					<h2>{t("about.contactTitle")}</h2>
+					<div class="about-prose">
+						<p>{t("about.contact")}</p>
+						<p>
+							<a href={site.issues} target="_blank" rel="noopener noreferrer">GitHub {t("nav.issues")}</a>
+							<span aria-hidden="true"> · </span>
+							<a href={site.repo} target="_blank" rel="noopener noreferrer">{t("about.sourceCode")}</a>
+						</p>
+					</div>
+				</section>
+
+				<section class="about-section" id="subscribe">
+					<h2>{t("nav.digestTitle")}</h2>
+					<div class="about-prose">
+						<p>{t("nav.digestBody")}</p>
+						<p class="about-actions">
+							<a class="about-button" href={rssHref}>{t("nav.digestAction")}</a>
+							<a class="about-text-link" href={site.issues} target="_blank" rel="noopener noreferrer">
+								{t("notice.action")}
+							</a>
+						</p>
+					</div>
+				</section>
+			</div>
+		</div>
+
+		<footer class="about-footer">
+			<div class="about-footer__inner">
+				<div class="about-footer__top">
+					<div>
+						<h2>{t("about.footerTitle")}</h2>
+						<p>{t("about.footerBody")}</p>
+					</div>
+					<div class="about-footer__actions">
+						<a class="about-button" href={rssHref}>{t("nav.digestAction")}</a>
+						<a class="about-text-link" href={site.issues} target="_blank" rel="noopener noreferrer">
+							{t("notice.action")}
+						</a>
+					</div>
+				</div>
+
+				<a class="about-footer__wordmark" href={homeHref} aria-label={t("nav.brandHome")}>博观</a>
+
+				<div class="about-footer__bottom">
+					<nav aria-label={t("nav.primary")}>
+						<a href={homeHref}>{t("breadcrumb.home")}</a>
+						<a href={tagsHref}>{t("nav.tags")}</a>
+						<a href={companiesHref}>{t("nav.companies")}</a>
+						<a href={aboutHref} aria-current="page">{t("nav.about")}</a>
+					</nav>
+					<nav class="about-languages" aria-label={t("nav.language")}>
+						{
+							languageLinks.map((language) => (
+								<a
+									href={language.href}
+									hreflang={language.locale}
+									lang={language.locale}
+									aria-label={t("language.switchTo", { language: language.label })}
+									aria-current={language.locale === locale ? "true" : undefined}
+								>
+									{language.label}
+								</a>
+							))
+						}
+					</nav>
+				</div>
+
+				<p class="about-license">{t("about.license")}</p>
+				<p class="about-credit">
+					{t("about.imageCredit")}
+					<a
+						href="https://commons.wikimedia.org/wiki/File:Blueprint_for_Spectacle_Reef_Lighthouse_-_NARA_-_76028775.jpg"
+						target="_blank"
+						rel="noopener noreferrer"
+					>
+						{t("about.imageCreditLink")}
+					</a>
+				</p>
+			</div>
+		</footer>
+	</div>
+</BaseLayout>
