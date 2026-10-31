@@ -2,6 +2,16 @@
 import sitemap from "@astrojs/sitemap";
 import node from "@astrojs/node";
 import { defineConfig } from "astro/config";
+import { tagIndex } from "./src/lib/db/queries";
+import { openWebDatabase } from "./src/lib/db/queries";
+import { isIndexableTag } from "./src/lib/tags";
+
+// 薄标签页只有站内入口，不进 sitemap：门槛常量在 src/lib/tags.ts，页面侧用的也是它
+const indexableTags = new Set(
+  tagIndex(openWebDatabase())
+    .filter((tag) => isIndexableTag(tag.count))
+    .map((tag) => tag.slug),
+);
 
 // https://astro.build/config
 export default defineConfig({
@@ -27,8 +37,13 @@ export default defineConfig({
         defaultLocale: "zh-CN",
         locales: { "zh-CN": "zh-CN", en: "en" },
       },
-      // 搜索页与筛选组合页是 noindex，不进 sitemap
-      filter: (page) => !new URL(page).pathname.match(/(^|\/)search\/?$/),
+      // 搜索页、筛选组合页、薄标签页都是 noindex，不进 sitemap
+      filter: (page) => {
+        const path = new URL(page).pathname;
+        if (/(^|\/)search\/?$/.test(path)) return false;
+        const tag = path.match(/\/(?:en\/)?tag\/([^/]+)/);
+        return tag ? indexableTags.has(tag[1]) : true;
+      },
     }),
   ],
 });

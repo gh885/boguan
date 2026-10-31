@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { canonicalizeUrl } from "../../src/lib/domain/url";
 import { parsePublishedAt, yearInTimeZone } from "../../src/lib/domain/date";
 import { decodeEntities, stripHtml, truncateSummary } from "../../src/lib/domain/text";
+import { stripSiteSuffix } from "../../src/lib/domain/curate";
 import { readingMinutes } from "../../src/lib/domain/reading";
 import { titleNorm } from "../../src/lib/domain/title";
 import type { Detail, ListItem, TagRef } from "./types";
@@ -45,6 +46,8 @@ export interface NormalizeInput {
   timezone: string;
   /** 列表页 URL，用来补相对链接 */
   base: string;
+  /** 公司名（中英），用来剥掉标题末尾的站点名后缀，如 `｜得物技术` */
+  brands?: readonly string[];
 }
 
 function cleanText(value: string | null | undefined): string | null {
@@ -74,11 +77,13 @@ export function listHash(title: string, summary: string): string {
 }
 
 export function normalizePost(input: NormalizeInput): NormalizedPost | null {
-  const { item, detail, timezone, base } = input;
+  const { item, detail, timezone, base, brands = [] } = input;
 
   // 详情页优先：sitemap 这类列表没有标题，只有详情页能给出
-  const title = cleanText(detail?.title ?? item.title);
-  if (!title) return null;
+  const rawTitle = cleanText(detail?.title ?? item.title);
+  if (!rawTitle) return null;
+  // 站点名后缀在算 title_norm 与指纹之前就剥掉，否则去重和「内容是否变化」都会被它带偏
+  const title = stripSiteSuffix(rawTitle, brands);
 
   const canonicalUrl = canonicalizeUrl(item.url, base);
   if (!canonicalUrl) return null;

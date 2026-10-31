@@ -14,6 +14,7 @@
     "db:init": "vpx scripts/db/init.ts",
     "db:seed": "vpx scripts/db/seed.ts",
     "db:check": "vpx scripts/db/check.ts",
+    "db:curate": "vpx scripts/db/curate.ts",
     "db:metrics": "vpx scripts/db/metrics.ts",
     "crawl": "vpx scripts/crawler/cli.ts",
     "db:fixture": "vpx scripts/db/fixture.ts"

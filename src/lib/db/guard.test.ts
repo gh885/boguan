@@ -58,6 +58,7 @@ describe("进程边界", () => {
     const allowed = new Set([
       "scripts/crawler/pipeline.ts",
       "scripts/db/check.ts",
+      "scripts/db/curate-lib.ts",
       "scripts/db/metrics.ts",
     ]);
     const offenders = [...srcFiles, ...scriptFiles]

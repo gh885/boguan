@@ -13,6 +13,7 @@ import { formatCount, localizePath, localeLabels, localeRoutes, useTranslations 
 import { companyDisplayName } from "../../lib/i18n/company";
 import { locales, type Locale } from "../../lib/i18n/config";
 import { site } from "../../lib/site";
+import { isIndexableTag } from "../../lib/tags";
 
 export const getStaticPaths = (() => localeRoutes()) satisfies GetStaticPaths;
 
@@ -27,7 +28,7 @@ const db = openWebDatabase();
 const stats = siteStats(db);
 const years = postYears(db);
 const teams = companyCards(db).filter((company) => company.count > 0);
-const topics = tagIndex(db);
+const topics = tagIndex(db).filter((tag) => isIndexableTag(tag.count));
 const topTeams = teams.slice(0, 6);
 const topTopics = topics.slice(0, 6);
 const yearRange =

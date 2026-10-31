@@ -128,6 +128,7 @@ vpr crawl                            # 增量（默认最多翻 5 页）
 vpr crawl --mode=backfill --max-pages=20   # 首次接入：回填最近 20 页
 vpr crawl --source=youzan-tech       # 只跑一个源
 vpr db:fixture                       # 造构建用的最小数据集 data/fixture.db
+vpr db:curate                        # 清洗存量数据：标题站点后缀、非文章页（--dry-run）
 vpr db:check                         # 对账 FTS / 正文文件 / 被挡住的源（--fix / --prune）
 vpr db:metrics                       # 从 crawler 私有正文回填阅读时长 / 含代码
 # 每日定时任务：vpr crawl && vpr db:check --fix --prune && vpr build

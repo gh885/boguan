@@ -88,6 +88,7 @@ vpr db:generate          # schema.ts 改动后生成 SQL 迁移
 vpr db:init              # 建库 / 应用未执行的迁移（幂等）
 vpr db:seed              # 写入公司 / 渠道 / 规则标签（幂等）
 vpr db:fixture           # 造构建用最小数据集 data/fixture.db（CI 用，不碰真实库）
+vpr db:curate            # 把清洗规则应用到存量数据（剥标题后缀、标记非文章页）；--dry-run
 vpr db:check             # 对账：FTS、孤正文文件、被挡住的源；--fix / --prune
 vpr db:metrics           # 从 crawler 私有正文回填阅读时长 / 含代码
 vpr crawl                # 抓取（默认增量）；--dry-run / --mode=backfill / --source=
@@ -165,7 +166,9 @@ vpr dev stop           # 停止
 - **解析时间走 `src/lib/domain/date.ts`**：源站时间可能是 `28 Oct 2022` / `2026年10月29日` / 无时区，统一由 `parsePublishedAt(raw, sources.timezone)` 处理；解析不出来就存 `NULL`，**不要编造**。
 - **`published_year` 是派生列**：改 `published_at` 必须同时改它，计算只经 `yearInTimeZone()`。
 - **正文只在 `data/bodies/`**：web 侧不许引用 `src/lib/db/bodies`，也不许读 `posts_fts` 的 `body_tokens`（contentless，读回来是 NULL；`snippet()`/`highlight()` 不可用，搜索结果只给摘要）。
-- **跨源去重用 `title_norm`**（`src/lib/domain/title.ts`），不要拿原始标题比字符串。
+- **清洗规则只写一份**（`src/lib/domain/curate.ts`）：标题站点后缀、非文章页判定；入库与 `vpr db:curate` 共用。
+- **改标题必须重算 `content_hash`**，否则下一轮抓取会把整批当成「内容变了」。`vpr db:curate` 会核对这一项。
+- **薄标签页（< 3 篇）是 `noindex, follow`**，门槛在 `src/lib/tags.ts`，页面与 sitemap 共用。（`src/lib/domain/title.ts`），不要拿原始标题比字符串。
 - **抓取侧发请求只能经 `PoliteFetcher`**：它负责 robots、限速、重试与编码。适配器里不许直接 `fetch`。
 - **通用格式不手写解析**：feed 用 `rss-parser`，HTML 用 cheerio + `entities`。新增「实体映射表」「feed 字段归一」这类胶水前先看依赖里是不是已经有。
 - **页面与 endpoint 只能通过 `src/lib/db/queries` 读库**，不许直接 `openReadonlyDatabase`（`guard.test.ts` 守）。

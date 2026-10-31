@@ -109,6 +109,8 @@ export const posts = sqliteTable(
       onDelete: "set null",
     }),
     isVisible: integer("is_visible", { mode: "boolean" }).notNull().default(true),
+    /** 为什么不可见：非文章页 / 人工下架。可见时为 NULL，改判只看这一列 */
+    hiddenReason: text("hidden_reason"),
     firstSeenAt: text("first_seen_at").notNull().default(nowIso),
     lastSeenAt: text("last_seen_at").notNull().default(nowIso),
   },

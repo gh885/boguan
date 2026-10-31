@@ -213,6 +213,12 @@ interface SourceAdapter {
   由 `Detail.title` 补齐；对「只给 URL」的条目，管道有一个快路径：库里已有正文就算未变、一次请求都不发，
   否则 sitemap 当列表意味着每天重抓全站详情页。也因此 `--max-pages` 在增量模式下不约束这种列表
   （切片之间不发请求；它只在回填时限制要抓多少详情页）。见 `docs/SOURCES.md`。
+- **清洗规则只写一份**（`src/lib/domain/curate.ts`）：抓取入库时用一次，`vpr db:curate` 对存量数据再跑一遍。
+  两件事——剥标题末尾的站点名后缀（只有后缀里含公司名才剥，`｜归因篇` 这种真副标题保留），
+  以及把非文章页（活动报名、团队介绍）标成 `is_visible = false` + `hidden_reason = 'non-article'`。
+  下架不是删除：页面/搜索/sitemap 一起干净，数据留着，改判只改一行。
+- **改标题必须同时重算 `content_hash`**：指纹是 `sha256(标题 + 摘要 + 正文)`，只改标题会让下一轮抓取
+  把整批当成「内容变了」，再触发一次无意义的正文与索引重写。`db:curate` 会顺手核对并修好这一项。
 - **空列表页的语义要写死在适配器里**：有的站越界返回 404（有赞旧方案），有的返回 200 + 空列表（得物）。
   「第 1 页解析出 0 条」一律抛错（选择器失效），「第 N>1 页 0 条」才是到底——
   否则一次改版会把「选择器坏了」变成「这个源没有新文章」。
@@ -338,8 +344,12 @@ select rowid from posts_fts where posts_fts match 'title_tokens : ("缓存")'
 4. 每个页面输出唯一的 `<title>`、`description`、`canonical`、OG 标签。
 5. 列表页输出 `ItemList` / `CollectionPage` 结构化数据。
 6. 外链跳转使用 `rel="noopener"`；如需统计点击，用显式跳转参数而非 `nofollow`。
-7. 多语言页面互相声明：每页输出各语言的 `hreflang` 与 `x-default`，canonical 指自己。见 §9。
-8. 站内 feed（`/rss.xml`、`/en/rss.xml`）只放**标题 + 摘要 + 原文链接**，与页面同一套内容边界（硬性规则 1）；`BaseLayout` 输出 `<link rel="alternate" type="application/rss+xml">` 便于订阅发现。
+7. **薄标签页 `noindex, follow`**：文章数 < 3 的标签页照样生成（老外链不断），但不进 sitemap、
+   也不从 `/tags` 与页脚导航链过去。556 篇语料里 420 个标签有 299 个只有 1 篇，占 sitemap 七成，
+   而只出现在薄标签里、没有别的标签兜底的文章只有 3 篇——门槛几乎不损失可达性。
+   门槛常量在 `src/lib/tags.ts`，页面与 sitemap 用的是同一个。
+8. 多语言页面互相声明：每页输出各语言的 `hreflang` 与 `x-default`，canonical 指自己。见 §9。
+9. 站内 feed（`/rss.xml`、`/en/rss.xml`）只放**标题 + 摘要 + 原文链接**，与页面同一套内容边界（硬性规则 1）；`BaseLayout` 输出 `<link rel="alternate" type="application/rss+xml">` 便于订阅发现。
 
 ---
 
@@ -481,8 +491,11 @@ select rowid from posts_fts where posts_fts match 'title_tokens : ("缓存")'
   回填后暴露两个内容问题，都需要产品判断：**标签长尾**（418 个标签里 300 个只有 1 篇，
   等于 300 个薄页面进了 sitemap）与**非文章页**（`技术活动`、`团队介绍` 共 25 篇，短、关键词密度高，
   在「秒杀」「MySQL 索引」这类查询里排在前列）。
-- **标签长尾的处置**：倾向「文章数 ≥ 3 的标签页才 index 并进 sitemap，其余 `noindex, follow`」，
-  但这会让 sitemap 从 1132 条掉到约 200 条，需要先确认站内导航仍能走通。
+- **非文章页的处置**（已定）：入库但 `is_visible = false`，原因记在 `hidden_reason`。
+  判定是「源站标签 + 标题」两条信号：`tech-activity` 命中即下架；`team-introduction` 要配合标题
+  （有赞把这个标签也打在 OKR、项目例会、入职随笔上，一刀切会误伤管理实践文章）。
+- **标签长尾的处置**（已定）：≥3 篇才 index 并进 sitemap，其余 `noindex, follow`。
+  sitemap 从 1298 条降到 570 条，只有 3 篇文章失去唯一的标签入口。见 §8 第 7 条。
 - **标签的自动程度**：v1 是「源标签映射 + 关键词规则 + 人工维护」。实测有赞的标签云里英语与拼音写法并存（`big-data` / `da-shu-ju` / `bigdata`），靠中文名归并 + 人工别名够用；LLM 抽取留到数据量稳定之后再评估。
 - **搜索排序**：现在是「BM25（标题 5 : 正文 1）+ 时间次级」。真实数据上够不够用要等语料变大，尤其是同一主题跨年份的结果。
 - **去重的改判**：胜出方被删后，`duplicate_of_id` 指向的记录不会自动复活，需要人工或一个专门的修复脚本。

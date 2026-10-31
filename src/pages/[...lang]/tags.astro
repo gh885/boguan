@@ -5,6 +5,7 @@ import EmptyState from "../../components/EmptyState.astro";
 import PageHeader from "../../components/PageHeader.astro";
 import { openWebDatabase, tagIndex } from "../../lib/db/queries";
 import { groupTags, type TagGroupId } from "../../lib/domain/tag-group";
+import { isIndexableTag } from "../../lib/tags";
 import { formatCount, localizePath, localeRoutes, useTranslations } from "../../lib/i18n";
 import type { Locale } from "../../lib/i18n/config";
 import { collectionJsonLd } from "../../lib/structured-data";
@@ -19,7 +20,8 @@ interface Props {
 const { locale } = Astro.props;
 const t = useTranslations(locale);
 const db = openWebDatabase();
-const tags = tagIndex(db);
+// 只列 ≥3 篇的标签：薄标签页是 noindex 的，从这里连过去只会制造孤岛
+const tags = tagIndex(db).filter((tag) => isIndexableTag(tag.count));
 const groups = groupTags(tags);
 const description = t("tags.description", {
 	count: formatCount(locale, "tags", tags.length),

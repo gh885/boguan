@@ -14,6 +14,7 @@ import {
   tagAliases,
   tags,
 } from "../../src/lib/db/schema";
+import { HIDDEN_NON_ARTICLE, isNonArticle } from "../../src/lib/domain/curate";
 import { normalizeRawTag } from "../../src/lib/domain/tag";
 import { canonicalizeUrl } from "../../src/lib/domain/url";
 import { slugify } from "../../src/lib/domain/title";
@@ -174,6 +175,9 @@ async function crawlSource(
   }
 
   const adapter = adapterFor(source.adapter);
+  // 公司名用于剥掉标题里的站点后缀（`｜得物技术`）
+  const company = db.select().from(companies).where(eq(companies.id, source.companyId)).get();
+  const brands = [company?.name, company?.nameEn].filter((name): name is string => !!name);
   const run = db
     .insert(crawlRuns)
     .values({ jobId, sourceId: source.id, mode: options.mode })
@@ -229,6 +233,7 @@ async function crawlSource(
           seen,
           log,
           options.force ?? false,
+          brands,
         );
         if (!outcome) continue;
         seen.add(outcome.canonicalUrl);
@@ -350,6 +355,7 @@ async function processItem(
   seen: Set<string>,
   log: Log,
   force: boolean,
+  brands: string[],
 ): Promise<ItemOutcome | null> {
   const canonicalUrl = canonicalizeUrl(item.url, source.listUrl);
   if (!canonicalUrl) return null;
@@ -361,7 +367,12 @@ async function processItem(
     adapter.capabilities.detail !== "none" && typeof adapter.fetchDetail === "function";
 
   // 列表层元数据：sitemap 这类「只给 URL」的列表给不出标题，这里就是 null
-  const listLevel = normalizePost({ item, timezone: source.timezone, base: source.listUrl });
+  const listLevel = normalizePost({
+    item,
+    timezone: source.timezone,
+    base: source.listUrl,
+    brands,
+  });
 
   // 只为发现新条目的列表（sitemap）：库里已有正文就一次请求都不发。
   // 这是「sitemap 当列表」能天天跑的前提——否则每天要重抓全站详情页。
@@ -387,7 +398,7 @@ async function processItem(
     try {
       const detail = await adapter.fetchDetail!(ctx, fetchUrl);
       normalized =
-        normalizePost({ item, detail, timezone: source.timezone, base: source.listUrl }) ??
+        normalizePost({ item, detail, timezone: source.timezone, base: source.listUrl, brands }) ??
         listLevel;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -404,6 +415,13 @@ async function processItem(
     }
     return null;
   }
+
+  // 可见性：非文章页（活动报名、团队介绍）不入列表/搜索/sitemap，但数据保留（ARCHITECTURE §3）
+  const resolvedTags = resolveTags(db, normalized.tags, unmapped);
+  const hidden = isNonArticle(normalized.title, resolvedTagSlugs(db, resolvedTags));
+  const visibility = hidden
+    ? { isVisible: false, hiddenReason: HIDDEN_NON_ARTICLE }
+    : { isVisible: true, hiddenReason: null };
 
   // 详情页没拿到就沿用库里已有的正文，避免把好的正文覆盖成空
   const body = normalized.body || (existing ? (readBody(existing.id) ?? "") : "");
@@ -429,13 +447,14 @@ async function processItem(
         hasCode: normalized.hasCode,
         coverUrl: normalized.coverUrl,
         contentHash: hash,
+        ...visibility,
       })
       .returning()
       .get();
 
     putBody(inserted.id, body);
     upsertPostFts(db, inserted.id, normalized.title, body);
-    writePostTags(db, inserted.id, resolveTags(db, normalized.tags, unmapped), normalized);
+    writePostTags(db, inserted.id, resolvedTags, normalized);
     return {
       kind: "inserted",
       canonicalUrl: normalized.canonicalUrl,
@@ -476,6 +495,8 @@ async function processItem(
       coverUrl: normalized.coverUrl,
       contentHash: hash,
       lastSeenAt: now,
+      // 人工下架（原因不是 non-article）不被规则覆盖，规则只管自己那一类
+      ...(existing.hiddenReason && existing.hiddenReason !== HIDDEN_NON_ARTICLE ? {} : visibility),
       // 内容变了，之前判重的结论可能不再成立
       duplicateOfId: null,
     })
@@ -484,13 +505,23 @@ async function processItem(
 
   if (body) putBody(existing.id, body);
   upsertPostFts(db, existing.id, normalized.title, body);
-  writePostTags(db, existing.id, resolveTags(db, normalized.tags, unmapped), normalized);
+  writePostTags(db, existing.id, resolvedTags, normalized);
 
   return {
     kind: "updated",
     canonicalUrl: normalized.canonicalUrl,
     publishedAt: normalized.publishedAt,
   };
+}
+
+/** 已解析的标签 id → slug，用于可见性判定 */
+function resolvedTagSlugs(db: Db, resolved: ResolvedTag[]): string[] {
+  if (resolved.length === 0) return [];
+  const placeholders = resolved.map(() => "?").join(", ");
+  const rows = db.$client
+    .prepare(`select slug from tags where id in (${placeholders})`)
+    .all(...resolved.map((tag) => tag.id)) as { slug: string }[];
+  return rows.map((row) => row.slug);
 }
 
 interface ResolvedTag {
@@ -726,6 +757,7 @@ export async function inspect(
         detail,
         timezone: source.timezone,
         base: source.listUrl,
+        brands: [company?.name, company?.nameEn].filter((name): name is string => !!name),
       });
       if (!normalized) {
         log(`   ✗ 归一失败：${item.url}`);
