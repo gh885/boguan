@@ -14,6 +14,7 @@ import type { Locale } from "../../../../../lib/i18n/config";
 import { PAGE_SIZE, pageCount, pageOffset, pagePath } from "../../../../../lib/pagination";
 import { collectionJsonLd } from "../../../../../lib/structured-data";
 import { site } from "../../../../../lib/site";
+import { isIndexableTag } from "../../../../../lib/tags";
 
 interface Props {
 	locale: Locale;
@@ -53,6 +54,7 @@ const nextHref =
 	locale={locale}
 	title={title}
 	description={description}
+	noindex={!isIndexableTag(tag.count)}
 	prevHref={prevHref}
 	nextHref={nextHref}
 	jsonLd={collectionJsonLd({

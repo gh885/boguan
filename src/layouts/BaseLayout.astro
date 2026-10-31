@@ -7,6 +7,7 @@ import { companyCards, openWebDatabase, tagIndex } from "../lib/db/queries";
 import { alternateLinks, localizePath, resolveLocale, useTranslations } from "../lib/i18n";
 import { defaultLocale, locales, ogLocales, type Locale } from "../lib/i18n/config";
 import { site } from "../lib/site";
+import { isIndexableTag } from "../lib/tags";
 import "../styles/tokens.css";
 import "../styles/base.css";
 
@@ -54,7 +55,7 @@ const isBare = chrome === "bare";
 
 const t = useTranslations(locale);
 const db = isBare ? null : openWebDatabase();
-const tags = db ? tagIndex(db) : [];
+const tags = db ? tagIndex(db).filter((tag) => isIndexableTag(tag.count)) : [];
 const companies = db ? companyCards(db) : [];
 const pageTitle = title.endsWith(site.name) ? title : `${title} · ${site.name}`;
 const pathname = Astro.url.pathname;

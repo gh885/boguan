@@ -1,0 +1,1 @@
+ALTER TABLE `posts` ADD `hidden_reason` text;
