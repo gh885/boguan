@@ -1,0 +1,65 @@
+---
+import type { GetStaticPaths } from "astro";
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import CompanyView from "../../../components/CompanyView.astro";
+import {
+	companyBySlug,
+	companyCards,
+	companyTopTags,
+	openWebDatabase,
+	postsByCompany,
+} from "../../../lib/db/queries";
+import { localizePath, localeRoutes, useTranslations } from "../../../lib/i18n";
+import { companyDisplayName } from "../../../lib/i18n/company";
+import type { Locale } from "../../../lib/i18n/config";
+import { PAGE_SIZE, pageCount, pagePath } from "../../../lib/pagination";
+import { collectionJsonLd } from "../../../lib/structured-data";
+import { site } from "../../../lib/site";
+
+interface Props {
+	locale: Locale;
+}
+
+export const getStaticPaths = (() => {
+	const companies = companyCards(openWebDatabase());
+	return companies.flatMap((company) => localeRoutes({ slug: company.slug }));
+}) satisfies GetStaticPaths;
+
+const { locale } = Astro.props;
+const t = useTranslations(locale);
+const db = openWebDatabase();
+const slug = String(Astro.params.slug);
+const company = companyBySlug(db, slug);
+
+if (!company) throw new Error(`公司不存在：${slug}`);
+
+const topTags = companyTopTags(db, slug);
+const { items, total } = postsByCompany(db, slug, { limit: PAGE_SIZE });
+const totalPages = pageCount(total);
+const name = companyDisplayName(company, locale);
+const title = t("meta.company.title", { name });
+const description = t("meta.company.description", { name });
+---
+
+<BaseLayout
+	locale={locale}
+	title={title}
+	description={description}
+	nextHref={totalPages > 1 ? localizePath(pagePath(`/company/${slug}`, 2), locale) : undefined}
+	jsonLd={collectionJsonLd({
+		name: title,
+		description,
+		url: new URL(localizePath(`/company/${slug}`, locale), site.url).href,
+		items,
+	})}
+>
+	<CompanyView
+		locale={locale}
+		company={company}
+		topTags={topTags}
+		posts={items}
+		page={1}
+		totalPages={totalPages}
+		nextHref={totalPages > 1 ? localizePath(pagePath(`/company/${slug}`, 2), locale) : undefined}
+	/>
+</BaseLayout>

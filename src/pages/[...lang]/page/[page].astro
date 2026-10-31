@@ -1,0 +1,81 @@
+---
+import type { GetStaticPaths } from "astro";
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import PageHeader from "../../../components/PageHeader.astro";
+import PostList from "../../../components/PostList.astro";
+import { latestPosts, openWebDatabase, siteStats } from "../../../lib/db/queries";
+import { formatCount, localizePath, localeRoutes, useTranslations } from "../../../lib/i18n";
+import type { Locale } from "../../../lib/i18n/config";
+import { PAGE_SIZE, pageCount, pageOffset, pagePath } from "../../../lib/pagination";
+import { searchHref } from "../../../lib/search-url";
+import { collectionJsonLd } from "../../../lib/structured-data";
+import { site } from "../../../lib/site";
+
+interface Props {
+	locale: Locale;
+}
+
+export const getStaticPaths = (() => {
+	const total = latestPosts(openWebDatabase(), { limit: 1 }).total;
+	const pages = pageCount(total);
+	return Array.from({ length: Math.max(0, pages - 1) }, (_, index) => index + 2).flatMap(
+		(page) => localeRoutes({ page: String(page) }),
+	);
+}) satisfies GetStaticPaths;
+
+const { locale } = Astro.props;
+const t = useTranslations(locale);
+const page = Math.max(2, Number(Astro.params.page));
+
+const db = openWebDatabase();
+const stats = siteStats(db);
+const { items, total } = latestPosts(db, { limit: PAGE_SIZE, offset: pageOffset(page) });
+const totalPages = pageCount(total);
+const description = `${t("meta.home.description")}${t("meta.page.suffix", { page })}`;
+const title = `${t("meta.home.title")}${t("meta.page.suffix", { page })}`;
+
+const subtitle = t("home.subtitle", {
+	articles: formatCount(locale, "articles", stats.posts),
+	companies: formatCount(locale, "companies", stats.companies),
+});
+
+const prevHref = localizePath(pagePath("/", page - 1), locale);
+const nextHref = page < totalPages ? localizePath(pagePath("/", page + 1), locale) : undefined;
+---
+
+<BaseLayout
+	locale={locale}
+	title={title}
+	description={description}
+	prevHref={prevHref}
+	nextHref={nextHref}
+	jsonLd={collectionJsonLd({
+		name: title,
+		description,
+		url: new URL(localizePath(pagePath("/", page), locale), site.url).href,
+		items,
+	})}
+>
+	<PageHeader locale={locale} title={t("home.title")} description={subtitle} />
+
+	<div class="latest">
+		<PostList
+			locale={locale}
+			posts={items}
+			heading={t("home.latest")}
+			emptyTitle={t("list.empty")}
+			emptyBody={t("search.noQuery.body")}
+			filterHref={searchHref(locale, { has_code: true })}
+			page={page}
+			totalPages={totalPages}
+			prevHref={prevHref}
+			nextHref={nextHref}
+		/>
+	</div>
+</BaseLayout>
+
+<style>
+	.latest {
+		margin-block-start: 1.5rem;
+	}
+</style>

@@ -92,8 +92,10 @@ describe("设计令牌", () => {
   it("每个角色都有亮/暗两套值", () => {
     expect([...semantic.keys()].sort()).toEqual([
       "accent",
+      "accent-strong",
       "bg",
       "border",
+      "on-accent",
       "surface",
       "surface-muted",
       "text-primary",
@@ -145,6 +147,7 @@ describe("设计令牌", () => {
     ["text-secondary", "surface", 4.5],
     ["text-secondary", "surface-muted", 4.5],
     ["accent", "surface-muted", 4.5],
+    ["on-accent", "accent-strong", 4.5],
     ["border", "surface", 1.4],
     ["border", "bg", 1.4],
   ];

@@ -1,0 +1,81 @@
+---
+import { useTranslations } from "../lib/i18n";
+import type { Locale } from "../lib/i18n/config";
+import Icon from "./Icon.astro";
+
+interface Item {
+	label: string;
+	href?: string;
+}
+
+interface Props {
+	locale: Locale;
+	items: Item[];
+}
+
+const { locale, items } = Astro.props;
+const t = useTranslations(locale);
+---
+
+<nav class="breadcrumb" aria-label={t("breadcrumb.label")}>
+	<ol>
+		{
+			items.map((item, index) => (
+				<li>
+					{index > 0 && <span class="breadcrumb__sep" aria-hidden="true"><Icon name="chevron-right" size={12} /></span>}
+					{item.href ? (
+						<a href={item.href}>
+							{index === 0 && <Icon name="home" size={13} />}
+							<span>{item.label}</span>
+						</a>
+					) : (
+						<span class="breadcrumb__current">{item.label}</span>
+					)}
+				</li>
+			))
+		}
+	</ol>
+</nav>
+
+<style>
+	.breadcrumb ol {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.25rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.breadcrumb li {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+		min-width: 0;
+	}
+
+	.breadcrumb a,
+	.breadcrumb__current {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		color: var(--color-text-secondary);
+		font-size: var(--text-sm);
+		text-decoration: none;
+	}
+
+	.breadcrumb a:hover {
+		color: var(--color-text-primary);
+		text-decoration: none;
+	}
+
+	.breadcrumb__current {
+		color: var(--color-text-primary);
+	}
+
+	.breadcrumb__sep {
+		display: inline-flex;
+		color: var(--color-text-secondary);
+	}
+</style>

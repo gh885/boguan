@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import { canonicalizeUrl } from "../../src/lib/domain/url";
 import { parsePublishedAt, yearInTimeZone } from "../../src/lib/domain/date";
-import { stripHtml, truncateSummary } from "../../src/lib/domain/text";
+import { decodeEntities, stripHtml, truncateSummary } from "../../src/lib/domain/text";
+import { readingMinutes } from "../../src/lib/domain/reading";
 import { titleNorm } from "../../src/lib/domain/title";
 import type { Detail, ListItem, TagRef } from "./types";
 
@@ -28,6 +29,10 @@ export interface NormalizedPost {
   publishedAtRaw: string | null;
   /** 按源站时区取的年份；时间解析不出来就是 null */
   publishedYear: number | null;
+  /** 按正文估算的阅读分钟数；没有正文时为 null */
+  readingMinutes: number | null;
+  /** 是否含代码；列表层不知道时为 null，不伪装成 false */
+  hasCode: boolean | null;
   tags: TagRef[];
   body: string;
   contentHash: string;
@@ -44,7 +49,7 @@ export interface NormalizeInput {
 
 function cleanText(value: string | null | undefined): string | null {
   if (!value) return null;
-  const text = value.replace(/\s+/g, " ").trim();
+  const text = decodeEntities(value).replace(/\s+/g, " ").trim();
   return text ? text : null;
 }
 
@@ -97,6 +102,8 @@ export function normalizePost(input: NormalizeInput): NormalizedPost | null {
     publishedAt,
     publishedAtRaw,
     publishedYear,
+    readingMinutes: readingMinutes(body),
+    hasCode: detail?.hasCode ?? item.hasCode ?? null,
     tags,
     body,
     contentHash: contentHash(title, summary, body),

@@ -31,18 +31,21 @@ https://boguan.dev
 
 | 功能                               | 状态      |
 | :--------------------------------- | :-------- |
-| 首页文章流（按发布时间倒序）       | 规划中    |
-| 按公司筛选                         | 规划中    |
-| 按技术标签筛选                     | 规划中    |
-| 按年份归档                         | 规划中    |
-| 标题 + 正文全文搜索                | 规划中    |
-| 点击跳转原文                       | 规划中    |
-| 定时增量抓取                       | 规划中    |
-| SEO：sitemap / JSON-LD / canonical | 规划中    |
+| 首页文章流（按发布时间倒序）       | ✅ 已就绪 |
+| 按公司浏览                         | ✅ 已就绪 |
+| 按技术标签浏览                     | ✅ 已就绪 |
+| 按年份归档                         | ✅ 已就绪 |
+| 标题 + 正文全文搜索                | ✅ 已就绪 |
+| 阅读时长 / 含代码标记              | ✅ 已就绪 |
+| 点击跳转原文                       | ✅ 已就绪 |
+| 定时增量抓取                       | ✅ 已就绪 |
+| SEO：sitemap / JSON-LD / canonical | ✅ 已就绪 |
 | 双语界面（zh-CN 默认 / en）        | ✅ 已就绪 |
 | 亮/暗模式（跟随系统 + 手动切换）   | ✅ 已就绪 |
 
-> 当前进度：页面骨架、i18n、设计令牌已就位；数据模型、抓取管道（美团 RSS + 有赞 HTML）、中文检索查询层已跑通并有测试。**列表页尚未实现**——现在只有首页占位。
+> 当前进度：列表、公司、标签、年份与搜索页已按参考站版式落地；数据模型、抓取管道
+> （美团 RSS + 有赞 HTML）、中文检索与阅读元数据已跑通并有测试。搜索是唯一的 SSR
+> 页面，其余列表页在构建时生成。
 
 ---
 
@@ -75,7 +78,7 @@ boguan/
 ├── public/                 # 静态资源（favicon 等）
 ├── scripts/
 │   ├── crawler/            # 抓取管道：fetch/robots → adapters → normalize → pipeline
-│   └── db/                 # init / seed / check
+│   └── db/                 # init / seed / check / metrics
 ├── drizzle/                # SQL 迁移（FTS5 为手写迁移）
 ├── data/                   # 本地 SQLite 与正文文件（不进仓库）
 ├── src/
@@ -126,6 +129,7 @@ vpr crawl --mode=backfill --max-pages=20   # 首次接入：回填最近 20 页
 vpr crawl --source=youzan-tech       # 只跑一个源
 vpr db:fixture                       # 造构建用的最小数据集 data/fixture.db
 vpr db:check                         # 对账 FTS / 正文文件 / 被挡住的源（--fix / --prune）
+vpr db:metrics                       # 从 crawler 私有正文回填阅读时长 / 含代码
 # 每日定时任务：vpr crawl && vpr db:check --fix --prune && vpr build
 ```
 
@@ -137,6 +141,9 @@ vpr db:check                         # 对账 FTS / 正文文件 / 被挡住的�
 ```bash
 vpr db:fixture && BOGUAN_DB=data/fixture.db vpr build
 ```
+
+生产构建会同时产出静态列表页与 SSR 搜索入口（`@astrojs/node`）；搜索页必须走 Node 运行时，
+其余页面仍然是纯静态 HTML。
 
 站点产出 `sitemap.xml`（带 hreflang）与 `/rss.xml`、`/en/rss.xml`（只放标题 + 摘要 + 原文链接）。
 

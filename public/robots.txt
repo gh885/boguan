@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /search
+Disallow: /en/search
+
+Sitemap: https://boguan.dev/sitemap-index.xml

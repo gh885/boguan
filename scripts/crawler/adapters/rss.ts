@@ -1,4 +1,5 @@
 import Parser from "rss-parser";
+import { hasCodeInHtml } from "../../../src/lib/domain/code";
 import { htmlToText } from "../extract";
 import type { Detail, ListItem, TagRef } from "../types";
 import type { SourceAdapter } from "./types";
@@ -80,6 +81,7 @@ export function createRssAdapter(options: RssAdapterOptions): SourceAdapter {
         const encoded = str(entry["content:encoded"]);
         // 只有 feed 给全了正文才用；否则留给详情页，避免把「摘要」当正文入库
         const body = detail === "none" && encoded ? htmlToText(encoded) : undefined;
+        const hasCode = detail === "none" && encoded ? hasCodeInHtml(encoded) : undefined;
 
         const categories: TagRef[] = (entry.categories ?? [])
           .map((category) => str(category))
@@ -95,6 +97,7 @@ export function createRssAdapter(options: RssAdapterOptions): SourceAdapter {
           author: str(entry.creator) ?? str(entry.author),
           tags: categories,
           body,
+          hasCode,
         });
       }
       return items;
@@ -103,7 +106,7 @@ export function createRssAdapter(options: RssAdapterOptions): SourceAdapter {
     async fetchDetail(ctx, url): Promise<Detail> {
       const response = await ctx.fetcher.page(url);
       if (!response.text) throw new Error(response.error ?? "详情页为空");
-      return { body: htmlToText(response.text) };
+      return { body: htmlToText(response.text), hasCode: hasCodeInHtml(response.text) };
     },
   };
 }
