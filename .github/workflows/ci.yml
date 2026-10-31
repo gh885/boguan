@@ -21,7 +21,13 @@ jobs:
 
     steps:
       - name: 检出代码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
+
+      # Astro 构建时由 Node 执行，需要满足 package.json 的 engines 要求
+      - name: 安装 Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
 
       - name: 安装 Bun
         uses: oven-sh/setup-bun@v2
