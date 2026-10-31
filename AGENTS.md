@@ -1,22 +1,145 @@
-## Development
+# AGENTS.md
 
-When starting the dev server, use background mode:
+本文件面向在此仓库工作的 AI 编码助手与人类协作者。**动手前先读完「硬性规则」。**
 
+## 项目
+
+**博观（boguan）**：中文技术团队工程博客索引站。聚合国内互联网公司技术团队博客的元数据，按公司 / 技术标签 / 年份浏览，支持标题与正文检索，阅读时跳转原文。非商业项目，目标是跑通一条完整的轻量全栈链路。
+
+系统由**两个进程**组成：
+
+1. `web` —— Astro 应用，只读数据库，负责渲染与检索
+2. `crawler` —— 独立脚本，定时抓取、规范化、写入数据库
+
+两者不共用运行时，不互相调用。
+
+---
+
+## 硬性规则（不可违反）
+
+1. **不转载全文。** 页面只渲染标题、摘要（≤ 200 字）、作者、时间、标签、原文链接。正文可以入库用于检索，但**不得完整输出到页面**。
+2. **抓取必须守规矩。** 遵守 `robots.txt`，同一域名并发 ≤ 1、请求间隔 ≥ 1s，不携带登录态，不绕过付费墙、验证码或反爬机制。
+3. **抓取逻辑只写在与 Web 进程分离的脚本里。** 任何 `src/pages/`、`src/middleware.ts` 中不得执行抓取或长时间任务。
+4. **每个可索引页面必须有唯一的 `<title>`、`description` 和 canonical。** 搜索页与任意筛选组合页默认 `noindex`。
+5. **不引入客户端全局状态。** 筛选、分页、搜索一律走 URL 查询参数，保证可分享、可索引、可后退。
+6. **不改动 `docs/ARCHITECTURE.md` 中的决策，除非先更新文档并说明理由。**
+
+---
+
+## 技术栈与边界
+
+| 层              | 选型                                 |
+| :-------------- | :----------------------------------- |
+| 框架            | Astro 7（默认静态输出，按需 SSR）    |
+| 语言            | TypeScript strict                    |
+| 运行时 / 包管理 | Bun 1.4                              |
+| 工具链          | Vite+（`vp` / `vpx`）                |
+| 数据库          | SQLite + Drizzle ORM                 |
+| 检索            | SQLite FTS5，中文先经 nodejieba 分词 |
+| 样式            | 待定                                 |
+
+依赖方向：`pages → components → lib`。`lib/` 放数据访问与纯函数，禁止在组件里直接拼 SQL。所有数据库访问经由 `src/lib/db/` 暴露的函数。
+
+---
+
+## 目录约定
+
+```text
+src/pages/          路由，文件即路由
+src/layouts/        页面骨架，全局 <head> 在 BaseLayout 统一维护
+src/components/     展示组件，不含数据访问
+src/lib/db/         Drizzle schema 与查询函数
+src/lib/domain/     纯逻辑：slug、日期、标签归一化、摘要截断
+scripts/crawler/    抓取管道，独立进程，不 import 任何 src/ 下的 Astro 代码
+docs/               架构与决策
 ```
-astro dev --background
+
+---
+
+## 常用命令
+
+```bash
+vp install              # 安装依赖
+vpr dev              # 开发服务器 :4321
+vpr build            # 生产构建
+vp check                 # 格式化 + lint + 类型检查（提交前必跑）
+vp test                  # 测试
+vpx scripts/crawler/...  # 运行抓取脚本，替代 tsx
 ```
 
-Manage the background server with `astro dev stop`, `astro dev status`, and `astro dev logs`.
+需要后台运行开发服务器时：
 
-## Documentation
+```bash
+vpr dev --background   # 启动
+vpr dev status         # 状态
+vpr dev logs           # 日志
+vpr dev stop           # 停止
+```
 
-Full documentation: https://docs.astro.build
+---
 
-Consult these guides before working on related tasks:
+## 路由约定
 
-- [Adding pages, dynamic routes, or middleware](https://docs.astro.build/en/guides/routing/)
-- [Working with Astro components](https://docs.astro.build/en/basics/astro-components/)
-- [Using React, Vue, Svelte, or other framework components](https://docs.astro.build/en/guides/framework-components/)
-- [Adding or managing content](https://docs.astro.build/en/guides/content-collections/)
-- [Adding styles or using Tailwind](https://docs.astro.build/en/guides/styling/)
-- [Supporting multiple languages](https://docs.astro.build/en/guides/internationalization/)
+```text
+/                   首页（最新文章流）
+/companies          公司索引
+/company/[slug]     公司页
+/tags               标签索引
+/tag/[slug]         标签页
+/year/[year]        年份归档
+/search             站内搜索（noindex）
+```
+
+- 文章卡片直接外链原文，**v1 不做中转详情页**。若日后需要分享卡片，再加 `noindex` 的预览页。
+- slug 一律小写、短横线连接、不含中文；生成规则写在 `src/lib/domain/slug.ts`。
+
+---
+
+## 编码约定
+
+- 组件优先 `.astro`；只有在确实需要客户端交互时才引入岛屿，并明确写出为什么。
+- 数据查询函数返回已确定的类型，类型从 Drizzle schema 推导，不手写重复 interface。
+- 日期统一以 UTC 存储，展示时按 `Asia/Shanghai` 格式化。
+- 不要用 `any`；确需逃逸时写 `unknown` + 收窄。
+- 提交前跑 `vp check`，构建必须通过 `bun run build`。
+
+---
+
+## 文档
+
+- [`README.md`](README.md) — 项目定位、功能、路线图
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — 系统形状、数据模型、搜索与 SEO 策略、关键决策
+
+---
+
+<!--VITE PLUS START-->
+
+# Using Vite+, the Unified Toolchain for the Web
+
+This project is using Vite+, a unified toolchain built on top of Vite, Rolldown, Vitest, tsdown, Oxlint, Oxfmt, and Vite Task. Vite+ wraps runtime management, package management, and frontend tooling in a single global CLI called `vp`. Vite+ is distinct from Vite, and it invokes Vite through `vp dev` and `vp build`. Run `vp help` to print a list of commands and `vp <command> --help` for information about a specific command.
+
+Docs are local at `node_modules/vite-plus/docs` or online at https://viteplus.dev/guide/.
+
+## Built-in Commands vs Scripts
+
+`vp <name>` runs a built-in command. `vp run <name>` runs a `package.json` script or a `vite.config.ts` task. Scripts cannot overwrite built-ins, so `vp dev` and `vp run dev` may do different things. Check `package.json` and `vite.config.ts` first, and run `vp run <name>` when the project defines a script or task with that name.
+
+## Running Scripts
+
+Run TypeScript and JavaScript files with `vpx <file>`, for example `vpx ./scripts/seed.ts --dry-run`. It handles enums, decorators, JSX, and tsconfig `paths`, so do not add `tsx` or `ts-node` to run scripts. `vpx --watch <file>` reruns the file when a file it uses changes, in place of `tsx watch`. `vp node <file>` runs plain Node.js.
+
+## Tool Versions
+
+Run `vp toolchain` to show versions and relationships in the active Vite+
+release. Add a tool name to select part of the graph. For example, run
+`vp toolchain vite`. Use `--global` to ignore the local `vite-plus` package. Use
+`vp why <package>` to show the package-manager dependency graph.
+
+## Review Checklist
+
+- [ ] Run `vp install` after pulling remote changes and before getting started.
+- [ ] Run `vp check` and `vp test` to format, lint, type check and test changes.
+- [ ] Check if there are `vite.config.ts` tasks or `package.json` scripts necessary for validation, run via `vp run <script>`.
+- [ ] If setup, runtime, or package-manager behavior looks wrong, run `vp env doctor` and include its output when asking for help.
+
+<!--VITE PLUS END-->
