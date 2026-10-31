@@ -2,10 +2,10 @@
 import type { GetStaticPaths } from "astro";
 import BaseLayout from "../../../layouts/BaseLayout.astro";
 import YearView from "../../../components/YearView.astro";
-import { openWebDatabase, postYears, postsByYear } from "../../../lib/db/queries";
+import { openWebDatabase, postYears, postsByYear, topCompaniesByYear, topTagsByYear } from "../../../lib/db/queries";
 import { localizePath, localeRoutes, useTranslations } from "../../../lib/i18n";
 import type { Locale } from "../../../lib/i18n/config";
-import { PAGE_SIZE, pageCount, pagePath } from "../../../lib/pagination";
+import { INDEX_PAGE_SIZE, pageCount, pagePath } from "../../../lib/pagination";
 import { collectionJsonLd } from "../../../lib/structured-data";
 import { site } from "../../../lib/site";
 
@@ -22,12 +22,16 @@ const { locale } = Astro.props;
 const t = useTranslations(locale);
 const db = openWebDatabase();
 const year = Number(Astro.params.year);
-const yearRow = postYears(db).find((entry) => entry.year === year);
+const years = postYears(db);
+const yearRow = years.find((entry) => entry.year === year);
 
 if (!yearRow) throw new Error(`年份不存在：${year}`);
 
-const { items, total } = postsByYear(db, year, { limit: PAGE_SIZE });
-const totalPages = pageCount(total);
+const topTags = topTagsByYear(db, year, 6);
+const topCompanies = topCompaniesByYear(db, year, 5);
+const { items, total } = postsByYear(db, year, { limit: INDEX_PAGE_SIZE });
+const totalPages = pageCount(total, INDEX_PAGE_SIZE);
+const navYearsHref = localizePath(`/year/${year}`, locale);
 const title = t("meta.year.title", { year });
 const description = t("meta.year.description", { year });
 ---
@@ -36,6 +40,7 @@ const description = t("meta.year.description", { year });
 	locale={locale}
 	title={title}
 	description={description}
+	chrome="bare"
 	nextHref={totalPages > 1 ? localizePath(pagePath(`/year/${year}`, 2), locale) : undefined}
 	jsonLd={collectionJsonLd({
 		name: title,
@@ -47,10 +52,14 @@ const description = t("meta.year.description", { year });
 	<YearView
 		locale={locale}
 		year={year}
-		count={yearRow.count}
+		years={years}
+		topTags={topTags}
+		topCompanies={topCompanies}
 		posts={items}
+		total={total}
 		page={1}
 		totalPages={totalPages}
 		nextHref={totalPages > 1 ? localizePath(pagePath(`/year/${year}`, 2), locale) : undefined}
+		navYearsHref={navYearsHref}
 	/>
 </BaseLayout>

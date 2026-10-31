@@ -1,63 +1,112 @@
 ---
-import type { PostCard as PostCardData } from "../lib/db/queries";
+import type { CompanyCard, PostCard as PostCardData, TagCard } from "../lib/db/queries";
 import { formatCount, localizePath, useTranslations } from "../lib/i18n";
 import type { Locale } from "../lib/i18n/config";
+import { INDEX_PAGE_SIZE } from "../lib/pagination";
 import { searchHref } from "../lib/search-url";
-import Breadcrumb from "./Breadcrumb.astro";
-import PageHeader from "./PageHeader.astro";
-import PostList from "./PostList.astro";
+import type { IndexFacetGroup, IndexRailModule } from "../lib/index-sheet";
+import IndexSheet from "./IndexSheet.astro";
 
 interface Props {
-	locale: Locale;
-	year: number;
-	count: number;
-	posts: PostCardData[];
-	page: number;
-	totalPages: number;
-	prevHref?: string;
-	nextHref?: string;
+  locale: Locale;
+  year: number;
+  years: { year: number; count: number }[];
+  topTags: TagCard[];
+  topCompanies: CompanyCard[];
+  posts: PostCardData[];
+  total: number;
+  page: number;
+  totalPages: number;
+  prevHref?: string;
+  nextHref?: string;
+  navYearsHref?: string;
 }
 
-const { locale, year, count, posts, page, totalPages, prevHref, nextHref } = Astro.props;
+const {
+  locale,
+  year,
+  years,
+  topTags,
+  topCompanies,
+  posts,
+  total,
+  page,
+  totalPages,
+  prevHref,
+  nextHref,
+  navYearsHref,
+} = Astro.props;
 const t = useTranslations(locale);
-const homeHref = localizePath("/", locale);
+
+const facets: IndexFacetGroup[] = [
+  {
+    label: t("filter.label"),
+    items: [
+      {
+        label: t("filter.hasCode"),
+        href: searchHref(locale, { year, has_code: true }),
+      },
+    ],
+  },
+];
+
+const rail: IndexRailModule[] = [
+  {
+    title: t("nav.years"),
+    links: years.map((entry) => ({
+      label: String(entry.year),
+      href: localizePath(`/year/${entry.year}`, locale),
+      count: entry.count,
+      active: entry.year === year,
+    })),
+  },
+];
+
+if (topTags.length > 0) {
+  rail.push({
+    title: t("search.hotTags"),
+    links: topTags.map((tag) => ({
+      label: tag.name,
+      href: localizePath(`/tag/${tag.slug}`, locale),
+      count: tag.count,
+      lang: locale === "en" ? "zh-CN" : undefined,
+    })),
+    allHref: localizePath("/tags", locale),
+    allLabel: t("nav.viewAllTags"),
+  });
+}
+
+if (topCompanies.length > 0) {
+  rail.push({
+    title: t("index.activeCompanies"),
+    links: topCompanies.map((company) => ({
+      label: locale === "en" && company.nameEn ? company.nameEn : company.name,
+      href: localizePath(`/company/${company.slug}`, locale),
+      count: company.count,
+      lang: locale === "en" && !company.nameEn ? "zh-CN" : undefined,
+    })),
+    allHref: localizePath("/companies", locale),
+    allLabel: t("nav.viewAllCompanies"),
+  });
+}
 ---
 
-<PageHeader
+<IndexSheet
 	locale={locale}
-	icon="calendar"
+	kicker={t("index.kicker.year")}
+	current="years"
 	title={t("year.heading", { year })}
-	description={t("year.description", {
-		year,
-		count: formatCount(locale, "articles", count),
-	})}
-/>
-
-<div class="year-breadcrumb">
-	<Breadcrumb
-		locale={locale}
-		items={[
-			{ label: t("breadcrumb.home"), href: homeHref },
-			{ label: String(year) },
-		]}
-	/>
-</div>
-
-<PostList
-	locale={locale}
+	facts={[formatCount(locale, "articles", total)]}
 	posts={posts}
-	heading={t("year.latest")}
-	emptyTitle={t("list.empty")}
-	emptyBody={t("search.noQuery.body")}
-	filterHref={searchHref(locale, { year, has_code: true })}
+	total={total}
 	page={page}
 	totalPages={totalPages}
 	prevHref={prevHref}
 	nextHref={nextHref}
+	pageSize={INDEX_PAGE_SIZE}
+	facets={facets}
+	rail={rail}
+	emptyTitle={t("list.empty")}
+	emptyBody={t("search.noQuery.body")}
+	navYearsHref={navYearsHref}
 />
-
-<style>
-	.year-breadcrumb {
-		margin-block: 0.9rem 1.5rem;
-	}
-</style>

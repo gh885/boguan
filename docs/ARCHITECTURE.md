@@ -446,6 +446,14 @@ select rowid from posts_fts where posts_fts match 'title_tokens : ("缓存")'
 
 关于页是一张「印刷页」，使用 `src/styles/about.css` 里页面级的 `--about-*` 暖色令牌（纸面、墨色、橄榄绿、赭石），固定为暖色，不跟随全站亮/暗主题；这是版面决策，不是第二套全站主题。它不改变 `--color-*` 的角色定义，也不把暖色带到组件层。`about.css` 只由关于页引入，其他页面不应依赖这些变量。
 
+### 报纸纸面：首页、索引页与目录页
+
+首页是一张全宽的「技术晨报」，由 `src/components/HomeNewspaper.astro` 与 `src/styles/home.css` 实现。纸面底层抽在 `src/styles/paper.css`：页面级 `--home-*` 语义色、纸纹、检索框、主题/语言控件与共享页脚 `PaperFooter.astro`。与关于页不同，报纸纸面通过 `light-dark()` 跟随全站亮/暗主题：亮色是暖纸 + 墨色 + 朱砂，暗色是暖炭黑 + 奶油 + 琥珀红；不另做一套布局。
+
+标签、公司、年份、搜索与首页分页共用 `src/components/IndexSheet.astro` 与 `src/styles/index-sheet.css`：报眉（桌面吸顶）、版头（kicker + 衬线标题 + 真实统计）、筛选条（链接驱动，无 JS）、两栏目录、右栏相关切片与分页。报眉与版头抽成 `PaperRunningHead.astro` / `PaperSectionHead.astro`，目录页复用。版头换、目录不换；静态切片页保留唯一 canonical，任何带筛选的组合与搜索页都是 `noindex`。索引页每页 20 条；`/page/[n]` 是首页续版，保持 10 条；搜索无查询时展示最近 8 条作为检索着陆页。首页与索引页都用 `chrome="bare"`，由报眉承担导航、检索、主题与语言切换。
+
+`/tags`、`/companies` 用 `DirectorySheet.astro` 与 `src/styles/directory.css` 做分组目录，共享同一套报眉、版头与页脚：公司按收录数排成索引，标签按主题分组并在顶部提供分组跳转；标签目录只列可索引标签。`/about` 使用自己的 `about.css` 固定纸面，不跟随亮/暗主题，也不属于报纸系统。
+
 > 基线：`light-dark()` 与 `oklch()` 需要 2024 年后的浏览器（Chrome 123 / Safari 17.5 / Firefox 120）。本站面向开发者，不再为更老的浏览器降级。
 
 ---

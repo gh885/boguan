@@ -2,15 +2,27 @@
 export const prerender = false;
 
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import EmptyState from "../../components/EmptyState.astro";
-import FilterBar from "../../components/FilterBar.astro";
-import Icon from "../../components/Icon.astro";
-import PageHeader from "../../components/PageHeader.astro";
-import Pagination from "../../components/Pagination.astro";
-import PostCard from "../../components/PostCard.astro";
-import { listPosts, openWebDatabase, searchPosts, type PostCard as PostCardData } from "../../lib/db/queries";
-import { formatCount, resolveLocale, useTranslations } from "../../lib/i18n";
-import { PAGE_SIZE, pageCount, pageOffset } from "../../lib/pagination";
+import IndexSheet from "../../components/IndexSheet.astro";
+import type {
+	IndexEmptyAction,
+	IndexFacetGroup,
+	IndexFacetItem,
+	IndexRailModule,
+} from "../../lib/index-sheet";
+import {
+	companyBySlug,
+	latestPosts,
+	listPosts,
+	openWebDatabase,
+	postYears,
+	searchPosts,
+	tagBySlug,
+	topTags,
+	type PostCard as PostCardData,
+} from "../../lib/db/queries";
+import { companyDisplayName } from "../../lib/i18n/company";
+import { formatCount, localizePath, resolveLocale, useTranslations } from "../../lib/i18n";
+import { INDEX_PAGE_SIZE, pageCount, pageOffset } from "../../lib/pagination";
 import { searchHref } from "../../lib/search-url";
 
 const locale = resolveLocale(Astro.currentLocale);
@@ -24,160 +36,224 @@ const tagSlug = params.get("tag") ?? undefined;
 const yearParam = params.get("year");
 const year = yearParam && /^\d{4}$/.test(yearParam) ? Number(yearParam) : undefined;
 const hasCode = params.get("has_code") === "1";
-const page = Math.max(1, Number(params.get("page") ?? "1") || 1);
+const requestedPage = Math.max(1, Number(params.get("page") ?? "1") || 1);
 
 const hasFilters = Boolean(companySlug || tagSlug || year !== undefined || hasCode);
+const isLanding = !q && !hasFilters;
+const page = isLanding ? 1 : requestedPage;
 const filters = { companySlug, tagSlug, year, hasCode: hasCode ? true : undefined };
-const hidden: Record<string, string> = {};
-if (companySlug) hidden.company = companySlug;
-if (tagSlug) hidden.tag = tagSlug;
-if (year !== undefined) hidden.year = String(year);
-if (hasCode) hidden.has_code = "1";
 
 let posts: PostCardData[] = [];
 let total = 0;
 
-if (q) {
-	const result = searchPosts(db, { q, ...filters, limit: PAGE_SIZE, offset: pageOffset(page) });
+if (isLanding) {
+	const result = latestPosts(db, { limit: 8 });
+	posts = result.items;
+	total = result.total;
+} else if (q) {
+	const result = searchPosts(db, {
+		q,
+		...filters,
+		limit: INDEX_PAGE_SIZE,
+		offset: pageOffset(page, INDEX_PAGE_SIZE),
+	});
 	posts = result.hits;
 	total = result.total;
 } else if (hasFilters) {
-	const result = listPosts(db, filters, { limit: PAGE_SIZE, offset: pageOffset(page) });
+	const result = listPosts(db, filters, {
+		limit: INDEX_PAGE_SIZE,
+		offset: pageOffset(page, INDEX_PAGE_SIZE),
+	});
 	posts = result.items;
 	total = result.total;
 }
 
-const totalPages = pageCount(total);
-const description = q
+const totalPages = isLanding ? 1 : pageCount(total, INDEX_PAGE_SIZE);
+const pageSize = isLanding ? 8 : INDEX_PAGE_SIZE;
+const countText = formatCount(locale, "articles", total);
+const metaTitle = q ? `${t("meta.search.title")}: ${q}` : t("meta.search.title");
+const metaDescription = q
 	? t("search.description", { query: q })
 	: hasFilters
 		? t("search.descriptionFiltered")
 		: t("search.descriptionEmpty");
-const title = q ? `${t("meta.search.title")}: ${q}` : t("meta.search.title");
-const count = formatCount(locale, "articles", total);
 
-const clearSearchHref = searchHref(locale, {
-	company: companySlug,
-	tag: tagSlug,
-	year,
-	has_code: hasCode,
-});
-const toggleCodeHref = searchHref(locale, {
-	q,
-	company: companySlug,
-	tag: tagSlug,
-	year,
-	has_code: !hasCode,
-});
-const prevHref =
-	page > 1
-		? searchHref(locale, {
-				q,
-				company: companySlug,
-				tag: tagSlug,
-				year,
-				has_code: hasCode,
-				page: page - 1,
-			})
-		: undefined;
+const visibleTitle = q
+	? t("search.queryTitle", { query: q })
+	: hasFilters
+		? t("search.title")
+		: t("search.landingTitle");
+const facts = isLanding
+	? [formatCount(locale, "articles", total)]
+	: q || hasFilters
+		? [t("search.results", { count: countText })]
+		: [];
+
+const company = companySlug ? companyBySlug(db, companySlug) : null;
+const tag = tagSlug ? tagBySlug(db, tagSlug) : null;
+const companyName = company ? companyDisplayName(company, locale) : (companySlug ?? "");
+const tagName = tag?.name ?? tagSlug ?? "";
+
+const base = { q, company: companySlug, tag: tagSlug, year, has_code: hasCode };
+const withoutCompany = { ...base, company: undefined };
+const withoutTag = { ...base, tag: undefined };
+const withoutYear = { ...base, year: undefined };
+const withoutCode = { ...base, has_code: false };
+const years = postYears(db);
+
+const facets: IndexFacetGroup[] = [];
+
+if (!isLanding) {
+	const conditionItems: IndexFacetItem[] = [];
+
+	if (companySlug) {
+		conditionItems.push({
+			label: companyName,
+			lang: locale === "en" && !company?.nameEn ? "zh-CN" : undefined,
+			active: true,
+			removeHref: searchHref(locale, withoutCompany),
+		});
+	}
+
+	if (tagSlug) {
+		conditionItems.push({
+			label: tagName,
+			lang: locale === "en" ? "zh-CN" : undefined,
+			active: true,
+			removeHref: searchHref(locale, withoutTag),
+		});
+	}
+
+	conditionItems.push({
+		label: t("filter.hasCode"),
+		href: hasCode ? undefined : searchHref(locale, { ...base, has_code: true }),
+		active: hasCode,
+		removeHref: hasCode ? searchHref(locale, withoutCode) : undefined,
+	});
+
+	facets.push({ label: t("filter.label"), items: conditionItems });
+
+	if (years.length > 1) {
+		facets.push({
+			label: t("nav.years"),
+			items: years.map((entry) => ({
+				label: String(entry.year),
+				href: searchHref(locale, { ...base, year: entry.year }),
+				active: entry.year === year,
+				removeHref: entry.year === year ? searchHref(locale, withoutYear) : undefined,
+			})),
+		});
+	}
+}
+
+const clearAllHref = hasFilters ? searchHref(locale, { q }) : undefined;
+const clearHref = q
+	? searchHref(locale, { company: companySlug, tag: tagSlug, year, has_code: hasCode })
+	: undefined;
+
+const hotTags = topTags(db, 12);
+
+const rail: IndexRailModule[] = [
+	{
+		title: t("search.hotTags"),
+		links: hotTags.slice(0, 8).map((entry) => ({
+			label: entry.name,
+			href: localizePath(`/tag/${entry.slug}`, locale),
+			count: entry.count,
+			lang: locale === "en" ? "zh-CN" : undefined,
+		})),
+		allHref: localizePath("/tags", locale),
+		allLabel: t("nav.viewAllTags"),
+	},
+	{
+		title: t("search.railTitle"),
+		body: t("search.railNote"),
+	},
+];
+
+let emptyAction: IndexEmptyAction | undefined;
+if (year !== undefined) {
+	emptyAction = {
+		label: t("search.removeYear", { year }),
+		href: searchHref(locale, withoutYear),
+	};
+} else if (hasCode) {
+	emptyAction = { label: t("search.removeHasCode"), href: searchHref(locale, withoutCode) };
+} else if (tagSlug) {
+	emptyAction = {
+		label: t("search.removeTag", { name: tagName }),
+		href: searchHref(locale, withoutTag),
+	};
+} else if (companySlug) {
+	emptyAction = {
+		label: t("search.removeCompany", { name: companyName }),
+		href: searchHref(locale, withoutCompany),
+	};
+} else if (q) {
+	emptyAction = { label: t("search.clear"), href: searchHref(locale) };
+}
+
+const navYearsHref = years[0]
+	? localizePath(`/year/${years[0].year}`, locale)
+	: localizePath("/tags", locale);
+
+const searchHidden: Record<string, string> = {};
+if (companySlug) searchHidden.company = companySlug;
+if (tagSlug) searchHidden.tag = tagSlug;
+if (year !== undefined) searchHidden.year = String(year);
+if (hasCode) searchHidden.has_code = "1";
+
+const prevHref = page > 1 ? searchHref(locale, { ...base, page: page - 1 }) : undefined;
 const nextHref =
-	page < totalPages
-		? searchHref(locale, {
-				q,
-				company: companySlug,
-				tag: tagSlug,
-				year,
-				has_code: hasCode,
-				page: page + 1,
-			})
-		: undefined;
-
-const showEmpty = posts.length === 0;
+	page < totalPages ? searchHref(locale, { ...base, page: page + 1 }) : undefined;
 ---
 
 <BaseLayout
 	locale={locale}
-	title={title}
-	description={description}
+	title={metaTitle}
+	description={metaDescription}
+	chrome="bare"
 	noindex
 	prevHref={prevHref}
 	nextHref={nextHref}
 >
-	<PageHeader
+	<IndexSheet
 		locale={locale}
-		icon="search"
-		title={t("search.title")}
-		description={description}
+		kicker={t("index.kicker.search")}
+		title={visibleTitle}
+		facts={facts}
+		posts={posts}
+		total={total}
+		page={page}
+		totalPages={totalPages}
+		pageSize={pageSize}
+		prevHref={prevHref}
+		nextHref={nextHref}
+		facets={facets}
+		clearAllHref={clearAllHref}
+		clearAllLabel={t("filter.clear")}
+		clearHref={clearHref}
+		clearLabel={t("search.clear")}
+		rail={rail}
+		emptyTitle={t("search.empty.title")}
+		emptyBody={t("search.empty.body")}
+		emptyAction={emptyAction}
 		searchValue={q}
-		searchHidden={hidden}
-		searchClearHref={clearSearchHref}
-	/>
-
-	<div class="search-page">
-		<div class="search-toolbar">
-			<span class="search-count">
-				<Icon name="filter" size={12} />
-				<span>{q || hasFilters ? t("search.results", { count }) : t("search.descriptionEmpty")}</span>
-			</span>
-			<FilterBar
-				locale={locale}
-				href={toggleCodeHref}
-				active={hasCode}
-				clearHref={hasCode ? toggleCodeHref : undefined}
-			/>
-		</div>
-
-		{
-			showEmpty ? (
-				<EmptyState
-					title={q || hasFilters ? t("search.empty.title") : t("search.noQuery.title")}
-					body={q || hasFilters ? t("search.empty.body") : t("search.noQuery.body")}
-					icon={q || hasFilters ? "search" : "hash"}
-				/>
-			) : (
-				<div class="search-results">
-					{posts.map((post) => (
-						<PostCard post={post} locale={locale} />
-					))}
-				</div>
-			)
-		}
-
-		<Pagination
-			locale={locale}
-			page={page}
-			totalPages={totalPages}
-			prevHref={prevHref}
-			nextHref={nextHref}
-		/>
-	</div>
+		searchHidden={searchHidden}
+		navYearsHref={navYearsHref}
+	>
+		<Fragment slot="intro">
+			{
+				isLanding && (
+					<div class="index-landing-intro">
+						<p class="index-landing-lead">{t("search.noQuery.body")}</p>
+						<a class="index-landing-more" href={localizePath("/companies", locale)}>
+							{t("nav.viewAllCompanies")} →
+						</a>
+						<p class="index-landing-listhead">{t("search.recent")}</p>
+					</div>
+				)
+			}
+		</Fragment>
+	</IndexSheet>
 </BaseLayout>
-
-<style>
-	.search-page {
-		margin-block-start: 1rem;
-	}
-
-	.search-toolbar {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		justify-content: space-between;
-		gap: var(--space-sm);
-		margin-block-end: 1rem;
-	}
-
-	.search-count {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.35rem;
-		color: var(--color-text-secondary);
-		font-size: var(--text-xs);
-	}
-
-	.search-results {
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-	}
-</style>

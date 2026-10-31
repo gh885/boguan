@@ -1,20 +1,21 @@
 ---
 import type { GetStaticPaths } from "astro";
+import HomeNewspaper from "../../components/HomeNewspaper.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import PageHeader from "../../components/PageHeader.astro";
-import PostList from "../../components/PostList.astro";
-import { latestPosts, openWebDatabase, siteStats } from "../../lib/db/queries";
 import {
-	formatCount,
-	localizePath,
-	localeRoutes,
-	useTranslations,
-} from "../../lib/i18n";
+	latestPosts,
+	openWebDatabase,
+	postYears,
+	siteStats,
+	tagIndex,
+} from "../../lib/db/queries";
+import { localizePath, localeRoutes, useTranslations } from "../../lib/i18n";
 import type { Locale } from "../../lib/i18n/config";
 import { PAGE_SIZE, pageCount, pagePath } from "../../lib/pagination";
 import { searchHref } from "../../lib/search-url";
 import { homeJsonLd } from "../../lib/structured-data";
 import { site } from "../../lib/site";
+import { isIndexableTag } from "../../lib/tags";
 
 // 一份页面 × 所有语言：/ 和 /en/
 export const getStaticPaths = (() => localeRoutes()) satisfies GetStaticPaths;
@@ -29,52 +30,43 @@ const t = useTranslations(locale);
 const db = openWebDatabase();
 const stats = siteStats(db);
 const { items, total } = latestPosts(db, { limit: PAGE_SIZE });
+const [lead, ...latest] = items;
+const topics = tagIndex(db)
+	.filter((tag) => isIndexableTag(tag.count))
+	.slice(0, 3);
+const years = postYears(db);
+const yearHref = years[0]
+	? localizePath(`/year/${years[0].year}`, locale)
+	: localizePath("/tags", locale);
+
 const totalPages = pageCount(total);
 const description = t("meta.home.description");
-
-const subtitle = t("home.subtitle", {
-	articles: formatCount(locale, "articles", stats.posts),
-	companies: formatCount(locale, "companies", stats.companies),
-});
+const nextHref = totalPages > 1 ? localizePath(pagePath("/", 2), locale) : undefined;
 ---
 
 <BaseLayout
 	locale={locale}
 	title={t("meta.home.title")}
 	description={description}
-	showNotice
-	nextHref={totalPages > 1 ? localizePath(pagePath("/", 2), locale) : undefined}
+	chrome="bare"
+	nextHref={nextHref}
 	jsonLd={homeJsonLd(
 		items,
 		description,
-		t("home.latest"),
-		new URL(localizePath("/search", locale), site.url).href,
+		t("home.latestIndex"),
+		new URL(searchHref(locale), site.url).href,
 		locale,
 	)}
 >
-	<PageHeader
+	<HomeNewspaper
 		locale={locale}
-		title={t("home.title")}
-		description={subtitle}
+		items={latest}
+		lead={lead}
+		topics={topics}
+		stats={stats}
+		page={1}
+		totalPages={totalPages}
+		nextHref={nextHref}
+		yearHref={yearHref}
 	/>
-
-	<div class="latest">
-		<PostList
-			locale={locale}
-			posts={items}
-			heading={t("home.latest")}
-			emptyTitle={t("list.empty")}
-			emptyBody={t("search.noQuery.body")}
-			filterHref={searchHref(locale, { has_code: true })}
-			page={1}
-			totalPages={totalPages}
-			nextHref={totalPages > 1 ? localizePath(pagePath("/", 2), locale) : undefined}
-		/>
-	</div>
 </BaseLayout>
-
-<style>
-	.latest {
-		margin-block-start: 1.5rem;
-	}
-</style>

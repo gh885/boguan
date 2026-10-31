@@ -1,11 +1,19 @@
 ---
 import type { GetStaticPaths } from "astro";
+import IndexSheet from "../../../components/IndexSheet.astro";
 import BaseLayout from "../../../layouts/BaseLayout.astro";
-import PageHeader from "../../../components/PageHeader.astro";
-import PostList from "../../../components/PostList.astro";
-import { latestPosts, openWebDatabase, siteStats } from "../../../lib/db/queries";
+import {
+	companyCards,
+	latestPosts,
+	openWebDatabase,
+	postYears,
+	siteStats,
+	topTags,
+} from "../../../lib/db/queries";
+import { companyDisplayName } from "../../../lib/i18n/company";
 import { formatCount, localizePath, localeRoutes, useTranslations } from "../../../lib/i18n";
 import type { Locale } from "../../../lib/i18n/config";
+import type { IndexFacetGroup, IndexRailModule } from "../../../lib/index-sheet";
 import { PAGE_SIZE, pageCount, pageOffset, pagePath } from "../../../lib/pagination";
 import { searchHref } from "../../../lib/search-url";
 import { collectionJsonLd } from "../../../lib/structured-data";
@@ -31,13 +39,63 @@ const db = openWebDatabase();
 const stats = siteStats(db);
 const { items, total } = latestPosts(db, { limit: PAGE_SIZE, offset: pageOffset(page) });
 const totalPages = pageCount(total);
+const years = postYears(db);
+const hotTags = topTags(db, 8);
+const companies = companyCards(db).slice(0, 6);
+const navYearsHref = years[0]
+	? localizePath(`/year/${years[0].year}`, locale)
+	: localizePath("/tags", locale);
+
+const facets: IndexFacetGroup[] = [
+	{
+		label: t("filter.label"),
+		items: [
+			{
+				label: t("filter.hasCode"),
+				href: searchHref(locale, { has_code: true }),
+			},
+		],
+	},
+];
+
+if (years.length > 1) {
+	facets.push({
+		label: t("nav.years"),
+		items: years.map((entry) => ({
+			label: String(entry.year),
+			count: entry.count,
+			href: localizePath(`/year/${entry.year}`, locale),
+		})),
+	});
+}
+
+const rail: IndexRailModule[] = [
+	{
+		title: t("search.hotTags"),
+		links: hotTags.map((tag) => ({
+			label: tag.name,
+			href: localizePath(`/tag/${tag.slug}`, locale),
+			count: tag.count,
+			lang: locale === "en" ? "zh-CN" : undefined,
+		})),
+		allHref: localizePath("/tags", locale),
+		allLabel: t("nav.viewAllTags"),
+	},
+	{
+		title: t("nav.companies"),
+		links: companies.map((company) => ({
+			label: companyDisplayName(company, locale),
+			href: localizePath(`/company/${company.slug}`, locale),
+			count: company.count,
+			lang: locale === "en" && !company.nameEn ? "zh-CN" : undefined,
+		})),
+		allHref: localizePath("/companies", locale),
+		allLabel: t("nav.viewAllCompanies"),
+	},
+];
+
 const description = `${t("meta.home.description")}${t("meta.page.suffix", { page })}`;
 const title = `${t("meta.home.title")}${t("meta.page.suffix", { page })}`;
-
-const subtitle = t("home.subtitle", {
-	articles: formatCount(locale, "articles", stats.posts),
-	companies: formatCount(locale, "companies", stats.companies),
-});
 
 const prevHref = localizePath(pagePath("/", page - 1), locale);
 const nextHref = page < totalPages ? localizePath(pagePath("/", page + 1), locale) : undefined;
@@ -47,6 +105,7 @@ const nextHref = page < totalPages ? localizePath(pagePath("/", page + 1), local
 	locale={locale}
 	title={title}
 	description={description}
+	chrome="bare"
 	prevHref={prevHref}
 	nextHref={nextHref}
 	jsonLd={collectionJsonLd({
@@ -56,26 +115,20 @@ const nextHref = page < totalPages ? localizePath(pagePath("/", page + 1), local
 		items,
 	})}
 >
-	<PageHeader locale={locale} title={t("home.title")} description={subtitle} />
-
-	<div class="latest">
-		<PostList
-			locale={locale}
-			posts={items}
-			heading={t("home.latest")}
-			emptyTitle={t("list.empty")}
-			emptyBody={t("search.noQuery.body")}
-			filterHref={searchHref(locale, { has_code: true })}
-			page={page}
-			totalPages={totalPages}
-			prevHref={prevHref}
-			nextHref={nextHref}
-		/>
-	</div>
+	<IndexSheet
+		locale={locale}
+		kicker={t("index.kicker.all")}
+		title={t("index.allTitle")}
+		facts={[formatCount(locale, "articles", stats.posts), t("home.page", { page })]}
+		posts={items}
+		total={total}
+		page={page}
+		totalPages={totalPages}
+		pageSize={PAGE_SIZE}
+		prevHref={prevHref}
+		nextHref={nextHref}
+		facets={facets}
+		rail={rail}
+		navYearsHref={navYearsHref}
+	/>
 </BaseLayout>
-
-<style>
-	.latest {
-		margin-block-start: 1.5rem;
-	}
-</style>

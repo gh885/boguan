@@ -7,12 +7,18 @@ import {
 	companyCards,
 	companyTopTags,
 	openWebDatabase,
+	postYearsByFilters,
 	postsByCompany,
 } from "../../../../../lib/db/queries";
 import { localizePath, localeRoutes, useTranslations } from "../../../../../lib/i18n";
 import { companyDisplayName } from "../../../../../lib/i18n/company";
 import type { Locale } from "../../../../../lib/i18n/config";
-import { PAGE_SIZE, pageCount, pageOffset, pagePath } from "../../../../../lib/pagination";
+import {
+	INDEX_PAGE_SIZE,
+	pageCount,
+	pageOffset,
+	pagePath,
+} from "../../../../../lib/pagination";
 import { collectionJsonLd } from "../../../../../lib/structured-data";
 import { site } from "../../../../../lib/site";
 
@@ -24,7 +30,7 @@ export const getStaticPaths = (() => {
 	const db = openWebDatabase();
 	const companies = companyCards(db);
 	return companies.flatMap((company) => {
-		const pages = pageCount(company.count);
+		const pages = pageCount(company.count, INDEX_PAGE_SIZE);
 		return Array.from({ length: Math.max(0, pages - 1) }, (_, index) => index + 2).flatMap((page) =>
 			localeRoutes({ slug: company.slug, page: String(page) }),
 		);
@@ -40,12 +46,16 @@ const company = companyBySlug(db, slug);
 
 if (!company) throw new Error(`公司不存在：${slug}`);
 
-const topTags = companyTopTags(db, slug);
+const topTags = companyTopTags(db, slug, 8);
+const years = postYearsByFilters(db, { companySlug: slug });
 const { items, total } = postsByCompany(db, slug, {
-	limit: PAGE_SIZE,
-	offset: pageOffset(page),
+	limit: INDEX_PAGE_SIZE,
+	offset: pageOffset(page, INDEX_PAGE_SIZE),
 });
-const totalPages = pageCount(total);
+const totalPages = pageCount(total, INDEX_PAGE_SIZE);
+const navYearsHref = years[0]
+	? localizePath(`/year/${years[0].year}`, locale)
+	: localizePath("/tags", locale);
 const name = companyDisplayName(company, locale);
 const title = `${t("meta.company.title", { name })}${t("meta.page.suffix", { page })}`;
 const description = `${t("meta.company.description", { name })}${t("meta.page.suffix", { page })}`;
@@ -59,6 +69,7 @@ const nextHref =
 	locale={locale}
 	title={title}
 	description={description}
+	chrome="bare"
 	prevHref={prevHref}
 	nextHref={nextHref}
 	jsonLd={collectionJsonLd({
@@ -72,10 +83,13 @@ const nextHref =
 		locale={locale}
 		company={company}
 		topTags={topTags}
+		years={years}
 		posts={items}
+		total={total}
 		page={page}
 		totalPages={totalPages}
 		prevHref={prevHref}
 		nextHref={nextHref}
+		navYearsHref={navYearsHref}
 	/>
 </BaseLayout>

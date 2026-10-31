@@ -1,0 +1,425 @@
+/**
+ * 报纸纸面：首页与索引页共享的底层。
+ *
+ * 这里只放「所有报纸页面都一样」的东西：页面级语义色、纸面底纹、
+ * 检索框、主题/语言控件与页脚。具体版式（报头、头版、目录）由
+ * home.css 与 index-sheet.css 各自叠加。
+ *
+ * 颜色仍是页面级 `--home-*`，用 light-dark() 跟随全站主题；
+ * 不改变 tokens.css 里全站 `--color-*` 的角色定义。
+ */
+
+:root {
+  --home-paper: light-dark(#efe6d3, #1a1611);
+  --home-paper-raised: light-dark(#f6efdf, #221c15);
+  --home-ink: light-dark(#211d17, #efe6d3);
+  --home-ink-soft: light-dark(#4f483e, #d8c9b4);
+  --home-muted: light-dark(#6b6357, #b7a68e);
+  --home-red: light-dark(#a33a29, #e09a7f);
+  --home-rule: light-dark(rgb(33 29 23 / 32%), rgb(239 230 214 / 28%));
+  --home-rule-soft: light-dark(rgb(33 29 23 / 18%), rgb(239 230 214 / 16%));
+  --home-rule-strong: light-dark(#211d17, #efe6d3);
+  --home-texture: light-dark(rgb(33 29 23 / 3.5%), rgb(239 230 214 / 4%));
+  --home-seal-ink: light-dark(#f6efdf, #1a1611);
+  --home-soft: light-dark(#e5d8bf, #2c241b);
+}
+
+html:has(.paper-page),
+body:has(.paper-page) {
+  background-color: var(--home-paper);
+}
+
+body:has(.paper-page) .skip-link {
+  border-color: var(--home-rule);
+  background-color: var(--home-paper-raised);
+  color: var(--home-ink);
+}
+
+.paper-page {
+  min-height: 100dvh;
+  background-color: var(--home-paper);
+  background-image: radial-gradient(var(--home-texture) 0.5px, transparent 0.5px);
+  background-size: 5px 5px;
+  color: var(--home-ink);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.paper-page ::selection {
+  background-color: var(--home-red);
+  color: var(--home-seal-ink);
+}
+
+.paper-page :focus-visible {
+  outline-color: var(--home-red);
+}
+
+/* 检索框：首页导航行与索引页报眉共用 */
+
+.paper-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: min(22rem, 100%);
+  border: 1.5px solid var(--home-rule-strong);
+  background-color: color-mix(in oklab, var(--home-paper) 82%, var(--home-paper-raised));
+}
+
+.paper-search input {
+  flex: 1;
+  min-width: 0;
+  min-height: 2.25rem;
+  padding: 0 2.25rem 0 0.9rem;
+  border: 0;
+  background: transparent;
+  color: var(--home-ink);
+  font-family: var(--font-serif);
+  font-size: 1rem;
+}
+
+.paper-search input::placeholder {
+  color: var(--home-muted);
+}
+
+.paper-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.paper-search button {
+  position: absolute;
+  inset-inline-end: 0.3rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  background: transparent;
+  color: var(--home-muted);
+  cursor: pointer;
+}
+
+.paper-search button:hover {
+  color: var(--home-red);
+}
+
+/* 报眉：桌面吸顶，长列表里随时能搜；移动端不吸顶，避免吃掉首屏 */
+
+.paper-runninghead {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 20;
+  border-block-end: 1px solid var(--home-rule-strong);
+  background-color: var(--home-paper);
+}
+
+.paper-runninghead-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+  width: 100%;
+  max-width: 90rem;
+  margin-inline: auto;
+  padding: 0.5rem clamp(1rem, 1.6vw, 1.75rem);
+}
+
+.paper-wordmark {
+  flex-shrink: 0;
+  color: var(--home-ink);
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.paper-wordmark:hover {
+  color: var(--home-red);
+  text-decoration: none;
+}
+
+.paper-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.9rem;
+  font-size: 0.8125rem;
+}
+
+.paper-nav a {
+  color: var(--home-ink);
+  text-decoration: none;
+}
+
+.paper-nav a:hover {
+  color: var(--home-red);
+}
+
+.paper-nav a[aria-current="page"] {
+  font-weight: 600;
+}
+
+.paper-searchbar {
+  width: min(20rem, 100%);
+  margin-inline-start: auto;
+}
+
+/* 版头：一页的身份 */
+
+.paper-kicker {
+  margin: 0 0 0.4rem;
+  color: var(--home-red);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+}
+
+.paper-headrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 2rem;
+}
+
+.paper-title {
+  min-width: 0;
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: clamp(2rem, 3.2vw, 2.75rem);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+.paper-headmeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 1rem;
+}
+
+.paper-facts {
+  margin: 0;
+  color: var(--home-muted);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.paper-clear {
+  color: var(--home-red);
+  font-size: 0.75rem;
+  text-decoration: none;
+}
+
+.paper-clear:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.paper-description {
+  max-width: 48rem;
+  margin: 0.5rem 0 0;
+  color: var(--home-muted);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.paper-sectrule {
+  height: 2px;
+  margin-block: 0.7rem 0;
+  background-color: var(--home-rule-strong);
+}
+
+/* 反馈只做颜色，不做位移或缩放 */
+
+.paper-nav a,
+.paper-wordmark,
+.paper-clear {
+  transition: color var(--transition-fast);
+}
+
+@media (max-width: 980px) {
+  .paper-runninghead {
+    position: static;
+  }
+}
+
+@media (min-width: 681px) and (max-width: 980px) {
+  .paper-runninghead-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.45rem 1rem;
+  }
+
+  .paper-wordmark {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .paper-utility {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+
+  .paper-nav {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .paper-searchbar {
+    grid-column: 2;
+    grid-row: 2;
+    width: min(18rem, 100%);
+    margin-inline-start: 0;
+  }
+}
+
+@media (max-width: 680px) {
+  .paper-runninghead-inner {
+    align-items: flex-start;
+    gap: 0.6rem;
+  }
+
+  .paper-wordmark {
+    font-size: 1.125rem;
+  }
+
+  .paper-nav {
+    order: 2;
+    width: 100%;
+  }
+
+  .paper-searchbar {
+    order: 3;
+    width: 100%;
+    margin-inline-start: 0;
+  }
+
+  .paper-runninghead .paper-utility {
+    order: 1;
+    margin-inline-start: auto;
+  }
+
+  .paper-title {
+    font-size: clamp(1.75rem, 8vw, 2.25rem);
+  }
+
+  .paper-headrow {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+}
+
+/* 主题与语言：两套页面共用同一套辅助色 */
+
+.paper-utility {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.paper-page .paper-utility .theme-toggle {
+  color: var(--home-muted);
+}
+
+.paper-page .paper-utility .theme-toggle:hover {
+  background-color: var(--home-soft);
+  color: var(--home-ink);
+}
+
+.paper-page .paper-utility .language-switch a {
+  color: var(--home-muted);
+  font-size: 0.875rem;
+}
+
+.paper-page .paper-utility .language-switch a:hover {
+  color: var(--home-red);
+}
+
+.paper-page .paper-utility .language-switch a[aria-current="true"] {
+  color: var(--home-ink);
+}
+
+/* 页脚：首页与索引页共用 */
+
+.paper-footer {
+  margin-block-start: 1.5rem;
+  padding-block-start: 0.6rem;
+  border-block-start: 2px solid var(--home-rule-strong);
+  color: var(--home-muted);
+  font-size: 0.75rem;
+}
+
+.paper-footer-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.25rem 2rem;
+}
+
+.paper-footer-brand {
+  color: var(--home-ink);
+  font-family: var(--font-serif);
+  font-size: 1.125rem;
+  letter-spacing: 0.1em;
+  text-decoration: none;
+}
+
+.paper-footer-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+}
+
+.paper-footer-nav a {
+  color: var(--home-muted);
+  text-decoration: none;
+}
+
+.paper-footer-nav a:hover {
+  color: var(--home-red);
+}
+
+.paper-footer-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.3rem 1.25rem;
+  margin-block-start: 0.5rem;
+  padding-block-start: 0.4rem;
+  border-block-start: 1px solid var(--home-rule-soft);
+}
+
+.paper-footer-bottom a {
+  color: var(--home-red);
+}
+
+@media (max-width: 680px) {
+  .paper-footer-main,
+  .paper-footer-bottom {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paper-page *,
+  .paper-page *::before,
+  .paper-page *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

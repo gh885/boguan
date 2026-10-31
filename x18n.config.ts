@@ -17,6 +17,9 @@ export default defineConfig({
       // translate(locale, 'key')
       { callee: "translate", key: { arg: 1 } },
     ],
+    // BaseLayout 的跳转链接与移动端菜单在条件块里，Astro 扫描器读不到；
+    // 它们确实是页面文案，登记为已使用而不是删 key。
+    keysInUse: ["nav.menu", "nav.skipToContent"],
   },
   write: {
     sort: "binary",

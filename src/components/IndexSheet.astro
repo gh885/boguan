@@ -1,0 +1,305 @@
+---
+import type { PostCard } from "../lib/db/queries";
+import { formatDate, localizePath, useTranslations } from "../lib/i18n";
+import { companyDisplayName } from "../lib/i18n/company";
+import type { Locale } from "../lib/i18n/config";
+import type {
+	IndexEmptyAction,
+	IndexFacetGroup,
+	IndexRailModule,
+} from "../lib/index-sheet";
+import "../styles/paper.css";
+import "../styles/index-sheet.css";
+import Icon from "./Icon.astro";
+import PaperFooter from "./PaperFooter.astro";
+import PaperRunningHead from "./PaperRunningHead.astro";
+import PaperSectionHead from "./PaperSectionHead.astro";
+
+interface Props {
+  locale: Locale;
+  /** 版头眉批，例如「标签 / TOPIC」；由页面传本地化文案。 */
+  kicker: string;
+  title: string;
+  titleLang?: string;
+  facts?: string[];
+  /** 当前所在栏目，用于报眉主导航的高亮。 */
+  current?: "home" | "companies" | "tags" | "years" | "about";
+  posts: PostCard[];
+  /** 匹配总数，只用于编号补零与分页口径。 */
+  total: number;
+  page: number;
+  totalPages: number;
+  pageSize: number;
+  prevHref?: string;
+  nextHref?: string;
+  facets?: IndexFacetGroup[];
+  clearAllHref?: string;
+  clearAllLabel?: string;
+  clearHref?: string;
+  clearLabel?: string;
+  rail?: IndexRailModule[];
+  emptyTitle?: string;
+  emptyBody?: string;
+  emptyAction?: IndexEmptyAction;
+  /** 搜索框预填；索引页没有查询时留空。 */
+  searchValue?: string;
+  /** 在切片内继续搜索时要保留的条件。 */
+  searchHidden?: Record<string, string>;
+  footerNote?: string;
+  /** 「年份」导航的落点；不传则退化到标签索引。 */
+  navYearsHref?: string;
+}
+
+const {
+  locale,
+  kicker,
+  title,
+  titleLang,
+  facts = [],
+  current,
+  posts,
+  total,
+  page,
+  totalPages,
+  pageSize,
+  prevHref,
+  nextHref,
+  facets = [],
+  clearAllHref,
+  clearAllLabel,
+  clearHref,
+  clearLabel,
+  rail = [],
+  emptyTitle,
+  emptyBody,
+  emptyAction,
+  searchValue = "",
+  searchHidden = {},
+  footerNote,
+  navYearsHref,
+} = Astro.props;
+
+const t = useTranslations(locale);
+const startNumber = (page - 1) * pageSize + 1;
+const pad = total >= 100 ? 3 : 2;
+const numberFor = (index: number) => String(startNumber + index).padStart(pad, "0");
+const pageOf = t("pagination.pageOf", { page, total: totalPages });
+---
+
+<div class="index-page paper-page">
+	<PaperRunningHead
+		locale={locale}
+		current={current}
+		searchValue={searchValue}
+		searchHidden={searchHidden}
+		navYearsHref={navYearsHref}
+	/>
+
+	<div class="index-sheet">
+		<PaperSectionHead
+			locale={locale}
+			kicker={kicker}
+			title={title}
+			titleLang={titleLang}
+			facts={facts}
+			clearHref={clearHref}
+			clearLabel={clearLabel}
+		/>
+
+		{
+			facets.length > 0 && (
+				<nav class="index-facetbar" aria-label={t("filter.label")}>
+					<div class="index-facetgroups">
+						{facets.map((group) => (
+							<div class="index-facetgroup">
+								{group.label && <span class="index-facetlabel">{group.label}</span>}
+								<ul class="index-facets">
+									{group.items.map((item) => (
+										<li>
+											{item.active ? (
+												item.removeHref ? (
+													<a
+														class="index-facet is-active"
+														href={item.removeHref}
+														aria-label={t("filter.remove", { label: item.label })}
+													>
+														<span lang={item.lang}>{item.label}</span>
+														{item.count !== undefined && (
+															<span class="index-facetcount">{item.count}</span>
+														)}
+														<span class="index-facetx" aria-hidden="true">
+															×
+														</span>
+													</a>
+												) : (
+													<span class="index-facet is-active" aria-current="true">
+														<span lang={item.lang}>{item.label}</span>
+														{item.count !== undefined && (
+															<span class="index-facetcount">{item.count}</span>
+														)}
+													</span>
+												)
+											) : (
+												<a class="index-facet" href={item.href}>
+													<span>{item.label}</span>
+													{item.count !== undefined && (
+														<span class="index-facetcount">{item.count}</span>
+													)}
+												</a>
+											)}
+										</li>
+									))}
+								</ul>
+							</div>
+						))}
+					</div>
+					{clearAllHref && (
+						<a class="index-facetclear" href={clearAllHref}>
+							{clearAllLabel ?? t("filter.clear")}
+						</a>
+					)}
+				</nav>
+			)
+		}
+
+		<slot name="intro" />
+
+		<div class="index-body">
+			<section class="index-results" aria-labelledby="paper-title">
+				{
+					posts.length > 0 ? (
+						<ol class="index-list" role="list" start={startNumber}>
+							{posts.map((post, index) => {
+								const contentLang = post.lang !== locale ? post.lang : undefined;
+								const companyName = companyDisplayName(
+									{ name: post.companyName, nameEn: post.companyNameEn },
+									locale,
+								);
+								const companyHref = localizePath(`/company/${post.companySlug}`, locale);
+								return (
+									<li class="index-entry">
+										<span class="index-entry-num" aria-hidden="true">
+											{numberFor(index)}
+										</span>
+										<div class="index-entry-body">
+											<h2 class="index-entry-title" lang={contentLang}>
+												<a href={post.url} target="_blank" rel="noopener noreferrer">
+													{post.title}
+												</a>
+											</h2>
+											<p class="index-entry-meta">
+												<a href={companyHref}>{companyName}</a>
+												{post.readingMinutes !== null && (
+													<span class="index-dot">
+														{t("card.readingTime", { minutes: post.readingMinutes })}
+													</span>
+												)}
+												{post.hasCode === true && (
+													<span class="index-dot">{t("card.includesCode")}</span>
+												)}
+												{post.publishedAt && (
+													<span class="index-dot">
+														<time datetime={post.publishedAt}>
+															{formatDate(post.publishedAt, locale)}
+														</time>
+													</span>
+												)}
+											</p>
+											{post.summary && (
+												<p class="index-entry-summary" lang={contentLang}>
+													{post.summary}
+												</p>
+											)}
+										</div>
+									</li>
+								);
+							})}
+						</ol>
+					) : (
+						<div class="index-empty">
+							<h2>{emptyTitle ?? t("list.empty")}</h2>
+							{emptyBody && <p>{emptyBody}</p>}
+							{emptyAction && (
+								<a class="index-empty-action" href={emptyAction.href}>
+									{emptyAction.label} →
+								</a>
+							)}
+						</div>
+					)
+				}
+
+				{
+					totalPages > 1 && (
+						<nav class="index-pager" aria-label={t("pagination.label")}>
+							<span>{pageOf}</span>
+							<div class="index-pager-links">
+								{prevHref ? (
+									<a href={prevHref} rel="prev">
+										<Icon name="arrow-left" size={13} />
+										<span>{t("pagination.previous")}</span>
+									</a>
+								) : (
+									<span class="is-disabled" aria-disabled="true">
+										<Icon name="arrow-left" size={13} />
+										<span>{t("pagination.previous")}</span>
+									</span>
+								)}
+								{nextHref ? (
+									<a href={nextHref} rel="next">
+										<span>{t("pagination.next")}</span>
+										<Icon name="arrow-right" size={13} />
+									</a>
+								) : (
+									<span class="is-disabled" aria-disabled="true">
+										<span>{t("pagination.next")}</span>
+										<Icon name="arrow-right" size={13} />
+									</span>
+								)}
+							</div>
+						</nav>
+					)
+				}
+			</section>
+
+			{
+				rail.length > 0 && (
+					<aside class="index-rail" aria-label={t("index.railLabel")}>
+						{rail.map((module) => (
+							<section class="index-rail-box">
+								<h2>{module.title}</h2>
+								{module.links && module.links.length > 0 && (
+									<ul class="index-rail-list">
+										{module.links.map((link) => (
+											<li>
+												<a
+													class:list={{ "is-active": link.active }}
+													href={link.href}
+													aria-current={link.active ? "true" : undefined}
+												>
+													<span class="index-rail-link" lang={link.lang}>
+														{link.label}
+													</span>
+													{link.count !== undefined && (
+														<span class="index-rail-count">{link.count}</span>
+													)}
+												</a>
+											</li>
+										))}
+									</ul>
+								)}
+								{module.body && <p class="index-rail-body">{module.body}</p>}
+								{module.allHref && (
+									<a class="index-rail-all" href={module.allHref}>
+										{module.allLabel ?? t("index.all")} →
+									</a>
+								)}
+							</section>
+						))}
+					</aside>
+				)
+			}
+		</div>
+
+		<PaperFooter locale={locale} note={footerNote} />
+	</div>
+</div>
