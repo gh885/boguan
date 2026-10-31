@@ -23,22 +23,15 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v7
 
-      # Astro 构建时由 Node 执行，需要满足 package.json 的 engines 要求
-      - name: 安装 Node.js
-        uses: actions/setup-node@v7
+      # setup-vp 会安装 Vite+、Node.js 与包管理器，并默认执行 vp install
+      - name: 安装 Vite+ 与依赖
+        uses: voidzero-dev/setup-vp@v1.22.0
         with:
-          node-version: 24
-
-      - name: 安装 Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.4.4
-
-      - name: 安装依赖
-        run: bun install --frozen-lockfile
+          node-version: "24"
+          cache: true
 
       - name: 格式、Lint 与类型检查
-        run: bunx vp check
+        run: vp check
 
       - name: 构建
-        run: bun run build
+        run: vpr build

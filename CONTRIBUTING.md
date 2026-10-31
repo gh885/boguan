@@ -13,10 +13,10 @@
 ## 本地开发
 
 ```bash
-bun install
-bun run dev        # http://localhost:4321
+vp install
+vpr dev            # http://localhost:4321
 vp check           # 提交前必跑
-bun run build
+vpr build
 ```
 
 ## 提交 PR

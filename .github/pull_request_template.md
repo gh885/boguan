@@ -13,7 +13,7 @@
 ## 检查清单
 
 - [ ] `vp check` 通过
-- [ ] `bun run build` 通过
+- [ ] `vpr build` 通过
 - [ ] 没有在页面上输出原文全文
 - [ ] 新增抓取逻辑遵守 `robots.txt` 与限速约定
 - [ ] 若改动了架构决策，已同步更新 `docs/ARCHITECTURE.md`

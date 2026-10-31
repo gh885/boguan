@@ -46,18 +46,18 @@ https://boguan.dev
 
 ## 技术栈
 
-| 层              | 选型                                            | 状态      |
-| :-------------- | :---------------------------------------------- | :-------- |
-| 框架            | Astro 7（静态优先，按需 SSR）                   | ✅ 已就绪 |
-| 语言            | TypeScript（strict）                            | ✅ 已就绪 |
-| 运行时 / 包管理 | Bun 1.4                                         | ✅ 已就绪 |
-| 工具链          | Vite+（`vp`：format / lint / typecheck / test） | ✅ 已就绪 |
-| 数据库          | SQLite                                          | 规划中    |
-| ORM             | Drizzle                                         | 规划中    |
-| 全文检索        | SQLite FTS5 + 中文分词（nodejieba）             | 规划中    |
-| 样式            | 待定（Tailwind 或原生 CSS）                     | 规划中    |
-| 抓取管道        | 独立 TS 进程（不跑在 Web 进程里）               | 规划中    |
-| 部署            | 单台轻量云服务器 + Docker + Caddy               | 规划中    |
+| 层              | 选型                                | 状态      |
+| :-------------- | :---------------------------------- | :-------- |
+| 框架            | Astro 7（静态优先，按需 SSR）       | ✅ 已就绪 |
+| 语言            | TypeScript（strict）                | ✅ 已就绪 |
+| 运行时 / 包管理 | Bun 1.4                             | ✅ 已就绪 |
+| 工具链          | Vite+（`vp` / `vpr` / `vpx`）       | ✅ 已就绪 |
+| 数据库          | SQLite                              | 规划中    |
+| ORM             | Drizzle                             | 规划中    |
+| 全文检索        | SQLite FTS5 + 中文分词（nodejieba） | 规划中    |
+| 样式            | 待定（Tailwind 或原生 CSS）         | 规划中    |
+| 抓取管道        | 独立 TS 进程（不跑在 Web 进程里）   | 规划中    |
+| 部署            | 单台轻量云服务器 + Docker + Caddy   | 规划中    |
 
 为什么是 Astro：这是一个以**只读内容**为主、SEO 权重很高的站点，Astro 默认输出零 JS 的静态 HTML，是这类产品的最优解。交互（筛选、搜索）通过 URL 参数驱动，不需要客户端状态。
 
@@ -93,10 +93,10 @@ boguan/
 需要 **Bun 1.4+**（`package.json` 的 `devEngines` 已声明）与 **Node 22.23+**。
 
 ```bash
-bun install        # 安装依赖
-bun run dev        # 启动开发服务器 http://localhost:4321
-bun run build      # 构建生产产物到 ./dist/
-bun run preview    # 本地预览构建产物
+vp install         # 安装依赖
+vpr dev            # 启动开发服务器 http://localhost:4321
+vpr build          # 构建生产产物到 ./dist/
+vpr preview        # 本地预览构建产物
 ```
 
 质量检查（Vite+ 工具链）：
@@ -110,10 +110,10 @@ vpx scripts/foo.ts # 直接运行 TS 脚本（替代 tsx）
 AI 助手或需要后台运行开发服务器时：
 
 ```bash
-astro dev --background   # 后台启动
-astro dev status         # 查看状态
-astro dev logs           # 查看日志
-astro dev stop           # 停止
+vpr dev --background   # 后台启动
+vpr dev status         # 查看状态
+vpr dev logs           # 查看日志
+vpr dev stop           # 停止
 ```
 
 ---
