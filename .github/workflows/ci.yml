@@ -36,5 +36,8 @@ jobs:
       - name: 国际化文案检查
         run: vp run i18n:check
 
+      - name: 单元测试
+        run: vp test
+
       - name: 构建
         run: vpr build

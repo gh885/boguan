@@ -49,139 +49,208 @@
 - 抓取脚本崩溃时，网站必须继续在线。
 - 抓取完成后需要触发站点重建，这是一个明确的边界事件。
 
-因此：`crawler` 不 import 任何 Astro 代码，`web` 不执行任何抓取。二者只通过数据库交汇。
+因此：`crawler` 不 import 任何 Astro 代码（页面、组件、layout），`web` 不执行任何抓取。二者只通过数据库交汇。
+
+共享的是**纯逻辑**，边界写在 `AGENTS.md`，并由 `src/lib/db/guard.test.ts` 守着：
+
+```text
+crawler → src/lib/{db,domain,search}   纯函数与 schema，没有 Astro 依赖
+web     → src/lib/db/queries/**        只读查询，不许碰正文来源
+两边都  ✗ src/pages | src/components | src/layouts
+```
 
 ---
 
 ## 3. 数据流
 
-1. 调度器按源遍历，每个源记录 `last_run_at`
-2. 拉取列表页（支持 ETag / If-Modified-Since）
-3. 解析出条目：标题、URL、发布时间、摘要、作者
-4. 按 canonical URL 去重，计算内容哈希判断是否更新
-5. 详情页只抓取**摘要与正文**用于检索，不抓图片
-6. 标签归一化（见 §7）
-7. 写库，写入 `crawl_runs`
-8. 全部源完成后，触发 `web` 重建（静态列表页）
-9. 失败重试：单源最多 3 次，指数退避；失败不阻塞其他源
+一次运行（`vpr crawl`，默认增量）：
+
+1. 取出 `enabled` 的源逐个处理；源之间可以并行，但**同一 origin 的请求永远串行**（`fetchPolite` 按 origin 排队）
+2. 拉列表页（带 `If-None-Match` / `If-Modified-Since`），解析出条目：标题、绝对 URL、原始时间串、摘要、源站标签
+3. 归一：canonical URL、时间、摘要、标题归一键
+4. 按 `canonical_url` 查库：
+   - **不存在** → 需要正文就进详情页（`detail: 'none'` 的源直接用 feed 里的全文），插入、写正文文件、写 FTS
+   - **已存在且标题/摘要/时间都没变、正文文件也在** → 只更新 `last_seen_at`，**不进详情页**（这是每日运行省请求的关键）
+   - **变了** → 进详情页（有条件请求）、重算指纹、覆盖正文文件与 FTS、重算标签
+5. 增量停止条件：**当前页所有条目的发布时间都早于水位 6 小时以上就停**；混合页再看「连续 10 条」兜底。停止判定看时间水位，不看条数——置顶与列表重排都不会让它误停
+6. 每个源一行 `crawl_runs`（挂在 `crawl_jobs` 下），逐 URL 的失败进 `crawl_failures`；单源失败不阻塞其它源
+7. 全部源跑完后：跨源去重 → 写批次汇总 → 建议重建站点
+
+两种模式共用同一套代码，只有停止条件不同：
+
+| 模式                  | 停止条件                                      | 何时用           |
+| :-------------------- | :-------------------------------------------- | :--------------- |
+| `incremental`（默认） | 整页早于水位（6h 余量），或连续 10 条早于水位 | 每天定时         |
+| `backfill`            | 翻到 `--max-pages` 上限（`0` 表示不设上限）   | 首次接入、补历史 |
+
+**首次接入默认只回填 20 页**：归一与标签规则还没稳定时全量回填，等于用错误的规则污染几千条数据，返工还要再骚扰源站一遍；规则稳定后再手动 `--mode=backfill --max-pages=0` 补全历史。增量模式**不替代**回填：跑完水位后，更早的页面只由 `backfill` 取。
+
+水位（`sources.watermark_at`）= 见过的最大 `published_at`。回填不更新它以外的东西，也不受它限制；没有 `cursor` 这种东西——回填中断就重跑，幂等，靠 `canonical_url` 与内容指纹去重。
+
+### 每日一次运行的请求预算
+
+以实测的两个源为例（见 `docs/SOURCES.md`）：
+
+| 场景                     | 请求数                             |
+| :----------------------- | :--------------------------------- |
+| 美团（RSS 带全文）无更新 | 1                                  |
+| 美团首次回填 10 篇       | 1                                  |
+| 有赞无更新（2 页列表）   | 2                                  |
+| 有赞首次回填 25 篇       | 1 + 25（每个详情页一次）           |
+| 有赞全量回填（约 40 页） | 约 40 + 400，约 7 分钟（≥1s/请求） |
 
 ---
 
-## 4. 数据模型（草案）
+## 4. 数据模型
+
+已落地为 `src/lib/db/schema.ts`（Drizzle + SQLite），迁移在 `drizzle/`（`vpr db:generate` 生成、`vpr db:init` 应用）。约定：**时间一律存 ISO 8601 UTC 字符串**，表名列名用 snake_case。
 
 ```text
-companies
-  id            integer pk
-  slug          text unique       -- meituan
-  name          text              -- 美团
-  name_en       text?
-  homepage      text?
-  logo_url      text?
+companies          公司
+  id, slug unique, name, name_en?, homepage?, logo_url?, created_at
 
-sources                        -- 一个公司可能有多个发布渠道
-  id            integer pk
-  company_id    integer fk
-  name          text             -- 美团技术团队
-  slug          text unique
-  lang          text             -- 内容语言，默认 'zh-CN'（见 §9）
-  list_url      text
-  adapter       text             -- 适配器标识，对应 scripts/crawler/adapters/*
-  enabled       boolean
-  last_run_at   text?
+sources            一个公司的发布渠道（官网博客 / RSS / 平台账号）
+  id, company_id, slug unique, name
+  adapter           对应 scripts/crawler/adapters/*，**解析形态的唯一真相源**
+  list_url, timezone (默认 Asia/Shanghai), lang, priority
+  enabled, watermark_at?, blocked_at?, blocked_reason?, last_run_at?, created_at
 
-posts
-  id            integer pk
-  source_id     integer fk
-  company_id    integer fk
-  canonical_url text unique
-  title         text
-  summary       text             -- ≤ 200 字，页面展示用
-  lang          text             -- 原文语言，默认 'zh-CN'（见 §9）
-  author        text?
-  published_at  text             -- ISO 8601, UTC
-  cover_url     text?
-  content_hash  text             -- 用于判断更新
-  first_seen_at text
-  last_seen_at  text
-  is_visible    boolean          -- 下线/移除请求置 false
+posts              文章元数据（不含正文）
+  id, source_id, company_id
+  canonical_url unique, title, title_norm, summary（≤200 字，CHECK 约束）
+  lang, author?
+  published_at?       ISO UTC；解析不出来就是 NULL，不编造
+  published_at_raw?   源站原始串，便于回溯解析规则
+  published_year?     按 sources.timezone 取年，/year/[year] 直接走索引
+  cover_url?, content_hash, duplicate_of_id?, is_visible
+  first_seen_at, last_seen_at
 
-tags
-  id            integer pk
-  slug          text unique
-  name          text
+tags               id, slug unique, name
+post_tags          post_id + tag_id 复合主键, origin (source|rule|manual)
+tag_aliases        raw unique → tag_id, source (auto|manual)
+http_cache         url pk, etag, last_modified, checked_at
+crawl_jobs         id, mode, started_at, finished_at, status, sources, requests,
+                   inserted, updated, duplicates, failed, error
+crawl_runs         id, job_id, source_id, mode, started_at, finished_at, status, requests,
+                   not_modified, listed, inserted, updated, unchanged, duplicates, failed, error
+crawl_failures     id, run_id, stage (list|detail), url, status?, message, at
 
-post_tags
-  post_id       integer fk
-  tag_id        integer fk
-  primary key (post_id, tag_id)
-
-crawl_runs
-  id            integer pk
-  source_id     integer fk
-  started_at    text
-  finished_at   text?
-  status        text             -- running | ok | failed
-  total         integer
-  inserted      integer
-  updated       integer
-  error         text?
-
-posts_fts                      -- FTS5 虚拟表，正文只在此存在
-  post_id       UNINDEXED
-  title_tokens  text             -- 中文已分词
-  body_tokens   text             -- 中文已分词
+posts_fts          FTS5 虚拟表：title_tokens, body_tokens
+                   contentless, contentless_delete, rowid = posts.id
 ```
 
-**关键约束**：`posts` 表**不存正文**。正文只在检索时使用，写入 `posts_fts` 后即可丢弃，避免任何形式的全文对外暴露。
+几条需要解释的取舍：
+
+- **正文不在这张库里**。它在 crawler 私有的文件目录 `data/bodies/<id>.txt.gz`（`src/lib/db/bodies.ts`），web 进程既没有表也没有路径。这不是洁癖：只要正文进了同一个 SQLite 文件，硬性规则 1 就只剩「查询层不去 select 它」这一条约定；移出去之后它变成结构性的。正文是**派生数据**——最坏情况能从源站重抓，所以它不参与事务、不参与迁移，崩溃只会留下孤文件，由 `vpr db:check --prune` 清掉。
+- **`posts_fts` 是 contentless 表**：只存 term 与位置，列值取回来是 `NULL`，`snippet()` / `highlight()` 不可用。因此搜索结果**只展示摘要**，不给命中上下文（§7）。
+- **索引与可见性解耦**：不变量只有一条——「每篇帖子都有一行索引」。`is_visible` / `duplicate_of_id` 在查询时过滤，抓取与去重都不动索引。否则一次「下架再上架」就会让帖子和索引脱钩，而抓取因为内容没变不会再写索引，只能等人工发现。
+- **`published_year` 单独存一列**：SQLite 没有时区函数，而 `/year/[year]` 要按 `sources.timezone` 取年且走索引，所以抓取时就算好落列；`published_at` 仍是 UTC。不变量：**改 `published_at` 必须同时改 `published_year`**，计算集中在 `src/lib/domain/date.ts`，由 `normalizePost` 单点调用。
+- **`summary` 带 CHECK 约束**（`length ≤ 200`）：硬性规则 1 的底线不靠自觉，超了直接写不进库。**200 字是规则上限，不是展示目标**：卡片上按两行裁（`line-clamp`），列表节奏不该被摘要长度带跑。
+- **`title_norm`** 是跨源去重的比对键（NFKC + 小写 + 只留字母数字汉字），配 `(company_id, title_norm)` 索引，去重不用全表扫。
+- **`priority` + `duplicate_of_id`**：官网与掘金重复发布是常态。抓完后按「同公司 + 同 `title_norm` + 3 天内」找碰撞，`priority` 小者胜出，另一条打上 `duplicate_of_id`。**索引不跟着删**——可见性与去重都在查询时过滤（见下一条），去掉这层耦合之后，「下架再上架」「胜出方被删」都不需要补索引。`duplicate_of_id` 是自引用外键，胜出方被删时置空。
+- **`crawl_jobs` 是批次层**：跨源去重、批次统计、「这轮要不要重建」需要一个比 `crawl_runs`（每个源一行）更高的维度。
+- **`sources.timezone`**：列表页给「无时区时间」的源（有赞是 `28 Oct 2022`）必须按源站时区解释，硬编码 `Asia/Shanghai` 会让收英文源时静默错位。
+- **`sources.blocked_at` / `blocked_reason`**：被 robots 或 403 挡住时标记，下一轮直接跳过，需要 `--force` 才重试；解除后自动清空。挡住不等于失败——每天重撞一次只会让源站更反感。
+
+### 保留与清理
+
+| 数据             | 策略                                                                                           |
+| :--------------- | :--------------------------------------------------------------------------------------------- |
+| 正文文件         | 帖子删除/判重后由 `vpr db:check --prune` 清孤文件；正文单篇入库上限 6 万字（`MAX_BODY_CHARS`） |
+| `http_cache`     | 90 天未校验的删掉                                                                              |
+| `crawl_failures` | 90 天；`crawl_runs` / `crawl_jobs` 180 天                                                      |
+| 下架/删除请求    | `is_visible = 0` **并**删正文文件与 FTS 行，不只是藏起来                                       |
+
+体量参考（实测 21 篇）：SQLite 612 KB（含 FTS），正文 gzip 后 216 KB，约 10 KB/篇。万级文章对应约 100 MB 正文 + 600 MB 库，单机无压力。
 
 ---
 
 ## 5. 抓取管道
 
-### 适配器接口
+### 分层
 
-每个数据源一个适配器，返回统一的中间结构：
+```text
+调度 → fetchPolite → 适配器解析 → 归一 → 写入（正文文件 + 库 + FTS）→ 收尾（去重）
+```
+
+`fetchPolite(url)`（`scripts/crawler/fetch.ts`）是**唯一**能发 HTTP 的地方。限速、robots、条件请求、重试、编码全在这一层，适配器只负责把 HTML/JSON 变成结构化字段。合规因此是结构保证的，不靠每个适配器自觉。
+
+### 传输层
+
+| 关注点     | 做法                                                                                                                                                                                           |
+| :--------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 限速       | 按 **origin** 排队（不是按 source），间隔 ≥1s；robots 的 `Crawl-delay` 更大时取它                                                                                                              |
+| robots.txt | 每个 origin 抓一次、进程内缓存 24h，用 `robots-parser`。404/410/200-HTML 兜底页 → 允许；401/403/5xx/429 → 本轮全站禁止（保守）                                                                 |
+| UA         | `boguan/0.1 (+https://boguan.dev/about; aggregator; honors robots.txt)`，**必须 ASCII**（HTTP header 不能含中文，否则 fetch 直接抛错），不伪装浏览器                                           |
+| 条件请求   | 列表页与详情页都带 `If-None-Match` / `If-Modified-Since`，命中 304 跳过解析并计入 `not_modified`。**这是尽力而为**：实测有赞对相同 ETag 仍返回 200，真正的省请求来自「元数据没变就不进详情页」 |
+| 重试       | 只重试「可能是暂时的」：网络错误 / 5xx / 429，最多 3 次指数退避；429 听 `Retry-After`；**403、404 不重试**                                                                                     |
+| 编码       | 从 `Content-Type` 与 `<meta charset>` 判定，GBK/GB2312 统一按 GB18030 解（生僻字不变问号）                                                                                                     |
+| 超时       | 整体 20s，超时按网络错误进入重试                                                                                                                                                               |
+| Cookie     | 永不携带登录态；遇到登录墙/验证码即标记跳过，不绕过                                                                                                                                            |
+
+### 适配器
 
 ```ts
 interface SourceAdapter {
   slug: string;
-  fetchList(ctx): Promise<ListItem[]>; // 标题、URL、时间、摘要
-  fetchDetail?(url, ctx): Promise<Detail>; // 正文（仅用于检索）
-  normalize(raw): NormalizedPost;
+  capabilities: { list: "html" | "rss" | "json"; detail: "html" | "json" | "none" };
+  pageUrl(listUrl, page): string;
+  fetchList(ctx, page): Promise<ListItem[]>; // 空数组 = 没有下一页
+  fetchDetail?(ctx, url): Promise<Detail>; // 正文纯文本、作者、标签、绝对时间
 }
 ```
 
-- 新增一个源 = 新增一个文件 + 一条 `sources` 记录，不改动框架代码。
-- 列表页无法拿到发布时间的源，允许走详情页补齐；顺序可配置。
+- 新增一个源 = 一个文件 + 一条 `sources` 记录，管道代码不动。
+- **解析形态只有一处真相**：`capabilities` 由适配器声明，数据库里不再存 `kind` / `time_from`——“列表页有没有时间”“要不要进详情页”不重复表达。
+- **列表页能拿到时间就不进详情页**；列表页能拿到正文（RSS `content:encoded`）就声明 `detail: 'none'`。
+- **纯前端渲染的源（掘金、知乎）只走公开 JSON 接口，不引入无头浏览器**。无头浏览器既贵又容易被判定为绕过反爬；拿不到公开接口就标记「暂不支持」，不做。
+- **解析失败必须响**：列表页 200 但解析出 0 条、详情页找不到正文容器、正文短于 200 字——都抛错进 `crawl_failures`，不静默写一条空正文。（有赞详情页会让轻量 HTML 解析器丢掉整段正文，所以用 cheerio；这就是「静默失败比崩溃更难查」的实例。）
 
-### 去重与更新
+### 归一
 
-- **主键**：`canonical_url`（去掉 utm、锚点，统一协议与末尾斜杠）
-- **更新判定**：`content_hash = sha256(title + summary + published_at + 正文)`
-- 哈希未变则只更新 `last_seen_at`
+1. **canonical URL**：去掉 `utm_*` / `from` / `spm` 等追踪参数与锚点、参数排序、去末尾斜杠；不改协议、不改 host（不猜源站支不支持 https）。
+2. **时间**：带时区偏移的串直接按偏移解析；无时区的串按 `sources.timezone` 解释后转 UTC；**解析失败置 NULL 并保留 `published_at_raw`**。宁可缺失，不要编造——列表按时间倒序时缺的沉底，且不进 `/year` 归档。
+3. **摘要**：优先源站 description；没有就从正文截首 200 字，在句首/句末标点处收口，不留半个词、不留 HTML 残留。
+4. **正文**：只用纯文本，单篇上限 6 万字；进详情页的源用适配器的容器选择器收敛范围，再由 `htmlToText` 抽文本。
+5. **指纹**：`content_hash = sha256(title + summary + 正文)`；`listHash = sha256(title + summary)` 用来判断「要不要再进详情页」。
 
-### 限速与礼貌
+### 去重
 
-- 同域名并发 1，请求间隔 ≥ 1s（可配置）
-- 遵守 `robots.txt`，不抓取被禁止的路径
-- 不伪造 UA，使用可识别的 UA 串
-- 不携带 cookie / 登录态
+- 同源：`canonical_url` 唯一约束。
+- 跨源：同公司 + 同 `title_norm` + 3 天内，`priority` 小者胜出；输家打 `duplicate_of_id`。索引与正文都保留，过滤发生在查询里。
+- v1 只做这一条规则。已知局限：胜出方被删后不会自动「改判」，需要人工处理。
+
+### 标签
+
+1. **源站标签**先按 `tag_aliases.raw` 查映射；
+2. 查不到就按**中文名**找已有标签（源站常有 `big-data` 与 `da-shu-ju` 两个 slug 指同一个「大数据」），找到就补一条别名，不新开标签页；
+3. 名字也没有的原始标签**不入库**，记进运行日志（`未映射的源站标签：…`）等人工补映射；
+4. 一个源站标签都没解析出来时，退到 `scripts/crawler/rules/tags.ts` 的关键词规则（`origin = 'rule'`）：标题命中直接算数，正文要出现 3 次以上，每篇最多 3 个；
+5. 人工干预写 `origin = 'manual'`，自动流程只删非 manual 的标签关联。
+
+### 失败与可观测
+
+- 单源失败不阻塞其它源；`crawl_runs.status` 区分 `ok` / `partial` / `failed` / `running`。
+- 逐 URL 的错误进 `crawl_failures`（stage 区分 list / detail），「哪几篇一直挂」是可查的，不用翻日志。
+- **幂等是验收标准**：同样的内容跑第二遍，`inserted` 与 `updated` 必须为 0（实测已验证，见 `docs/SOURCES.md`）。
+- `vpr db:check` 做对账：FTS 缺失/脏残留/孤儿、孤正文文件、被挡住的源、最近批次；`--fix` 修索引，`--prune` 清过期数据。
 
 ---
 
 ## 6. 渲染策略
 
-**静态优先，搜索按需 SSR。**
+**静态优先，搜索与筛选按需 SSR。**
 
 | 页面                                         | 渲染方式                   | 索引       |
 | :------------------------------------------- | :------------------------- | :--------- |
 | `/`、`/company/*`、`/tag/*`、`/year/*`、分页 | 构建时静态生成             | ✅ index   |
-| `/search`                                    | SSR（需服务端分词 + FTS5） | ❌ noindex |
+| `/search`、带筛选参数的结果页                | SSR（需服务端分词 + FTS5） | ❌ noindex |
 | sitemap.xml、robots.txt                      | 构建时生成                 | —          |
 
 - 每日抓取完成后触发一次重建；列表页最多滞后一天，可接受。
 - 搜索是唯一必须动态渲染的页面，因此站点需要 Node 适配器（而非纯静态托管）。
-- 筛选通过 URL 查询参数表达（`?company=&tag=&year=`），不引入客户端状态。筛选结果的组合页**默认不索引**，避免大量薄页面稀释权重。
+- **筛选只能走 SSR**：静态页读不到 `?company=&tag=&year=`。所以「筛选组合页」与搜索一样是 SSR + `noindex`，不要把筛选做成静态路径组合（数量爆炸且都是薄页面）。
+- 筛选状态全部在 URL 查询参数里（硬性规则 5），不引入客户端状态。
 
 > 实现时以当前 Astro 版本的 `output` / `prerender` 配置语义为准。
 
@@ -191,17 +260,39 @@ interface SourceAdapter {
 
 中文分词是这里唯一的难点：SQLite FTS5 默认的 `unicode61` 分词器不切中文，整段中文会被当成单个 token。
 
-**方案**：入库前用 `nodejieba` 切词，以空格连接写入 FTS5；查询时对关键词做同样切分。
+**方案**：入库前切词、以空格连接写入 FTS5；查询时对关键词做同样切分。分词器是 `@node-rs/jieba`（napi-rs 预编译，Bun 与 Node 都能用；`nodejieba` 是 node-gyp 原生模块，在 Bun 上不可靠），代码在 `src/lib/search/tokenize.ts`，crawler 与 SSR 搜索共用。索引与查询必须走同一个函数，否则 token 对不上。
 
 ```ts
-// 写入
-const tokens = jieba.cut(text).join(" ");
-// 查询：把 "缓存 淘汰" 切成 "缓存 淘汰"，用 AND / OR 组合
+segment("多级缓存架构实践"); // "多级 缓存 架构 实践"
+toMatchQuery("缓存 AND 淘汰"); // '"缓存" "AND" "淘汰"' —— 每个 token 都加引号，避免被当成 FTS5 语法
 ```
 
-- 标题与正文分列索引，BM25 中给标题更高权重
-- 不使用 FTS5 的 `trigram` 分词器：它要求查询串 ≥ 3 字符，而中文搜索词常为 2 字
-- 结果按 `published_at` 倒序，可按公司二次过滤
+### 排序
+
+**相关度优先**：`bm25(posts_fts, 5.0, 1.0)` 升序（SQLite 里越负越相关，标题权重 5、正文 1），同分再按 `published_at` 倒序，最后用 `id` 兜底——**分页必须稳定**，否则同分同时间的条目会跨页重复。
+
+> 不要同时宣称「BM25 标题加权」和「按时间倒序」：排序键只能是其中一种，另一个至多做次级排序键。
+
+### 结果里给什么
+
+`posts_fts` 是 contentless 表：`snippet()` / `highlight()` 返回 `NULL`，列值也读不回来。这恰好和硬性规则 1 对齐——**结果只展示标题、摘要、公司、时间、标签**，不截取正文命中片段。
+
+想告诉用户「为什么命中」，用 FTS5 的列过滤免费判断：
+
+```sql
+select rowid from posts_fts where posts_fts match 'title_tokens : ("缓存")'
+```
+
+拿它和当前页的 rowid 求交集，就能标出「标题命中 / 正文命中」，不增加任何文本外泄面。
+
+### 其它约定
+
+- 结果过滤 `is_visible = 1 and duplicate_of_id is null`，与列表页同一套可见性规则；过滤放在 SQL 里，不要先 LIMIT 再过滤（会短页）。
+- 索引里**有**下架与判重的帖子（索引与可见性解耦，见 §4），所以过滤不能省。
+- 查询串上限 120 字；分词后为空（全是符号）直接返回空结果，不要把空 MATCH 放给 FTS5。
+- 不做查询语法（不支持用户写 `OR` / 前缀 `*`）：每个 token 都被引号包住当字面量，避免 FTS5 语法注入，也避免用户学习成本。将来要 OR 就在 UI 上做复选框。
+- 不使用 FTS5 的 `trigram` 分词器：它要求查询串 ≥ 3 字符，而中文搜索词常为 2 字。
+- 只有 `content_hash` 变化才重写索引；换分词器 / 改参数后用 `rebuildAllPostFts` 从正文文件全量重建。
 
 **为什么不用 Meilisearch / Elasticsearch**：多一个服务就多一个部署单元和故障点。当前数据量（万级）FTS5 完全够用。
 
@@ -259,7 +350,7 @@ const tokens = jieba.cut(text).join(" ");
 
 - 文章标题、摘要、正文永远是原文。`en` 页面把标题包在 `lang="zh-CN"` 的元素里，避免被搜索引擎当成英文内容。
 - `en` 版本的价值在界面与浏览结构，不产生「翻译稿」，因此不会与原文构成重复内容竞争。
-- 数据层预留 `posts.lang` / `sources.lang`（默认 `zh-CN`）；将来收英文源时，FTS 分词按 `lang` 选择分词器（中文走 nodejieba）。
+- 数据层预留 `posts.lang` / `sources.lang`（默认 `zh-CN`）。将来收英文源时，**不要**以为能「按 `lang` 选分词器」：FTS5 的 `tokenizer` 是表级属性，一张表内无法按行切换。正确做法是**按 `lang` 决定是否过 jieba**——英文不切词直接写入，`unicode61` 本来就会按词边界切它。两种语言可以共存于同一列。
 
 ### 工具
 
@@ -319,11 +410,12 @@ const tokens = jieba.cut(text).join(" ");
 香港轻量云服务器（1C2G 起步）
 ├── Caddy            自动 HTTPS，反代
 ├── web (Node)       静态产物 + 搜索 SSR
-└── cron            每日抓取 → 重建 → 重启/刷新
+└── cron             每日：vpr crawl → vpr build → 热加载
 ```
 
-- SQLite 文件挂载到宿主机卷，定期备份（`sqlite3 .backup` 到对象存储）
-- 抓取任务在容器内或宿主机 cron 触发
+- **重建触发就用 cron 串行**，不引 webhook：`vpr crawl && vpr db:check --fix --prune && vpr build`，任一步失败就停在原地、留上一版站点继续服务。`db:check` 放在重建之前，保证上线的是对过账的数据。抓取与重建是同一个批次的不同阶段，中间少一个服务就少一个故障点。
+- 抓取需要写 `data/boguan.db` 与 `data/bodies/`；web 只需要 `data/boguan.db`（**只读**），不需要挂正文目录——这是硬性规则 1 在部署层的体现。
+- SQLite 文件挂载到宿主机卷，定期备份（`sqlite3 .backup` 到对象存储）；`data/bodies/` 一起备份，但丢了也能重抓。
 - 首版不引入 CDN、不做多实例；单机足以支撑
 - 若后续迁回国内，需要 ICP 备案
 
@@ -331,20 +423,23 @@ const tokens = jieba.cut(text).join(" ");
 
 ## 12. 里程碑
 
-| #   | 内容            | 验收标准                          |
-| :-- | :-------------- | :-------------------------------- |
-| 0   | 数据源可行性    | 3 家公司可稳定抓到标题/时间/正文  |
-| 1   | 数据模型 + 管道 | `vpr crawl` 可重复执行且幂等      |
-| 2   | 只读站点        | 四类列表页可访问，i18n 骨架就位   |
-| 3   | 搜索            | 中文两字词可命中，结果相关        |
-| 4   | SEO             | sitemap、canonical、hreflang 齐全 |
-| 5   | 上线            | 域名可访问，每日自动更新          |
+| #   | 内容            | 验收标准                                                          | 状态                 |
+| :-- | :-------------- | :---------------------------------------------------------------- | :------------------- |
+| 0   | 数据源可行性    | 至少 3 家公司可稳定抓到标题/时间/正文，结论记进 `docs/SOURCES.md` | 2 家已验证           |
+| 1   | 数据模型 + 管道 | `vpr crawl` 可重复执行且幂等；`vpr db:check` 全绿                 | ✅                   |
+| 2   | 只读站点        | 四类列表页可访问，i18n 骨架就位                                   | 进行中（骨架已就位） |
+| 3   | 搜索            | 中文两字词可命中，结果相关                                        | 查询层已就绪         |
+| 4   | SEO             | sitemap、canonical、hreflang 齐全                                 | 未开始               |
+| 5   | 上线            | 域名可访问，每日自动更新                                          | 未开始               |
 
----
+> 顺序不能跳：阶段 0 的结论会反过来改 schema（`fixtures` 就改过一次 `adapter` / `timezone` / `title_norm`），先做模型再验证源等于给猜测加索引。
 
 ## 13. 未决问题
 
-- **标签来源**：源站自带标签 / 规则匹配 / LLM 抽取。倾向 v1 规则匹配 + 人工维护映射表。
-- **数据源可抓性**：掘金、公众号、知乎等渠道的抓取稳定性需逐个验证，优先有 RSS 或静态 HTML 的站点。
-- **分页深度**：是否允许爬虫翻到第 N 页，如何避免抓取成本失控。
-- **历史回填**：是否一次性导入各站历史文章，还是只从上线日开始增量。
+- **第三个数据源**：需要至少再验证一家，才能确认适配器接口与标签规则不是只对「Ghost + VuePress」这两套模板成立的。
+- **`--mode=backfill` 的全量回填**：40 页 × 10 篇、≥1s/请求，一次约 7 分钟；还没在真实源上跑完过，抓完要复查标签质量与去重结果。
+- **标签的自动程度**：v1 是「源标签映射 + 关键词规则 + 人工维护」。实测有赞的标签云里英语与拼音写法并存（`big-data` / `da-shu-ju` / `bigdata`），靠中文名归并 + 人工别名够用；LLM 抽取留到数据量稳定之后再评估。
+- **搜索排序**：现在是「BM25（标题 5 : 正文 1）+ 时间次级」。真实数据上够不够用要等语料变大，尤其是同一主题跨年份的结果。
+- **去重的改判**：胜出方被删后，`duplicate_of_id` 指向的记录不会自动复活，需要人工或一个专门的修复脚本。
+
+> 已定下来的（原未决项）：分页深度——增量看水位、回填看 `--max-pages`（§3）；标签来源——规则匹配 + 人工映射（§5）；重建触发——cron 串行 `crawl → build`（§11）。

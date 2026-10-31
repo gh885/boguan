@@ -9,15 +9,28 @@
     "astro": "astro",
     "i18n:check": "x18n check",
     "i18n:ui": "x18n ui",
-    "prepare": "vp config"
+    "prepare": "vp config",
+    "db:generate": "drizzle-kit generate",
+    "db:init": "vpx scripts/db/init.ts",
+    "db:seed": "vpx scripts/db/seed.ts",
+    "db:check": "vpx scripts/db/check.ts",
+    "crawl": "vpx scripts/crawler/cli.ts"
   },
   "dependencies": {
-    "astro": "^7.4.4"
+    "astro": "^7.4.4",
+    "better-sqlite3": "^13.0.3",
+    "cheerio": "^1.2.0",
+    "drizzle-orm": "^0.45.4",
+    "fast-xml-parser": "^5.11.2",
+    "robots-parser": "^3.0.1"
   },
   "devDependencies": {
+    "@node-rs/jieba": "^2.0.4",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.6.6",
     "@x18n/cli": "^0.1.4",
     "@x18n/core": "^0.1.4",
+    "drizzle-kit": "^0.31.11",
     "vite": "npm:@voidzero-dev/vite-plus-core@1.4.0",
     "vite-plus": "1.4.0"
   },

@@ -42,25 +42,25 @@ https://boguan.dev
 | 双语界面（zh-CN 默认 / en）        | ✅ 已就绪 |
 | 亮/暗模式（跟随系统 + 手动切换）   | ✅ 已就绪 |
 
-> 当前仓库处于脚手架阶段：页面骨架与 i18n 基础已就位，数据层与抓取管道尚未实现。
+> 当前进度：页面骨架、i18n、设计令牌已就位；数据模型、抓取管道（美团 RSS + 有赞 HTML）、中文检索查询层已跑通并有测试。**列表页尚未实现**——现在只有首页占位。
 
 ---
 
 ## 技术栈
 
-| 层              | 选型                                | 状态      |
-| :-------------- | :---------------------------------- | :-------- |
-| 框架            | Astro 7（静态优先，按需 SSR）       | ✅ 已就绪 |
-| 语言            | TypeScript（strict）                | ✅ 已就绪 |
-| 运行时 / 包管理 | Bun 1.4                             | ✅ 已就绪 |
-| 工具链          | Vite+（`vp` / `vpr` / `vpx`）       | ✅ 已就绪 |
-| 数据库          | SQLite                              | 规划中    |
-| ORM             | Drizzle                             | 规划中    |
-| 全文检索        | SQLite FTS5 + 中文分词（nodejieba） | 规划中    |
-| 多语言          | `src/lib/i18n` + `x18n` 文案校验    | ✅ 已就绪 |
-| 样式            | 原生 CSS + 设计令牌，亮/暗主题      | ✅ 已就绪 |
-| 抓取管道        | 独立 TS 进程（不跑在 Web 进程里）   | 规划中    |
-| 部署            | 单台轻量云服务器 + Docker + Caddy   | 规划中    |
+| 层              | 选型                              | 状态          |
+| :-------------- | :-------------------------------- | :------------ |
+| 框架            | Astro 7（静态优先，按需 SSR）     | ✅ 已就绪     |
+| 语言            | TypeScript（strict）              | ✅ 已就绪     |
+| 运行时 / 包管理 | Bun 1.4                           | ✅ 已就绪     |
+| 工具链          | Vite+（`vp` / `vpr` / `vpx`）     | ✅ 已就绪     |
+| 数据库          | SQLite                            | ✅ 已就绪     |
+| ORM             | Drizzle                           | ✅ 已就绪     |
+| 全文检索        | SQLite FTS5 + 中文分词（jieba）   | ✅ 查询可用   |
+| 多语言          | `src/lib/i18n` + `x18n` 文案校验  | ✅ 已就绪     |
+| 样式            | 原生 CSS + 设计令牌，亮/暗主题    | ✅ 已就绪     |
+| 抓取管道        | 独立 TS 进程（不跑在 Web 进程里） | ✅ 两家源跑通 |
+| 部署            | 单台轻量云服务器 + Docker + Caddy | 规划中        |
 
 为什么是 Astro：这是一个以**只读内容**为主、SEO 权重很高的站点，Astro 默认输出零 JS 的静态 HTML，是这类产品的最优解。交互（筛选、搜索）通过 URL 参数驱动，不需要客户端状态。
 
@@ -73,6 +73,11 @@ https://boguan.dev
 ```text
 boguan/
 ├── public/                 # 静态资源（favicon 等）
+├── scripts/
+│   ├── crawler/            # 抓取管道：fetch/robots → adapters → normalize → pipeline
+│   └── db/                 # init / seed / check
+├── drizzle/                # SQL 迁移（FTS5 为手写迁移）
+├── data/                   # 本地 SQLite 与正文文件（不进仓库）
 ├── src/
 │   ├── assets/             # 需要被构建处理的资源
 │   ├── components/         # 可复用组件（.astro 或岛屿）
@@ -110,6 +115,22 @@ vp test            # 运行测试
 vpx scripts/foo.ts # 直接运行 TS 脚本（替代 tsx）
 ```
 
+抓取管道（独立进程，与 Web 无关）：
+
+```bash
+vpr db:init                          # 建库 / 应用迁移
+vpr db:seed                          # 写入公司、渠道、规则标签
+vpr crawl --dry-run                  # 只抓一页、只打印，接入新源时先跑这个
+vpr crawl                            # 增量（默认最多翻 5 页）
+vpr crawl --mode=backfill --max-pages=20   # 首次接入：回填最近 20 页
+vpr crawl --source=youzan-tech       # 只跑一个源
+vpr db:check                         # 对账 FTS / 正文文件 / 被挡住的源（--fix / --prune）
+# 每日定时任务：vpr crawl && vpr db:check --fix --prune && vpr build
+```
+
+抓取守着 `robots.txt`、同域串行、≥1s 间隔、不带登录态；每个源的实测结论与坑记在
+[`docs/SOURCES.md`](docs/SOURCES.md)。
+
 AI 助手或需要后台运行开发服务器时：
 
 ```bash
@@ -135,14 +156,14 @@ vpr dev stop           # 停止
 
 ## 路线图
 
-| 阶段 | 目标            | 产出                                           |
-| :--- | :-------------- | :--------------------------------------------- |
-| 0    | 验证数据源      | 手动跑通 3 家公司的抓取与解析                  |
-| 1    | 数据模型 + 管道 | 表结构、source adapter 接口、去重、抓取日志    |
-| 2    | 只读站点        | 首页 / 公司 / 标签 / 年份页面，SSR 或 SSG 输出 |
-| 3    | 搜索            | 中文分词入库 + FTS5 查询，搜索页 noindex       |
-| 4    | SEO 补齐        | head 元信息、JSON-LD、sitemap、canonical、OG   |
-| 5    | 上线            | Docker + Caddy + 定时任务 + 一键部署           |
+| 阶段 | 目标            | 产出                                                     |
+| :--- | :-------------- | :------------------------------------------------------- |
+| 0    | 验证数据源      | 至少 3 家可稳定抓取；已验证 2 家（见 `docs/SOURCES.md`） |
+| 1    | 数据模型 + 管道 | ✅ 表结构、适配器、去重、批次日志，幂等已验证            |
+| 2    | 只读站点        | 首页 / 公司 / 标签 / 年份页面，SSR 或 SSG 输出           |
+| 3    | 搜索            | ✅ 查询层 + 排序 + 索引；搜索页 UI 待做（noindex）       |
+| 4    | SEO 补齐        | head 元信息、JSON-LD、sitemap、canonical、OG             |
+| 5    | 上线            | Docker + Caddy + 定时任务 + 一键部署                     |
 
 ---
 
