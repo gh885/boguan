@@ -1,5 +1,8 @@
 # 博观 · boguan
 
+[![CI](https://github.com/gh885/boguan/actions/workflows/ci.yml/badge.svg)](https://github.com/gh885/boguan/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 > 博观而约取。
 
 中文技术团队工程博客索引。把分散在各家互联网公司技术团队博客里的文章，汇聚到一处，按公司、技术标签、年份浏览与检索；阅读时跳转原文。
@@ -153,3 +156,8 @@ astro dev stop           # 停止
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — 系统形状、数据模型、搜索与 SEO 策略
 - [`AGENTS.md`](AGENTS.md) — 工程约定（含给 AI 助手的规则）
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — 贡献流程与新增数据源指南
+
+## 许可证
+
+[MIT](LICENSE)

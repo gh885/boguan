@@ -1,0 +1,36 @@
+name: 内容移除请求
+description: 请求移除本站收录的某篇文章或某个来源
+title: "[移除] "
+labels: ["content-removal"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        本站只收录文章的标题、摘要、发布时间与原文链接，不存储对外展示的正文。
+        如果仍然希望移除相关内容，请填写下面的信息，我们会尽快处理。
+
+  - type: input
+    id: url
+    attributes:
+      label: 需要移除的链接
+      placeholder: 本站页面地址或原文地址
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 移除范围
+      options:
+        - 单篇文章
+        - 整个来源（某公司的全部文章）
+    validations:
+      required: true
+
+  - type: textarea
+    id: reason
+    attributes:
+      label: 说明
+      description: 可以不填，但如果有版权或合规方面的说明，请写在这里。
+    validations:
+      required: false

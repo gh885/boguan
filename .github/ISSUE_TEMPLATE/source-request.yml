@@ -1,0 +1,45 @@
+name: 新增数据源
+description: 推荐一个公司技术博客作为聚合来源
+title: "[数据源] "
+labels: ["data-source"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        推荐数据源前，请先确认：该站点公开可访问、遵守其 `robots.txt`、且不依赖登录态才能查看文章列表。
+
+  - type: input
+    id: company
+    attributes:
+      label: 公司 / 团队名称
+      placeholder: 例如：美团技术团队
+    validations:
+      required: true
+
+  - type: input
+    id: url
+    attributes:
+      label: 博客地址
+      placeholder: https://tech.meituan.com/
+    validations:
+      required: true
+
+  - type: dropdown
+    id: feed
+    attributes:
+      label: 是否提供 RSS / Atom
+      options:
+        - 提供
+        - 不提供
+        - 不确定
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: 补充说明
+      description: 列表页结构、分页方式、是否需要 JS 渲染、已知的反爬限制等。
+      placeholder: 列表页为服务端渲染，分页参数为 ?page=N，文章页有清晰的发布时间和摘要。
+    validations:
+      required: false
