@@ -39,5 +39,12 @@ jobs:
       - name: 单元测试
         run: vp test
 
+      # 站点是数据驱动的，构建前先造一份固定数据集：
+      # CI 里不跑抓取（没网、也不该在 CI 骚扰源站），构建结果与源站改版解耦
+      - name: 准备构建用数据集
+        run: vpr db:fixture
+
       - name: 构建
         run: vpr build
+        env:
+          BOGUAN_DB: data/fixture.db

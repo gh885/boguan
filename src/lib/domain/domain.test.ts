@@ -94,6 +94,11 @@ describe("文本归一", () => {
   it("解实体 + 去标签 + 折叠空白", () => {
     expect(stripHtml("<p>知识&amp;图谱</p><br/>　　第二段&hellip;</p>")).toBe("知识&图谱 第二段…");
     expect(decodeEntities("&#20013;&#x6587;")).toBe("中文");
+    // 命名实体全集交给 entities，不再依赖手写映射表
+    expect(decodeEntities("&ldquo;引号&rdquo; &trade; &mdash; &hellip;")).toBe("“引号” ™ — …");
+    // 不认识的实体原样保留（`&not` 这类是 HTML5 允许省略分号的实体前缀，会按规范解码）
+    expect(decodeEntities("&zzzUnknown;")).toBe("&zzzUnknown;");
+    expect(decodeEntities("R&D 与 Tom&Jerry")).toBe("R&D 与 Tom&Jerry");
     // 零宽字符直接删掉，不制造空格（避免把词拆开）
     expect(collapseWhitespace("a\u3000b\u200bc\n")).toBe("a bc");
   });

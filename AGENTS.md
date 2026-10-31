@@ -79,7 +79,7 @@ docs/               架构与决策（决策看 ARCHITECTURE，源站实测看 S
 ```bash
 vp install              # 安装依赖
 vpr dev              # 开发服务器 :4321
-vpr build            # 生产构建
+vpr build            # 生产构建（需要数据库，见下）
 vp check                 # 格式化 + lint + 类型检查（提交前必跑）
 vp test                  # 测试
 vpr i18n:check           # 校验文案：缺 key、漏翻、未使用 key（CI 必跑）
@@ -87,10 +87,14 @@ vpr i18n:ui              # 浏览器里浏览 / 编辑文案
 vpr db:generate          # schema.ts 改动后生成 SQL 迁移
 vpr db:init              # 建库 / 应用未执行的迁移（幂等）
 vpr db:seed              # 写入公司 / 渠道 / 规则标签（幂等）
+vpr db:fixture           # 造构建用最小数据集 data/fixture.db（CI 用，不碰真实库）
 vpr db:check             # 对账：FTS、孤正文文件、被挡住的源；--fix / --prune
 vpr crawl                # 抓取（默认增量）；--dry-run / --mode=backfill / --source=
 vpx scripts/...          # 运行脚本，替代 tsx
 ```
+
+构建需要数据库：本地用真实抓取库；只有构建数据时用
+`vpr db:fixture && BOGUAN_DB=data/fixture.db vpr build`（CI 就是这么做的，构建不依赖网络）。
 
 需要后台运行开发服务器时：
 
@@ -161,6 +165,8 @@ vpr dev stop           # 停止
 - **正文只在 `data/bodies/`**：web 侧不许引用 `src/lib/db/bodies`，也不许读 `posts_fts` 的 `body_tokens`（contentless，读回来是 NULL；`snippet()`/`highlight()` 不可用，搜索结果只给摘要）。
 - **跨源去重用 `title_norm`**（`src/lib/domain/title.ts`），不要拿原始标题比字符串。
 - **抓取侧发请求只能经 `PoliteFetcher`**：它负责 robots、限速、重试与编码。适配器里不许直接 `fetch`。
+- **通用格式不手写解析**：feed 用 `rss-parser`，HTML 用 cheerio + `entities`。新增「实体映射表」「feed 字段归一」这类胶水前先看依赖里是不是已经有。
+- **页面与 endpoint 只能通过 `src/lib/db/queries` 读库**，不许直接 `openReadonlyDatabase`（`guard.test.ts` 守）。
 - **UA 必须 ASCII**：HTTP header 不能含中文，中文说明放进 `/about` 页面。
 - 迁移先改 `src/lib/db/schema.ts` 再 `vpr db:generate`；Drizzle 生成不了的（如 FTS5 虚拟表）用 `vpr db:generate --custom` 手写。已提交的迁移文件只增不改。`vpr db:init` 会自动应用。
 - 提交前跑 `vp check`，构建必须通过 `vpr build`。
