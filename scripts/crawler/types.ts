@@ -10,7 +10,11 @@ export interface TagRef {
 export interface ListItem {
   /** 绝对或相对 URL，由 normalize 归一 */
   url: string;
-  title: string;
+  /**
+   * 列表页给的标题。sitemap 这类「只给 URL」的列表没有元数据，此时不传，
+   * 标题与时间由详情页补（见 `Detail.title`）。
+   */
+  title?: string;
   /** 源站原始时间串，不解析，交给 domain/date 按源站时区解释 */
   publishedAtRaw?: string;
   summary?: string;
@@ -25,6 +29,8 @@ export interface ListItem {
 
 /** 详情页补齐的字段 */
 export interface Detail {
+  /** 详情页标题：列表只给 URL 的源（sitemap）靠它拿标题 */
+  title?: string;
   publishedAtRaw?: string;
   author?: string;
   tags?: TagRef[];

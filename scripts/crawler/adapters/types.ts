@@ -19,7 +19,7 @@ export interface SourceAdapter {
    * 「怎么解析」的唯一声明处，数据库里不重复存这些信息。
    * `detail: 'none'` 表示列表页就给全了正文（RSS 常见），不必再进详情页。
    */
-  capabilities: { list: "html" | "rss" | "json"; detail: "html" | "json" | "none" };
+  capabilities: { list: "html" | "rss" | "json" | "sitemap"; detail: "html" | "json" | "none" };
   /** 第 `page` 页的 URL，page 从 1 开始；不支持翻页的源返回同一个地址 */
   pageUrl(listUrl: string, page: number): string;
   /** 返回空数组表示没有下一页 */

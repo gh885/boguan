@@ -76,7 +76,8 @@ export function listHash(title: string, summary: string): string {
 export function normalizePost(input: NormalizeInput): NormalizedPost | null {
   const { item, detail, timezone, base } = input;
 
-  const title = cleanText(item.title);
+  // 详情页优先：sitemap 这类列表没有标题，只有详情页能给出
+  const title = cleanText(detail?.title ?? item.title);
   if (!title) return null;
 
   const canonicalUrl = canonicalizeUrl(item.url, base);

@@ -8,7 +8,9 @@ import { upsertPostFts } from "../../src/lib/db/fts";
 import type { Db } from "../../src/lib/db/index";
 import * as schema from "../../src/lib/db/schema";
 import { companies, posts, sources } from "../../src/lib/db/schema";
+import { isPostUrl } from "./adapters/youzan";
 import { dedupe } from "./pipeline";
+import { parseSitemapUrls } from "./sitemap";
 import { contentHash, listHash, normalizePost } from "./normalize";
 import { ruleTags } from "./rules/tags";
 
@@ -82,6 +84,70 @@ describe("normalizePost", () => {
     expect(a).toBe(contentHash("标题", "摘要 A", "正文"));
     expect(a).not.toBe(contentHash("标题", "摘要 B", "正文"));
     expect(listHash("标题", "摘要 A")).toBe(listHash("标题", "摘要 A"));
+  });
+});
+
+describe("sitemap 当列表入口", () => {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+    <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+      <url><loc>https://tech.youzan.com/web-https-engineering/</loc>
+        <lastmod>2026-03-18T08:00:17.491Z</lastmod></url>
+      <url><loc>https://tech.youzan.com/cut-boy/</loc></url>
+      <url><loc>https://tech.youzan.com/cut-boy/</loc></url>
+      <url><loc>/relative-slug/</loc></url>
+      <url><loc></loc></url>
+    </urlset>`;
+
+  it("抓全部 loc、相对地址按 sitemap 地址补全、重复去掉", () => {
+    expect(parseSitemapUrls(xml, "https://tech.youzan.com/sitemap-posts.xml")).toEqual([
+      "https://tech.youzan.com/web-https-engineering/",
+      "https://tech.youzan.com/cut-boy/",
+      "https://tech.youzan.com/relative-slug/",
+    ]);
+  });
+
+  it("只留单段路径的文章页，标签页 / 分页 / 子站点地图都排掉", () => {
+    const urls = parseSitemapUrls(xml, "https://tech.youzan.com/sitemap-posts.xml", {
+      keep: isPostUrl,
+    });
+    expect(urls).toHaveLength(3);
+
+    const kept = (path: string) => isPostUrl(new URL(path, "https://tech.youzan.com"));
+    expect(kept("/cut-boy/")).toBe(true);
+    expect(kept("/tag/big-data/")).toBe(false);
+    expect(kept("/page/2/")).toBe(false);
+    expect(kept("/sitemap-pages.xml")).toBe(false);
+    expect(kept("/a/b/")).toBe(false);
+  });
+});
+
+describe("列表只给 URL 的源", () => {
+  it("标题与时间由详情页补", () => {
+    const post = normalizePost({
+      item: { url: "https://tech.youzan.com/cut-boy/" },
+      detail: {
+        title: "  《切男孩》—— 一次图片服务重构 ",
+        publishedAtRaw: "28 Oct 2022",
+        body: "正文".repeat(300),
+      },
+      timezone: TIMEZONE,
+      base: "https://tech.youzan.com/sitemap-posts.xml",
+    });
+
+    expect(post?.title).toBe("《切男孩》—— 一次图片服务重构");
+    expect(post?.publishedAt).toBe("2022-10-27T16:00:00.000Z");
+    expect(post?.publishedYear).toBe(2022);
+    expect(post?.summary.length).toBeLessThanOrEqual(200);
+  });
+
+  it("列表与详情页都没有标题就不入库", () => {
+    expect(
+      normalizePost({
+        item: { url: "https://tech.youzan.com/cut-boy/" },
+        timezone: TIMEZONE,
+        base: "https://tech.youzan.com/sitemap-posts.xml",
+      }),
+    ).toBeNull();
   });
 });
 
