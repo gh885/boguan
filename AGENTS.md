@@ -78,6 +78,17 @@ vpr dev stop           # 停止
 
 ---
 
+## Git 工作流
+
+`main` 受规则集保护：**不能直接 push、不能 force push**，改动必须走 Pull Request，且 CI 检查（`检查与构建`）通过后才能合并。
+
+1. 从最新 `main` 切分支：`feat/xxx`、`fix/xxx`、`docs/xxx`、`chore/xxx`
+2. 本地先跑 `vp check` 与 `vpr build`
+3. push 分支并通过 `gh pr create` 开 PR，等 CI 全绿后再合并（squash）
+4. 不要直接向 `main` 提交，也不要为了绕过检查而使用管理员权限
+
+---
+
 ## 路由约定
 
 ```text
@@ -101,7 +112,7 @@ vpr dev stop           # 停止
 - 数据查询函数返回已确定的类型，类型从 Drizzle schema 推导，不手写重复 interface。
 - 日期统一以 UTC 存储，展示时按 `Asia/Shanghai` 格式化。
 - 不要用 `any`；确需逃逸时写 `unknown` + 收窄。
-- 提交前跑 `vp check`，构建必须通过 `bun run build`。
+- 提交前跑 `vp check`，构建必须通过 `vpr build`。
 
 ---
 
