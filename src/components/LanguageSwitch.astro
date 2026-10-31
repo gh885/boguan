@@ -1,0 +1,33 @@
+---
+import { alternateLinks, useTranslations } from "../lib/i18n";
+import { localeLabels } from "../lib/i18n/config";
+import type { Locale } from "../lib/i18n/config";
+
+interface Props {
+	locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = useTranslations(locale);
+const links = alternateLinks(Astro.url.pathname);
+---
+
+<nav aria-label={t("nav.language")}>
+	<ul>
+		{
+			links.map((link) => (
+				<li>
+					<a
+						href={link.href}
+						hreflang={link.hreflang}
+						lang={link.hreflang}
+						aria-label={t("language.switchTo", { language: localeLabels[link.locale] })}
+						aria-current={link.locale === locale ? "true" : undefined}
+					>
+						{localeLabels[link.locale]}
+					</a>
+				</li>
+			))
+		}
+	</ul>
+</nav>

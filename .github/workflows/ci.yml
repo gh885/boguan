@@ -33,5 +33,8 @@ jobs:
       - name: 格式、Lint 与类型检查
         run: vp check
 
+      - name: 国际化文案检查
+        run: vp run i18n:check
+
       - name: 构建
         run: vpr build

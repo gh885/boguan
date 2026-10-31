@@ -1,0 +1,32 @@
+---
+import type { GetStaticPaths } from "astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { localeRoutes, useTranslations } from "../../lib/i18n";
+import type { Locale } from "../../lib/i18n/config";
+
+// 一份页面 × 所有语言：/ 和 /en/
+export const getStaticPaths = (() => localeRoutes()) satisfies GetStaticPaths;
+
+interface Props {
+	locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = useTranslations(locale);
+---
+
+<BaseLayout
+	locale={locale}
+	title={t("meta.home.title")}
+	description={t("meta.home.description")}
+>
+	<section>
+		<h1>{t("meta.home.title")}</h1>
+		<p>{t("home.intro")}</p>
+	</section>
+
+	<section>
+		<h2>{t("home.building.title")}</h2>
+		<p>{t("home.building.body")}</p>
+	</section>
+</BaseLayout>

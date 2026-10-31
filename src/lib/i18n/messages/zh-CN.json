@@ -1,0 +1,10 @@
+{
+  "footer.note": "索引内容均为各公司技术团队的原创文章，版权归原作者所有。",
+  "home.building.body": "抓取管道与列表页尚未就绪。当前可用的是 i18n 骨架：中英文两套界面文案已经接通。",
+  "home.building.title": "站点正在搭建中",
+  "home.intro": "本站只保留标题、摘要、作者、发布时间与原文链接，不转载全文。",
+  "language.switchTo": "切换到 {language}",
+  "meta.home.description": "把分散在各家互联网公司技术团队博客里的文章汇聚到一处，按公司、技术标签、年份浏览，支持标题与正文检索；阅读时跳转原文。",
+  "meta.home.title": "中文技术团队工程博客索引",
+  "nav.language": "语言"
+}
