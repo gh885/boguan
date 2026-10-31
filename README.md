@@ -40,6 +40,7 @@ https://boguan.dev
 | 定时增量抓取                       | 规划中    |
 | SEO：sitemap / JSON-LD / canonical | 规划中    |
 | 双语界面（zh-CN 默认 / en）        | ✅ 已就绪 |
+| 亮/暗模式（跟随系统 + 手动切换）   | ✅ 已就绪 |
 
 > 当前仓库处于脚手架阶段：页面骨架与 i18n 基础已就位，数据层与抓取管道尚未实现。
 
@@ -57,7 +58,7 @@ https://boguan.dev
 | ORM             | Drizzle                             | 规划中    |
 | 全文检索        | SQLite FTS5 + 中文分词（nodejieba） | 规划中    |
 | 多语言          | `src/lib/i18n` + `x18n` 文案校验    | ✅ 已就绪 |
-| 样式            | 待定（Tailwind 或原生 CSS）         | 规划中    |
+| 样式            | 原生 CSS + 设计令牌，亮/暗主题      | ✅ 已就绪 |
 | 抓取管道        | 独立 TS 进程（不跑在 Web 进程里）   | 规划中    |
 | 部署            | 单台轻量云服务器 + Docker + Caddy   | 规划中    |
 

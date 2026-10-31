@@ -1,13 +1,11 @@
 ---
 import LanguageSwitch from "../components/LanguageSwitch.astro";
-import {
-	alternateLinks,
-	localizePath,
-	resolveLocale,
-	useTranslations,
-} from "../lib/i18n";
+import ThemeToggle from "../components/ThemeToggle.astro";
+import { alternateLinks, localizePath, resolveLocale, useTranslations } from "../lib/i18n";
 import { defaultLocale, locales, ogLocales, type Locale } from "../lib/i18n/config";
 import { site } from "../lib/site";
+import "../styles/tokens.css";
+import "../styles/base.css";
 
 interface Props {
 	/** 页面自己的标题，不含站名；`<title>` 由 layout 统一拼上站名。 */
@@ -19,7 +17,7 @@ interface Props {
 	locale?: Locale;
 	/**
 	 * 本页实际生成的语言，默认全部。页面只在部分语言下存在时（例如某个只有中文的专题），
-	 * 在这里收窄，否则 hreflang 、语言切换都会指向 404。
+	 * 在这里收窄，否则 hreflang 与语言切换都会指向 404。
 	 */
 	alternateLocales?: readonly Locale[];
 }
@@ -45,7 +43,24 @@ const robots = noindex ? "noindex, follow" : "index, follow";
 <html lang={locale}>
 	<head>
 		<meta charset="utf-8" />
+		{/*
+			主题在首屏绘制前定好，避免白闪；只读本地偏好，不改任何页面状态。
+			见 docs/ARCHITECTURE.md §10。
+		*/}
+		<script is:inline>
+			(() => {
+				const root = document.documentElement;
+				root.dataset.js = "true";
+				try {
+					const stored = localStorage.getItem("boguan:theme");
+					if (stored === "light" || stored === "dark") root.dataset.theme = stored;
+				} catch {
+					// 隐私模式下 localStorage 不可用，跟随系统即可
+				}
+			})();
+		</script>
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="color-scheme" content="light dark" />
 		<title>{pageTitle}</title>
 		<meta name="description" content={description} />
 		<link rel="canonical" href={canonical} />
@@ -82,15 +97,71 @@ const robots = noindex ? "noindex, follow" : "index, follow";
 	</head>
 
 	<body>
-		<header>
-			<a href={localizePath("/", locale)}>{site.name}</a>
-			<LanguageSwitch locale={locale} />
+		<a class="skip-link" href="#main">{t("nav.skipToContent")}</a>
+
+		<header class="site-header">
+			<div class="page site-header__inner">
+				<a class="site-brand" href={localizePath("/", locale)}>{site.name}</a>
+				<div class="site-actions">
+					<LanguageSwitch locale={locale} />
+					<ThemeToggle locale={locale} />
+				</div>
+			</div>
 		</header>
-		<main>
+
+		<main id="main" class="page">
 			<slot />
 		</main>
-		<footer>
-			<p>{t("footer.note")}</p>
+
+		<footer class="site-footer">
+			<div class="page">
+				<p>{t("footer.note")}</p>
+			</div>
 		</footer>
 	</body>
 </html>
+
+<style>
+	.site-header {
+		border-block-end: 1px solid var(--color-border);
+		background-color: var(--color-surface);
+	}
+
+	.site-header__inner {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-md);
+		min-height: 3.5rem;
+	}
+
+	.site-brand {
+		color: var(--color-text-primary);
+		font-size: var(--text-lg);
+		font-weight: var(--weight-semibold);
+		text-decoration: none;
+		letter-spacing: 0.02em;
+	}
+
+	.site-brand:hover {
+		color: var(--color-accent);
+	}
+
+	.site-actions {
+		display: flex;
+		align-items: center;
+		gap: var(--space-sm);
+	}
+
+	.site-footer {
+		border-block-start: 1px solid var(--color-border);
+		padding-block: var(--space-lg);
+		color: var(--color-text-secondary);
+		font-size: var(--text-xs);
+	}
+
+	.site-footer p {
+		margin: 0;
+		max-width: var(--width-measure);
+	}
+</style>

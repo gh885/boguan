@@ -15,6 +15,7 @@
     "astro": "^7.4.4"
   },
   "devDependencies": {
+    "@types/node": "^26.6.6",
     "@x18n/cli": "^0.1.4",
     "@x18n/core": "^0.1.4",
     "vite": "npm:@voidzero-dev/vite-plus-core@1.4.0",
