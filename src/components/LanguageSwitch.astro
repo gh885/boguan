@@ -12,7 +12,7 @@ const t = useTranslations(locale);
 const links = alternateLinks(Astro.url.pathname);
 ---
 
-<nav aria-label={t("nav.language")}>
+<nav class="language-switch" aria-label={t("nav.language")}>
 	<ul>
 		{
 			links.map((link) => (
@@ -31,3 +31,30 @@ const links = alternateLinks(Astro.url.pathname);
 		}
 	</ul>
 </nav>
+
+<style>
+	.language-switch ul {
+		display: flex;
+		align-items: center;
+		gap: var(--space-sm);
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.language-switch a {
+		color: var(--color-text-secondary);
+		font-size: var(--text-sm);
+		text-decoration: none;
+	}
+
+	.language-switch a:hover {
+		color: var(--color-accent);
+		text-decoration: underline;
+	}
+
+	.language-switch a[aria-current="true"] {
+		color: var(--color-text-primary);
+		font-weight: var(--weight-semibold);
+	}
+</style>

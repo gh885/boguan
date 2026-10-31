@@ -1,10 +1,13 @@
 {
   "footer.note": "Every indexed post was published by its company's team; the copyright stays with the original authors.",
-  "home.building.body": "The crawler and the list pages are not ready yet. What works today is the i18n skeleton: both the Chinese and the English UI copy are wired up.",
+  "home.building.body": "The crawler and the list pages are not ready yet. What works today is the site skeleton: bilingual UI copy, the light and dark themes, and the design tokens.",
   "home.building.title": "The site is a work in progress",
   "home.intro": "This site keeps only the title, summary, author, publish date and a link to the original post. Full posts are never republished.",
   "language.switchTo": "Switch to {language}",
   "meta.home.description": "One index of engineering blog posts from Chinese internet companies, browsable by company, topic and year, with full-text search. Every card links to the original post.",
   "meta.home.title": "Engineering blogs from Chinese tech teams",
-  "nav.language": "Language"
+  "nav.language": "Language",
+  "nav.skipToContent": "Skip to content",
+  "theme.switchToDark": "Switch to dark mode",
+  "theme.switchToLight": "Switch to light mode"
 }

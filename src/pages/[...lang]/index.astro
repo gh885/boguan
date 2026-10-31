@@ -20,13 +20,47 @@ const t = useTranslations(locale);
 	title={t("meta.home.title")}
 	description={t("meta.home.description")}
 >
-	<section>
+	<section class="hero">
 		<h1>{t("meta.home.title")}</h1>
-		<p>{t("home.intro")}</p>
+		<p class="lead">{t("home.intro")}</p>
 	</section>
 
-	<section>
+	<section class="status">
 		<h2>{t("home.building.title")}</h2>
 		<p>{t("home.building.body")}</p>
 	</section>
 </BaseLayout>
+
+<style>
+	.hero {
+		max-width: var(--width-measure);
+	}
+
+	.hero h1 {
+		margin-block-end: var(--space-md);
+	}
+
+	.lead {
+		font-size: var(--text-lg);
+		line-height: var(--leading-normal);
+		color: var(--color-text-secondary);
+	}
+
+	.status {
+		margin-block-start: var(--space-2xl);
+		max-width: 40rem;
+		padding: var(--space-lg);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		background-color: var(--color-surface);
+	}
+
+	.status h2 {
+		font-size: var(--text-xl);
+	}
+
+	.status p {
+		margin: 0;
+		color: var(--color-text-secondary);
+	}
+</style>

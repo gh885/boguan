@@ -21,7 +21,7 @@
 2. **抓取必须守规矩。** 遵守 `robots.txt`，同一域名并发 ≤ 1、请求间隔 ≥ 1s，不携带登录态，不绕过付费墙、验证码或反爬机制。
 3. **抓取逻辑只写在与 Web 进程分离的脚本里。** 任何 `src/pages/`、`src/middleware.ts` 中不得执行抓取或长时间任务。
 4. **每个可索引页面必须有唯一的 `<title>`、`description` 和 canonical。** 搜索页与任意筛选组合页默认 `noindex`。
-5. **不引入客户端全局状态。** 筛选、分页、搜索一律走 URL 查询参数，保证可分享、可索引、可后退。
+5. **不引入客户端全局状态。** 筛选、分页、搜索一律走 URL 查询参数，保证可分享、可索引、可后退。主题偏好的 `localStorage` 是唯一例外（见 `docs/ARCHITECTURE.md` §10）。
 6. **不改动 `docs/ARCHITECTURE.md` 中的决策，除非先更新文档并说明理由。**
 7. **界面文案必须走 i18n，不得硬编码。** 页面与组件里的可见字符串一律通过 `useTranslations(locale)` 的 `t('key')` 取得，文案存在 `src/lib/i18n/messages/{locale}.json`；新增 key 时同步所有语言并跑 `vpr i18n:check`。
 
@@ -38,7 +38,7 @@
 | 数据库          | SQLite + Drizzle ORM                               |
 | 检索            | SQLite FTS5，中文先经 nodejieba 分词               |
 | 多语言          | `src/lib/i18n`（zh-CN 默认 + en），`x18n` 校验文案 |
-| 样式            | 待定                                               |
+| 样式            | 原生 CSS + 设计令牌（`src/styles/`），亮/暗主题    |
 
 依赖方向：`pages → components → lib`。`lib/` 放数据访问与纯函数，禁止在组件里直接拼 SQL。所有数据库访问经由 `src/lib/db/` 暴露的函数。
 
@@ -51,6 +51,7 @@ src/pages/[...lang]/  路由，一份页面 × 所有语言（`localeRoutes()`�
 src/layouts/        页面骨架，全局 <head> 在 BaseLayout 统一维护
 src/components/     展示组件，不含数据访问
 src/lib/i18n/       语言清单、messages、`t()`、路径前缀与日期格式化
+src/styles/         设计令牌（tokens.css）、全局基础样式、令牌守卫测试
 src/lib/db/         Drizzle schema 与查询函数
 src/lib/domain/     纯逻辑：slug、日期、标签归一化、摘要截断
 scripts/crawler/    抓取管道，独立进程，不 import 任何 src/ 下的 Astro 代码
@@ -132,6 +133,8 @@ vpr dev stop           # 停止
 - 数据查询函数返回已确定的类型，类型从 Drizzle schema 推导，不手写重复 interface。
 - 日期统一以 UTC 存储，展示时用 `formatDate(value, locale)`（内部按 `Asia/Shanghai`）。
 - 站内链接用 `localizePath(path, locale)`，不要在模板里手拼 `/en` 前缀。
+- 颜色、字号、行高、间距、圆角一律用令牌（`src/styles/tokens.css`）；组件里不写裸色值和裸字号，也不直接用 `--neutral-*` / `--accent-*` 原语。
+- 改颜色：在 `tokens.css` 里给语义色补 `light-dark()` 两值，然后跑 `vp test`（`tokens.test.ts` 实测对比度与单一主题机制）。
 - 不要用 `any`；确需逃逸时写 `unknown` + 收窄。
 - 提交前跑 `vp check`，构建必须通过 `vpr build`。
 
