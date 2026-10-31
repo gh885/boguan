@@ -1,4 +1,6 @@
 {
+  "feed.description": "Newest engineering posts indexed from Chinese tech teams — titles, summaries and links to the originals only.",
+  "feed.title": "Boguan · Latest posts",
   "footer.note": "Every indexed post was published by its company's team; the copyright stays with the original authors.",
   "home.building.body": "The crawler and the list pages are not ready yet. What works today is the site skeleton: bilingual UI copy, the light and dark themes, and the design tokens.",
   "home.building.title": "The site is a work in progress",

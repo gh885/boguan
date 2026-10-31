@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
 import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
@@ -38,6 +38,14 @@ export function openDatabase(path = defaultDatabasePath): Db {
  * 这张库里没有正文表——正文在文件里，web 拿不到。
  */
 export function openReadonlyDatabase(path = defaultDatabasePath): Db {
+  if (!existsSync(path)) {
+    // 构建/预览时最常见的失败原因，直接说清楚该跑什么，别让 better-sqlite3 报 SQLITE_CANTOPEN
+    throw new Error(
+      `数据库不存在：${path}
+  本地开发：vpr db:init && vpr db:seed && vpr crawl --mode=backfill --max-pages=1
+  只用构建数据：vpr db:fixture && BOGUAN_DB=data/fixture.db vpr build`,
+    );
+  }
   const raw = new Database(path, { readonly: true, fileMustExist: true });
   raw.pragma("busy_timeout = 5000");
   return drizzle(raw, { schema });

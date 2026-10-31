@@ -47,8 +47,8 @@ describe("进程边界", () => {
       for (const specifier of imports) {
         if (!specifier.includes("/db")) continue;
         expect(
-          specifier.includes("db/queries/"),
-          `${relativeToRepo(path)} 直接引用了 ${specifier}，页面只能经 src/lib/db/queries/ 读库`,
+          /db\/queries(\/|$)/.test(specifier),
+          `${relativeToRepo(path)} 直接引用了 ${specifier}，页面只能经 src/lib/db/queries 读库`,
         ).toBe(true);
       }
     }

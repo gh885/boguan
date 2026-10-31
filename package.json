@@ -14,15 +14,19 @@
     "db:init": "vpx scripts/db/init.ts",
     "db:seed": "vpx scripts/db/seed.ts",
     "db:check": "vpx scripts/db/check.ts",
-    "crawl": "vpx scripts/crawler/cli.ts"
+    "crawl": "vpx scripts/crawler/cli.ts",
+    "db:fixture": "vpx scripts/db/fixture.ts"
   },
   "dependencies": {
+    "@astrojs/rss": "^4.0.19",
+    "@astrojs/sitemap": "^3.7.4",
     "astro": "^7.4.4",
     "better-sqlite3": "^13.0.3",
     "cheerio": "^1.2.0",
     "drizzle-orm": "^0.45.4",
-    "fast-xml-parser": "^5.11.2",
-    "robots-parser": "^3.0.1"
+    "entities": "^4.5.0",
+    "robots-parser": "^3.0.1",
+    "rss-parser": "^3.13.0"
   },
   "devDependencies": {
     "@node-rs/jieba": "^2.0.4",

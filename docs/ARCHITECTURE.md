@@ -205,6 +205,8 @@ interface SourceAdapter {
 - **列表页能拿到时间就不进详情页**；列表页能拿到正文（RSS `content:encoded`）就声明 `detail: 'none'`。
 - **纯前端渲染的源（掘金、知乎）只走公开 JSON 接口，不引入无头浏览器**。无头浏览器既贵又容易被判定为绕过反爬；拿不到公开接口就标记「暂不支持」，不做。
 - **解析失败必须响**：列表页 200 但解析出 0 条、详情页找不到正文容器、正文短于 200 字——都抛错进 `crawl_failures`，不静默写一条空正文。（有赞详情页会让轻量 HTML 解析器丢掉整段正文，所以用 cheerio；这就是「静默失败比崩溃更难查」的实例。）
+- **通用格式交给现成库，不自己写胶水**：feed 解析用 `rss-parser`（RSS/Atom 归一、`rel="alternate"`、`content:encoded`、`dc:creator` 都已处理），实体解码用 `entities`（HTML5 命名实体全集）。自己维护一份「实体映射表 / feed 字段归一」只会写出一个覆盖更窄的版本。唯一保留手写的是 HTML → 文本：`htmlToText` 直接遍历已经解析好的 cheerio DOM，而 `html-to-text` 要重新 parse 一遍字符串；这 40 行没有外部状态，留着手写比多一个依赖划算。
+- **不用无头浏览器、也不默认上 Readability**：通用可读性抽取（`@mozilla/readability` + jsdom）能减少「一个源一份选择器」的成本，但它对**已知结构**的站点没有收益，还会把导航与评论混进正文。触发条件是「待接源里有一半以上没有稳定结构」，到那时再加 `detail: "auto"` 能力，现在不引。
 
 ### 归一
 
@@ -251,6 +253,9 @@ interface SourceAdapter {
 - 搜索是唯一必须动态渲染的页面，因此站点需要 Node 适配器（而非纯静态托管）。
 - **筛选只能走 SSR**：静态页读不到 `?company=&tag=&year=`。所以「筛选组合页」与搜索一样是 SSR + `noindex`，不要把筛选做成静态路径组合（数量爆炸且都是薄页面）。
 - 筛选状态全部在 URL 查询参数里（硬性规则 5），不引入客户端状态。
+- **页面只有一个数据库入口**：`src/lib/db/queries`。页面与 endpoint 不许直接 `openReadonlyDatabase`（`guard.test.ts` 守），查找与过滤规则也就不会各写一份。
+- **CI 构建用固定数据集**：`vpr db:fixture` 生成 `data/fixture.db`（4 条覆盖「有/无发布时间、两家公司」），
+  `BOGUAN_DB=data/fixture.db vpr build`。构建不依赖网络与源站可用性；本地开发则用真实抓取库。
 
 > 实现时以当前 Astro 版本的 `output` / `prerender` 配置语义为准。
 
@@ -304,11 +309,12 @@ select rowid from posts_fts where posts_fts match 'title_tokens : ("缓存")'
 
 1. **详情页不存在**。文章卡片直接外链原文，不在本站复制正文。
 2. **可索引的是列表页**：公司页、标签页、年份页。这些页面承载了"聚合"本身的独特价值——同一主题下跨公司、跨时间的文章集合，是原文页面没有的。**这是本站的 SEO 资产。**
-3. `sitemap.xml` 只收录列表页；搜索页与筛选组合页 `noindex`。
+3. `sitemap.xml` 用 `@astrojs/sitemap` 生成，只收录列表页并带 `hreflang` 互链；搜索页与筛选组合页 `noindex` 且被 `filter` 排除。
 4. 每个页面输出唯一的 `<title>`、`description`、`canonical`、OG 标签。
 5. 列表页输出 `ItemList` / `CollectionPage` 结构化数据。
 6. 外链跳转使用 `rel="noopener"`；如需统计点击，用显式跳转参数而非 `nofollow`。
 7. 多语言页面互相声明：每页输出各语言的 `hreflang` 与 `x-default`，canonical 指自己。见 §9。
+8. 站内 feed（`/rss.xml`、`/en/rss.xml`）只放**标题 + 摘要 + 原文链接**，与页面同一套内容边界（硬性规则 1）；`BaseLayout` 输出 `<link rel="alternate" type="application/rss+xml">` 便于订阅发现。
 
 ---
 
@@ -441,5 +447,6 @@ select rowid from posts_fts where posts_fts match 'title_tokens : ("缓存")'
 - **标签的自动程度**：v1 是「源标签映射 + 关键词规则 + 人工维护」。实测有赞的标签云里英语与拼音写法并存（`big-data` / `da-shu-ju` / `bigdata`），靠中文名归并 + 人工别名够用；LLM 抽取留到数据量稳定之后再评估。
 - **搜索排序**：现在是「BM25（标题 5 : 正文 1）+ 时间次级」。真实数据上够不够用要等语料变大，尤其是同一主题跨年份的结果。
 - **去重的改判**：胜出方被删后，`duplicate_of_id` 指向的记录不会自动复活，需要人工或一个专门的修复脚本。
+- **通用正文抽取（Readability）**：暂不引入。触发条件写在这里，避免以后反复讨论——当待接源里超过一半没有稳定的正文容器时，加 `detail: "auto"` 能力，用 `@mozilla/readability`（或 linkedom + 同名算法）兜底，正文过短仍按失败处理。
 
 > 已定下来的（原未决项）：分页深度——增量看水位、回填看 `--max-pages`（§3）；标签来源——规则匹配 + 人工映射（§5）；重建触发——cron 串行 `crawl → build`（§11）。

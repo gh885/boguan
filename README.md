@@ -124,12 +124,21 @@ vpr crawl --dry-run                  # 只抓一页、只打印，接入新源�
 vpr crawl                            # 增量（默认最多翻 5 页）
 vpr crawl --mode=backfill --max-pages=20   # 首次接入：回填最近 20 页
 vpr crawl --source=youzan-tech       # 只跑一个源
+vpr db:fixture                       # 造构建用的最小数据集 data/fixture.db
 vpr db:check                         # 对账 FTS / 正文文件 / 被挡住的源（--fix / --prune）
 # 每日定时任务：vpr crawl && vpr db:check --fix --prune && vpr build
 ```
 
 抓取守着 `robots.txt`、同域串行、≥1s 间隔、不带登录态；每个源的实测结论与坑记在
 [`docs/SOURCES.md`](docs/SOURCES.md)。
+
+构建需要数据库。CI 不跑抓取，用固定数据集构建：
+
+```bash
+vpr db:fixture && BOGUAN_DB=data/fixture.db vpr build
+```
+
+站点产出 `sitemap.xml`（带 hreflang）与 `/rss.xml`、`/en/rss.xml`（只放标题 + 摘要 + 原文链接）。
 
 AI 助手或需要后台运行开发服务器时：
 

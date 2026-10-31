@@ -5,47 +5,18 @@
  * 这里用码点计数，与 SQLite 的 `length()` 对齐，避免 emoji 让两边算出不同长度。
  */
 
+import { decodeHTML } from "entities";
+
 /** 摘要硬上限（字）。**这是规则上限，不是展示目标**：卡片上按两行裁（见 ARCHITECTURE §10） */
 export const SUMMARY_MAX = 200;
 
-const NAMED_ENTITIES: Record<string, string> = {
-  amp: "&",
-  lt: "<",
-  gt: ">",
-  quot: '"',
-  apos: "'",
-  nbsp: " ",
-  hellip: "…",
-  mdash: "—",
-  ndash: "–",
-  ldquo: "“",
-  rdquo: "”",
-  lsquo: "‘",
-  rsquo: "’",
-  middot: "·",
-  times: "×",
-  laquo: "«",
-  raquo: "»",
-  copy: "©",
-  reg: "®",
-};
-
+/**
+ * 实体解码交给 `entities`（HTML5 命名实体全集 + 数字实体），不自己维护映射表：
+ * 手写的表永远覆盖不全，`&ldquo;` / `&mdash;` / `&trade;` 这类漏一个就是页面上多一行乱码。
+ * `entities` 是纯 JS，web 与 crawler 都能用，不破坏进程边界。
+ */
 export function decodeEntities(input: string): string {
-  return input.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (whole, body: string) => {
-    if (body.startsWith("#")) {
-      const code =
-        body.startsWith("#x") || body.startsWith("#X")
-          ? Number.parseInt(body.slice(2), 16)
-          : Number.parseInt(body.slice(1), 10);
-      if (!Number.isFinite(code) || code <= 0 || code > 0x10ffff) return whole;
-      try {
-        return String.fromCodePoint(code);
-      } catch {
-        return whole;
-      }
-    }
-    return NAMED_ENTITIES[body.toLowerCase()] ?? whole;
-  });
+  return decodeHTML(input);
 }
 
 /** 空白折叠：普通空白 + 全角空格 + 零宽字符 */
