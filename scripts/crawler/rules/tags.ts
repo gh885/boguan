@@ -31,6 +31,18 @@ export const TAG_RULES: Rule[] = [
     patterns: [/分布式/i, /一致性/i, /共识算法/i, /raft/i, /paxos/i],
   },
   {
+    slug: "golang",
+    name: "Go",
+    order: 6,
+    patterns: [/golang/i, /go.*(协程|goroutine|channel)/i, /goroutine/i],
+  },
+  {
+    slug: "media",
+    name: "音视频",
+    order: 7,
+    patterns: [/音视频/i, /编解码/i, /播放器/i, /视频流/i, /webrtc/i, /ffmpeg/i],
+  },
+  {
     slug: "database",
     name: "数据库",
     order: 3,
