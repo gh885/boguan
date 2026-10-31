@@ -32,6 +32,7 @@ export interface SeedSource {
 export const SEED_COMPANIES: SeedCompany[] = [
   { slug: "meituan", name: "美团", nameEn: "Meituan", homepage: "https://tech.meituan.com/" },
   { slug: "youzan", name: "有赞", nameEn: "Youzan", homepage: "https://tech.youzan.com/" },
+  { slug: "dewu", name: "得物", nameEn: "Dewu", homepage: "https://tech.dewu.com/" },
 ];
 
 /**
@@ -41,6 +42,15 @@ export const SEED_COMPANIES: SeedCompany[] = [
 export const SEED_TAG_ALIASES: { raw: string; slug: string }[] = [
   { raw: "bigdata", slug: "big-data" }, // 有赞的 tag 云里 bigdata 与 big-data 并存
   { raw: "big data", slug: "big-data" },
+  // 得物的分类是中文名，映射到已有标签，跨公司才能聚合（大前端/前端 → frontend）
+  { raw: "大前端", slug: "frontend" },
+  { raw: "测试", slug: "testing" },
+  { raw: "java", slug: "java" },
+  { raw: "golang", slug: "golang" },
+  { raw: "ai&数据", slug: "ai" },
+  { raw: "运维&稳定生产", slug: "reliability" },
+  { raw: "技术思考", slug: "engineering" },
+  { raw: "音视频", slug: "media" },
 ];
 
 export const SEED_SOURCES: SeedSource[] = [
@@ -60,6 +70,14 @@ export const SEED_SOURCES: SeedSource[] = [
     // 有赞用 sitemap 当列表入口：一次请求就是全量文章 URL（见 docs/SOURCES.md）
     listUrl: "https://tech.youzan.com/sitemap-posts.xml",
     priority: 20,
+  },
+  {
+    companySlug: "dewu",
+    slug: "dewu-tech",
+    name: "得物技术团队",
+    adapter: "dewu",
+    listUrl: "https://tech.dewu.com/",
+    priority: 30,
   },
 ];
 
