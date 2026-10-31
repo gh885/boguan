@@ -3,7 +3,9 @@ import en from "./messages/en.json";
 import zhCN from "./messages/zh-CN.json";
 import {
   alternateLinks,
+  formatCount,
   formatDate,
+  formatList,
   localizePath,
   localeFromPathname,
   localeRoutes,
@@ -11,6 +13,7 @@ import {
   translate,
   useTranslations,
 } from "./index";
+import { companyDisplayName } from "./company";
 
 describe("messages", () => {
   it("每个语言都有同一套 key", () => {
@@ -98,6 +101,25 @@ describe("stripLocale / alternateLinks", () => {
   it("默认语言与其它语言互相还原", () => {
     const links = alternateLinks("/");
     expect(links.map((link) => stripLocale(link.href))).toEqual(["/", "/"]);
+  });
+});
+
+describe("formatCount / formatList", () => {
+  it("英文单复数与中文量词", () => {
+    expect(formatCount("en", "articles", 1)).toBe("1 article");
+    expect(formatCount("en", "articles", 2)).toBe("2 articles");
+    expect(formatCount("zh-CN", "articles", 2)).toBe("2 篇文章");
+  });
+
+  it("公司名在英文界面优先用 nameEn", () => {
+    expect(companyDisplayName({ name: "美团", nameEn: "Meituan" }, "en")).toBe("Meituan");
+    expect(companyDisplayName({ name: "美团", nameEn: "Meituan" }, "zh-CN")).toBe("美团");
+    expect(companyDisplayName({ name: "美团", nameEn: null }, "en")).toBe("美团");
+  });
+
+  it("列表连接符跟随语言", () => {
+    expect(formatList("en", ["A", "B", "C"])).toContain("and");
+    expect(formatList("zh-CN", ["A", "B", "C"])).toContain("、");
   });
 });
 

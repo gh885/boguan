@@ -15,11 +15,13 @@ import {
   tags,
 } from "../../src/lib/db/schema";
 import { normalizeRawTag } from "../../src/lib/domain/tag";
+import { canonicalizeUrl } from "../../src/lib/domain/url";
 import { slugify } from "../../src/lib/domain/title";
 import { adapterFor } from "./adapters";
 import type { AdapterContext, SourceAdapter } from "./adapters/types";
 import { PoliteFetcher } from "./fetch";
 import { contentHash, normalizePost, type NormalizedPost } from "./normalize";
+import type { Detail } from "./types";
 import { ruleTags } from "./rules/tags";
 import type { ListItem, TagRef } from "./types";
 
@@ -177,6 +179,13 @@ async function crawlSource(
     .values({ jobId, sourceId: source.id, mode: options.mode })
     .returning()
     .get();
+  // 「只给 URL」的列表（sitemap）切片之间不发请求，已知条目在 processItem 里就跳过了，
+  // 所以增量时必须走完全部切片才能发现新文章——`--max-pages` 在那里只约束回填
+  // （回填的每个新条目都要抓一次详情，才是真正要设上限的成本）。
+  const urlOnlyList = adapter.capabilities.list === "sitemap";
+  const pageLimit =
+    options.mode === "incremental" && urlOnlyList ? Number.POSITIVE_INFINITY : options.maxPages;
+
   const startedAt = Date.now();
   const ctx: AdapterContext = {
     fetcher,
@@ -196,11 +205,14 @@ async function crawlSource(
   let error: string | null = null;
 
   try {
-    while (page <= options.maxPages && !stopped) {
+    while (page <= pageLimit && !stopped) {
       const items = await adapter.fetchList(ctx, page);
       if (items.length === 0) break;
       base.pages = page;
 
+      // 时间水位只在列表条目自带时间时才有意义：sitemap 这类「只给 URL」的列表
+      // 没有时间也没有「新的在前」的排序保证，按水位停会漏掉排在后面的新文章。
+      const hasListTimes = items.some((item) => !!item.publishedAtRaw);
       const olderThanWatermark = (iso: string | null) =>
         !!iso && !!watermark && Date.parse(iso) <= Date.parse(watermark) - WATERMARK_SLACK_MS;
       let pageHasNew = false;
@@ -216,6 +228,7 @@ async function crawlSource(
           unmapped,
           seen,
           log,
+          options.force ?? false,
         );
         if (!outcome) continue;
         seen.add(outcome.canonicalUrl);
@@ -226,7 +239,11 @@ async function crawlSource(
         if (!olderThanWatermark(outcome.publishedAt)) pageHasNew = true;
 
         // 增量停止条件：看时间水位，不看条数（置顶、重排都不会误停）
-        if (options.mode === "incremental" && olderThanWatermark(outcome.publishedAt)) {
+        if (
+          options.mode === "incremental" &&
+          hasListTimes &&
+          olderThanWatermark(outcome.publishedAt)
+        ) {
           stopSignals += 1;
         } else {
           stopSignals = 0;
@@ -235,7 +252,7 @@ async function crawlSource(
 
       // 整页都早于水位：到此为止。比「连续 N 条」更稳，也和每页条数无关——
       // 否则一页只有 5 条时，阈值 10 永远达不到，增量就会一直往前补历史。
-      if (options.mode === "incremental" && watermark && !pageHasNew) {
+      if (options.mode === "incremental" && hasListTimes && watermark && !pageHasNew) {
         log(`  [${source.slug}] 第 ${page} 页全部早于水位，停止翻页`);
         stopped = true;
       }
@@ -253,7 +270,7 @@ async function crawlSource(
       db,
       run.id,
       "list",
-      adapter.pageUrl(source.listUrl, Math.min(page, options.maxPages)),
+      adapter.pageUrl(source.listUrl, pageLimit === Infinity ? page : Math.min(page, pageLimit)),
       null,
       error,
     );
@@ -332,45 +349,60 @@ async function processItem(
   unmapped: Set<string>,
   seen: Set<string>,
   log: Log,
+  force: boolean,
 ): Promise<ItemOutcome | null> {
-  const listLevel = normalizePost({
-    item,
-    timezone: source.timezone,
-    base: source.listUrl,
-  });
-  if (!listLevel) return null;
-  // 同一轮里列表页可能重复给出同一条（置顶、跨页重叠），抓过就别再抓详情
-  if (seen.has(listLevel.canonicalUrl)) return null;
+  const canonicalUrl = canonicalizeUrl(item.url, source.listUrl);
+  if (!canonicalUrl) return null;
+  // 同一轮里列表可能重复给出同一条（置顶、跨页重叠），处理过就别再来一次
+  if (seen.has(canonicalUrl)) return null;
 
-  const existing = db
-    .select()
-    .from(posts)
-    .where(eq(posts.canonicalUrl, listLevel.canonicalUrl))
-    .get();
+  const existing = db.select().from(posts).where(eq(posts.canonicalUrl, canonicalUrl)).get();
   const canDetail =
     adapter.capabilities.detail !== "none" && typeof adapter.fetchDetail === "function";
 
+  // 列表层元数据：sitemap 这类「只给 URL」的列表给不出标题，这里就是 null
+  const listLevel = normalizePost({ item, timezone: source.timezone, base: source.listUrl });
+
+  // 只为发现新条目的列表（sitemap）：库里已有正文就一次请求都不发。
+  // 这是「sitemap 当列表」能天天跑的前提——否则每天要重抓全站详情页。
+  if (!listLevel && existing && !force && hasBody(existing.id)) {
+    return { kind: "unchanged", canonicalUrl, publishedAt: existing.publishedAt };
+  }
+
   const metadataChanged =
+    !listLevel ||
     !existing ||
     existing.title !== listLevel.title ||
     existing.summary !== listLevel.summary ||
     existing.publishedAt !== listLevel.publishedAt;
-  // 能不打开详情页就不打开：列表页没给正文时，只有「新条目 / 元数据变了 / 正文文件丢了」才去
-  const needsDetail =
-    canDetail && !item.body && (!existing || metadataChanged || !hasBody(existing.id));
+  // 能不打开详情页就不打开：只有「新条目 / 元数据变了 / 正文文件丢了」才去
+  const needsDetail = canDetail && !item.body && metadataChanged;
+
+  // 抓取用列表里给的原始地址，canonical 地址只做身份：有赞对去掉结尾斜杠的地址
+  // 会 301 回来，拿 canonical 去抓等于每篇多一次请求（回填 351 篇就是双倍）
+  const fetchUrl = new URL(item.url, source.listUrl).toString();
 
   let normalized = listLevel;
   if (needsDetail) {
     try {
-      const detail = await adapter.fetchDetail!(ctx, listLevel.canonicalUrl);
+      const detail = await adapter.fetchDetail!(ctx, fetchUrl);
       normalized =
         normalizePost({ item, detail, timezone: source.timezone, base: source.listUrl }) ??
         listLevel;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      recordFailure(db, runId, "detail", listLevel.canonicalUrl, null, message);
-      log(`  [${source.slug}] 详情页失败：${listLevel.canonicalUrl}（${message}）`);
+      recordFailure(db, runId, "detail", canonicalUrl, null, message);
+      log(`  [${source.slug}] 详情页失败：${canonicalUrl}（${message}）`);
     }
+  }
+
+  // 列表与详情页都没给出标题：不是能入库的东西，记失败等人看
+  if (!normalized) {
+    if (!needsDetail) {
+      recordFailure(db, runId, "detail", canonicalUrl, null, "列表与详情页都没有标题");
+      log(`  [${source.slug}] 拿不到标题，跳过：${canonicalUrl}`);
+    }
+    return null;
   }
 
   // 详情页没拿到就沿用库里已有的正文，避免把好的正文覆盖成空
@@ -393,6 +425,8 @@ async function processItem(
         publishedAt: normalized.publishedAt,
         publishedAtRaw: normalized.publishedAtRaw,
         publishedYear: normalized.publishedYear,
+        readingMinutes: normalized.readingMinutes,
+        hasCode: normalized.hasCode,
         coverUrl: normalized.coverUrl,
         contentHash: hash,
       })
@@ -416,6 +450,8 @@ async function processItem(
         lastSeenAt: now,
         publishedAt: existing.publishedAt ?? normalized.publishedAt,
         publishedYear: existing.publishedYear ?? normalized.publishedYear,
+        readingMinutes: existing.readingMinutes ?? normalized.readingMinutes,
+        hasCode: normalized.hasCode ?? existing.hasCode,
       })
       .where(eq(posts.id, existing.id))
       .run();
@@ -435,6 +471,8 @@ async function processItem(
       publishedAt: normalized.publishedAt,
       publishedAtRaw: normalized.publishedAtRaw,
       publishedYear: normalized.publishedYear,
+      readingMinutes: normalized.readingMinutes ?? existing.readingMinutes,
+      hasCode: normalized.hasCode ?? existing.hasCode,
       coverUrl: normalized.coverUrl,
       contentHash: hash,
       lastSeenAt: now,
@@ -658,25 +696,45 @@ export async function inspect(
     const items = await adapter.fetchList(ctx, page);
     log(`   第 ${page} 页解析出 ${items.length} 条，来源 ${adapter.pageUrl(source.listUrl, page)}`);
     // 详情页选择器也要在 dry-run 里验一遍，否则「正文 0 字」看不出是对是错
-    if (items.length > 0 && adapter.fetchDetail && adapter.capabilities.detail !== "none") {
-      try {
-        const detail = await adapter.fetchDetail(ctx, items[0].url);
-        log(
-          `   详情页样例：正文 ${detail.body?.length ?? 0} 字 / 作者 ${detail.author ?? "无"} / 时间 ${detail.publishedAtRaw ?? "无"} / 标签 ${detail.tags?.map((tag) => tag.raw).join("、") || "无"}`,
-        );
-      } catch (error) {
-        log(`   ✗ 详情页失败：${error instanceof Error ? error.message : String(error)}`);
-      }
-    }
+    const canDetail =
+      adapter.capabilities.detail !== "none" && typeof adapter.fetchDetail === "function";
+    // sitemap 这类列表只给 URL：详情页是唯一的信息来源，多抽一条
+    const urlOnly = items.length > 0 && !items[0]!.title;
+    if (urlOnly) log("   列表只给 URL（sitemap），标题与时间取自详情页");
 
-    for (const item of items.slice(0, 5)) {
-      const normalized = normalizePost({ item, timezone: source.timezone, base: source.listUrl });
+    let detailCalls = 0;
+    const detailBudget = urlOnly ? 2 : 1;
+    for (const [index, item] of items.slice(0, urlOnly ? 2 : 5).entries()) {
+      let detail: Detail | undefined;
+      if (canDetail && (urlOnly || index === 0) && detailCalls < detailBudget) {
+        detailCalls += 1;
+        try {
+          detail = await adapter.fetchDetail!(ctx, item.url);
+          log(
+            `   详情页样例：${detail.title ? `「${detail.title}」` : ""}正文 ${detail.body?.length ?? 0} 字 / 作者 ${detail.author ?? "无"} / 时间 ${detail.publishedAtRaw ?? "无"} / 标签 ${detail.tags?.map((tag) => tag.raw).join("、") || "无"}`,
+          );
+        } catch (error) {
+          log(
+            `   ✗ 详情页失败：${item.url}（${error instanceof Error ? error.message : String(error)}）`,
+          );
+          continue;
+        }
+      }
+
+      const normalized = normalizePost({
+        item,
+        detail,
+        timezone: source.timezone,
+        base: source.listUrl,
+      });
       if (!normalized) {
         log(`   ✗ 归一失败：${item.url}`);
         continue;
       }
       log(
-        `   · ${normalized.title}\n     ${normalized.canonicalUrl}\n     时间 ${normalized.publishedAt ?? "（解析不出来）"}（源串 ${normalized.publishedAtRaw ?? "无"}） 摘要 ${Array.from(normalized.summary).length} 字 正文 ${normalized.body.length} 字 标签 ${normalized.tags.map((tag) => tag.raw).join("/") || "无"}`,
+        `   · ${normalized.title}
+     ${normalized.canonicalUrl}
+     时间 ${normalized.publishedAt ?? "（解析不出来）"}（源串 ${normalized.publishedAtRaw ?? "无"}） 摘要 ${Array.from(normalized.summary).length} 字 正文 ${normalized.body.length} 字 标签 ${normalized.tags.map((tag) => tag.raw).join("/") || "无"}`,
       );
     }
     log(`   请求 ${fetcher.stats.requests} 次，robots 拦截 ${fetcher.stats.denied} 次`);

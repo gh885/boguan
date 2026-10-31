@@ -11,6 +11,9 @@ import { crawl, inspect, type CrawlMode } from "./pipeline";
  *   vpr crawl --source=youzan-tech             # 只跑一个源
  *   vpr crawl --dry-run                        # 只抓一页、只打印，不写库
  *   vpr crawl --force                          # 忽略 blocked 标记跑一次
+ *
+ * `--max-pages` 对「只给 URL」的列表（sitemap）在增量模式下不生效：切片之间不发请求，
+ * 必须走完全部切片才能发现排在后段的新文章；那里它只约束回填。
  */
 
 const { values } = parseArgs({

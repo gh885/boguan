@@ -122,6 +122,8 @@ posts              文章元数据（不含正文）
   published_at?       ISO UTC；解析不出来就是 NULL，不编造
   published_at_raw?   源站原始串，便于回溯解析规则
   published_year?     按 sources.timezone 取年，/year/[year] 直接走索引
+  reading_minutes?   按正文估算的阅读分钟数（派生元数据，不是正文）
+  has_code?          详情页是否含 <pre>/<code>；列表页拿不到正文时为 NULL
   cover_url?, content_hash, duplicate_of_id?, is_visible
   first_seen_at, last_seen_at
 
@@ -146,6 +148,7 @@ posts_fts          FTS5 虚拟表：title_tokens, body_tokens
 - **索引与可见性解耦**：不变量只有一条——「每篇帖子都有一行索引」。`is_visible` / `duplicate_of_id` 在查询时过滤，抓取与去重都不动索引。否则一次「下架再上架」就会让帖子和索引脱钩，而抓取因为内容没变不会再写索引，只能等人工发现。
 - **`published_year` 单独存一列**：SQLite 没有时区函数，而 `/year/[year]` 要按 `sources.timezone` 取年且走索引，所以抓取时就算好落列；`published_at` 仍是 UTC。不变量：**改 `published_at` 必须同时改 `published_year`**，计算集中在 `src/lib/domain/date.ts`，由 `normalizePost` 单点调用。
 - **`summary` 带 CHECK 约束**（`length ≤ 200`）：硬性规则 1 的底线不靠自觉，超了直接写不进库。**200 字是规则上限，不是展示目标**：卡片上按两行裁（`line-clamp`），列表节奏不该被摘要长度带跑。
+- **`reading_minutes` / `has_code` 是派生元数据**：前者由正文字符数估算，后者由详情页 HTML 是否含 `<pre>` / `<code>` 判断，都不包含正文片段。它们只服务于卡片上的「N 分钟」「含代码」与筛选，不参与排序。列表页拿不到正文时 `has_code` 保持 NULL（不知道就不显示），不伪装成 false。已有库用 `vpr db:metrics` 从 crawler 私有正文文件回填；这个脚本与 `db:check` 一样只读 crawler 侧文件，web 没有访问路径。
 - **`title_norm`** 是跨源去重的比对键（NFKC + 小写 + 只留字母数字汉字），配 `(company_id, title_norm)` 索引，去重不用全表扫。
 - **`priority` + `duplicate_of_id`**：官网与掘金重复发布是常态。抓完后按「同公司 + 同 `title_norm` + 3 天内」找碰撞，`priority` 小者胜出，另一条打上 `duplicate_of_id`。**索引不跟着删**——可见性与去重都在查询时过滤（见下一条），去掉这层耦合之后，「下架再上架」「胜出方被删」都不需要补索引。`duplicate_of_id` 是自引用外键，胜出方被删时置空。
 - **`crawl_jobs` 是批次层**：跨源去重、批次统计、「这轮要不要重建」需要一个比 `crawl_runs`（每个源一行）更高的维度。
@@ -205,6 +208,14 @@ interface SourceAdapter {
 - **列表页能拿到时间就不进详情页**；列表页能拿到正文（RSS `content:encoded`）就声明 `detail: 'none'`。
 - **纯前端渲染的源（掘金、知乎）只走公开 JSON 接口，不引入无头浏览器**。无头浏览器既贵又容易被判定为绕过反爬；拿不到公开接口就标记「暂不支持」，不做。
 - **解析失败必须响**：列表页 200 但解析出 0 条、详情页找不到正文容器、正文短于 200 字——都抛错进 `crawl_failures`，不静默写一条空正文。（有赞详情页会让轻量 HTML 解析器丢掉整段正文，所以用 cheerio；这就是「静默失败比崩溃更难查」的实例。）
+- **列表入口可以是 sitemap**：`capabilities.list` 的第四种形态。sitemap 一次请求就是全量 URL 清单，
+  是回填最好的入口（不用翻 70 页、不靠「越界页 404」判底）。代价是列表层没有标题与时间，
+  由 `Detail.title` 补齐；对「只给 URL」的条目，管道有一个快路径：库里已有正文就算未变、一次请求都不发，
+  否则 sitemap 当列表意味着每天重抓全站详情页。也因此 `--max-pages` 在增量模式下不约束这种列表
+  （切片之间不发请求；它只在回填时限制要抓多少详情页）。见 `docs/SOURCES.md`。
+- **身份用 canonical，抓取用原始地址**：`canonicalizeUrl()` 会去掉结尾斜杠等噪音，但直接拿它去抓
+  会被站点 301 回来（有赞就是），回填 351 篇等于多打 351 次。`processItem` 因此把列表里的原始地址
+  交给适配器，canonical 只用于入库与去重。
 - **通用格式交给现成库，不自己写胶水**：feed 解析用 `rss-parser`（RSS/Atom 归一、`rel="alternate"`、`content:encoded`、`dc:creator` 都已处理），实体解码用 `entities`（HTML5 命名实体全集）。自己维护一份「实体映射表 / feed 字段归一」只会写出一个覆盖更窄的版本。唯一保留手写的是 HTML → 文本：`htmlToText` 直接遍历已经解析好的 cheerio DOM，而 `html-to-text` 要重新 parse 一遍字符串；这 40 行没有外部状态，留着手写比多一个依赖划算。
 - **不用无头浏览器、也不默认上 Readability**：通用可读性抽取（`@mozilla/readability` + jsdom）能减少「一个源一份选择器」的成本，但它对**已知结构**的站点没有收益，还会把导航与评论混进正文。触发条件是「待接源里有一半以上没有稳定结构」，到那时再加 `detail: "auto"` 能力，现在不引。
 
@@ -215,6 +226,7 @@ interface SourceAdapter {
 3. **摘要**：优先源站 description；没有就从正文截首 200 字，在句首/句末标点处收口，不留半个词、不留 HTML 残留。
 4. **正文**：只用纯文本，单篇上限 6 万字；进详情页的源用适配器的容器选择器收敛范围，再由 `htmlToText` 抽文本。
 5. **指纹**：`content_hash = sha256(title + summary + 正文)`；`listHash = sha256(title + summary)` 用来判断「要不要再进详情页」。
+6. **阅读元数据**：`reading_minutes` 按中文字符数（约 400 字/分钟）与英文词数（约 200 词/分钟）估算，至少 1 分钟；`has_code` 由适配器在原始 HTML 上检测 `<pre>` / `<code>`，不靠纯文本猜。两者都是派生元数据，正文仍然只进 crawler 私有文件与 FTS。
 
 ### 去重
 
@@ -229,6 +241,8 @@ interface SourceAdapter {
 3. 名字也没有的原始标签**不入库**，记进运行日志（`未映射的源站标签：…`）等人工补映射；
 4. 一个源站标签都没解析出来时，退到 `scripts/crawler/rules/tags.ts` 的关键词规则（`origin = 'rule'`）：标题命中直接算数，正文要出现 3 次以上，每篇最多 3 个；
 5. 人工干预写 `origin = 'manual'`，自动流程只删非 manual 的标签关联。
+
+`/tags` 的分组（人工智能、数据与检索、架构与稳定性……）是**展示层映射**，写在 `src/lib/domain/tag-group.ts`，不新增数据库列；未知标签落到「其他」，不会因为新增一个标签而消失。
 
 ### 失败与可观测
 
@@ -249,8 +263,16 @@ interface SourceAdapter {
 | `/search`、带筛选参数的结果页                | SSR（需服务端分词 + FTS5） | ❌ noindex |
 | sitemap.xml、robots.txt                      | 构建时生成                 | —          |
 
+列表页的「含代码」筛选入口指向 `/search?has_code=1`（可叠加 company / tag / year）：
+静态页读不到查询串，筛选统一在唯一的 SSR 结果页里完成，视觉上仍是同一套卡片与筛选条。
+
+分页同样是静态路由：首页 `/page/[n]`，公司 / 标签 / 年份分别是
+`/company/[slug]/page/[n]`、`/tag/[slug]/page/[n]`、`/year/[year]/page/[n]`；第 1 页不带
+`/page/1`，避免同一内容两个 URL。
+
 - 每日抓取完成后触发一次重建；列表页最多滞后一天，可接受。
 - 搜索是唯一必须动态渲染的页面，因此站点需要 Node 适配器（而非纯静态托管）。
+- 关于页用 `BaseLayout` 的 `chrome="bare"`：隐藏侧栏与移动栏，但 `<head>`、canonical、hreflang 仍由 layout 统一维护；页面自己提供顶部导航。不要为它复制一份 head。
 - **筛选只能走 SSR**：静态页读不到 `?company=&tag=&year=`。所以「筛选组合页」与搜索一样是 SSR + `noindex`，不要把筛选做成静态路径组合（数量爆炸且都是薄页面）。
 - 筛选状态全部在 URL 查询参数里（硬性规则 5），不引入客户端状态。
 - **页面只有一个数据库入口**：`src/lib/db/queries`。页面与 endpoint 不许直接 `openReadonlyDatabase`（`guard.test.ts` 守），查找与过滤规则也就不会各写一份。
@@ -403,8 +425,13 @@ select rowid from posts_fts where posts_fts match 'title_tokens : ("缓存")'
 ### 排版
 
 - 不加载 Web 字体：中文用系统字体栈（PingFang SC / Microsoft YaHei / Noto Sans CJK），不让字形拖首屏。
+- 关于页的展示字体走 `--font-serif`（Noto Serif SC / Songti SC / SimSun 等系统衬线），同样不加载 Web 字体。
 - 字号、行高、间距、圆角一律用令牌，组件里不出现裸色值与裸字号。
 - 正文按 `--width-measure` 收窄到 60–75 字符，标题 `text-wrap: balance`。
+
+### 关于页的固定纸面
+
+关于页是一张「印刷页」，使用 `src/styles/about.css` 里页面级的 `--about-*` 暖色令牌（纸面、墨色、橄榄绿、赭石），固定为暖色，不跟随全站亮/暗主题；这是版面决策，不是第二套全站主题。它不改变 `--color-*` 的角色定义，也不把暖色带到组件层。`about.css` 只由关于页引入，其他页面不应依赖这些变量。
 
 > 基线：`light-dark()` 与 `oklch()` 需要 2024 年后的浏览器（Chrome 123 / Safari 17.5 / Firefox 120）。本站面向开发者，不再为更老的浏览器降级。
 
@@ -429,21 +456,27 @@ select rowid from posts_fts where posts_fts match 'title_tokens : ("缓存")'
 
 ## 12. 里程碑
 
-| #   | 内容            | 验收标准                                                          | 状态                 |
-| :-- | :-------------- | :---------------------------------------------------------------- | :------------------- |
-| 0   | 数据源可行性    | 至少 3 家公司可稳定抓到标题/时间/正文，结论记进 `docs/SOURCES.md` | 2 家已验证           |
-| 1   | 数据模型 + 管道 | `vpr crawl` 可重复执行且幂等；`vpr db:check` 全绿                 | ✅                   |
-| 2   | 只读站点        | 四类列表页可访问，i18n 骨架就位                                   | 进行中（骨架已就位） |
-| 3   | 搜索            | 中文两字词可命中，结果相关                                        | 查询层已就绪         |
-| 4   | SEO             | sitemap、canonical、hreflang 齐全                                 | 未开始               |
-| 5   | 上线            | 域名可访问，每日自动更新                                          | 未开始               |
+| #   | 内容            | 验收标准                                                          | 状态                   |
+| :-- | :-------------- | :---------------------------------------------------------------- | :--------------------- |
+| 0   | 数据源可行性    | 至少 3 家公司可稳定抓到标题/时间/正文，结论记进 `docs/SOURCES.md` | 2 家已验证（359 篇）   |
+| 1   | 数据模型 + 管道 | `vpr crawl` 可重复执行且幂等；`vpr db:check` 全绿                 | ✅                     |
+| 2   | 只读站点        | 四类列表页可访问，i18n 骨架就位                                   | ✅                     |
+| 3   | 搜索            | 中文两字词可命中，结果相关                                        | ✅（排序待调，见 §13） |
+| 4   | SEO             | sitemap、canonical、hreflang 齐全                                 | 大部分（JSON-LD 未做） |
+| 5   | 上线            | 域名可访问，每日自动更新                                          | 未开始                 |
 
 > 顺序不能跳：阶段 0 的结论会反过来改 schema（`fixtures` 就改过一次 `adapter` / `timezone` / `title_norm`），先做模型再验证源等于给猜测加索引。
 
 ## 13. 未决问题
 
 - **第三个数据源**：需要至少再验证一家，才能确认适配器接口与标签规则不是只对「Ghost + VuePress」这两套模板成立的。
-- **`--mode=backfill` 的全量回填**：40 页 × 10 篇、≥1s/请求，一次约 7 分钟；还没在真实源上跑完过，抓完要复查标签质量与去重结果。
+- **回填的结论**（2026-10-31）：有赞 sitemap 351 条，`--max-pages=0` 跑完 342 次请求 / 343s，
+  新增 339、未变 10、失败 2（活动页正文只有几十字，按失败跳过）。库里 359 篇覆盖 2015–2022 + 2026。
+  回填后暴露两个内容问题，都需要产品判断：**标签长尾**（418 个标签里 300 个只有 1 篇，
+  等于 300 个薄页面进了 sitemap）与**非文章页**（`技术活动`、`团队介绍` 共 25 篇，短、关键词密度高，
+  在「秒杀」「MySQL 索引」这类查询里排在前列）。
+- **标签长尾的处置**：倾向「文章数 ≥ 3 的标签页才 index 并进 sitemap，其余 `noindex, follow`」，
+  但这会让 sitemap 从 1132 条掉到约 200 条，需要先确认站内导航仍能走通。
 - **标签的自动程度**：v1 是「源标签映射 + 关键词规则 + 人工维护」。实测有赞的标签云里英语与拼音写法并存（`big-data` / `da-shu-ju` / `bigdata`），靠中文名归并 + 人工别名够用；LLM 抽取留到数据量稳定之后再评估。
 - **搜索排序**：现在是「BM25（标题 5 : 正文 1）+ 时间次级」。真实数据上够不够用要等语料变大，尤其是同一主题跨年份的结果。
 - **去重的改判**：胜出方被删后，`duplicate_of_id` 指向的记录不会自动复活，需要人工或一个专门的修复脚本。

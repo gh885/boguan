@@ -55,7 +55,11 @@ describe("进程边界", () => {
   });
 
   it("正文存储只有 crawler 能引用", () => {
-    const allowed = new Set(["scripts/crawler/pipeline.ts", "scripts/db/check.ts"]);
+    const allowed = new Set([
+      "scripts/crawler/pipeline.ts",
+      "scripts/db/check.ts",
+      "scripts/db/metrics.ts",
+    ]);
     const offenders = [...srcFiles, ...scriptFiles]
       .filter((path) => /from\s+["'][^"']*db\/bodies["']/.test(readFileSync(path, "utf8")))
       .map(relativeToRepo)

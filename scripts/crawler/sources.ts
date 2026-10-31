@@ -57,7 +57,8 @@ export const SEED_SOURCES: SeedSource[] = [
     slug: "youzan-tech",
     name: "有赞技术团队",
     adapter: "youzan",
-    listUrl: "https://tech.youzan.com/",
+    // 有赞用 sitemap 当列表入口：一次请求就是全量文章 URL（见 docs/SOURCES.md）
+    listUrl: "https://tech.youzan.com/sitemap-posts.xml",
     priority: 20,
   },
 ];

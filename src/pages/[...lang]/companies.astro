@@ -1,0 +1,145 @@
+---
+import type { GetStaticPaths } from "astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import CompanyLogo from "../../components/CompanyLogo.astro";
+import EmptyState from "../../components/EmptyState.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import { companyCards, openWebDatabase } from "../../lib/db/queries";
+import { formatCount, localizePath, localeRoutes, useTranslations } from "../../lib/i18n";
+import { companyDisplayName } from "../../lib/i18n/company";
+import type { Locale } from "../../lib/i18n/config";
+import { collectionJsonLd } from "../../lib/structured-data";
+import { site } from "../../lib/site";
+
+export const getStaticPaths = (() => localeRoutes()) satisfies GetStaticPaths;
+
+interface Props {
+	locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = useTranslations(locale);
+const db = openWebDatabase();
+const companies = companyCards(db);
+const description = t("companies.description", {
+	count: formatCount(locale, "companies", companies.length),
+});
+const url = new URL(localizePath("/companies", locale), site.url).href;
+---
+
+<BaseLayout
+	locale={locale}
+	title={t("meta.companies.title")}
+	description={t("meta.companies.description")}
+	showNotice
+	jsonLd={collectionJsonLd({
+		name: t("companies.title"),
+		description,
+		url,
+		items: companies.map((company) => ({
+			title: companyDisplayName(company, locale),
+			url: new URL(localizePath(`/company/${company.slug}`, locale), site.url).href,
+		})),
+	})}
+>
+	<PageHeader locale={locale} title={t("companies.title")} description={description} />
+
+	<section class="companies">
+		<h2>{t("companies.browse")}</h2>
+		{
+			companies.length === 0 ? (
+				<EmptyState title={t("companies.empty")} body={t("list.empty")} icon="building" />
+			) : (
+				<div class="company-grid">
+					{companies.map((company) => {
+						const name = companyDisplayName(company, locale);
+						return (
+							<a class="company-card" href={localizePath(`/company/${company.slug}`, locale)}>
+								<span class="company-card__name">
+									<CompanyLogo company={company} size="lg" label={name} />
+									<span lang={locale === "en" && company.nameEn ? "en" : undefined}>{name}</span>
+								</span>
+								<span class="company-card__count">
+									{formatCount(locale, "articles", company.count)}
+								</span>
+							</a>
+						);
+					})}
+				</div>
+			)
+		}
+	</section>
+</BaseLayout>
+
+<style>
+	.companies {
+		margin-block-start: 1.5rem;
+	}
+
+	.companies > h2 {
+		margin-block-end: 1rem;
+		font-size: var(--text-xl);
+	}
+
+	.company-grid {
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		gap: 0.8rem;
+	}
+
+	.company-card {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.7rem;
+		padding: 1rem;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-lg);
+		background-color: var(--color-surface);
+		color: var(--color-text-primary);
+		text-decoration: none;
+		transition: border-color var(--transition-fast), background-color var(--transition-fast);
+	}
+
+	.company-card:hover {
+		border-color: color-mix(in oklab, var(--color-border) 55%, var(--color-text-secondary));
+		background-color: var(--color-surface);
+		text-decoration: none;
+	}
+
+	.company-card__name {
+		display: flex;
+		align-items: center;
+		gap: 0.55rem;
+		min-width: 0;
+		font-size: var(--text-sm);
+		font-weight: var(--weight-medium);
+	}
+
+	.company-card__name > span:last-child {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.company-card__count {
+		padding: 0.1rem 0.45rem;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		color: var(--color-text-secondary);
+		font-size: var(--text-xs);
+		font-variant-numeric: tabular-nums;
+	}
+
+	@media (max-width: 1023px) {
+		.company-grid {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+	}
+
+	@media (max-width: 479px) {
+		.company-grid {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+</style>

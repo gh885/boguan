@@ -1,6 +1,9 @@
 /**
  * 设计令牌。命名与分层见 docs/ARCHITECTURE.md §10。
  *
+ * 视觉基线取自参考站（engineering.fyi）：近黑背景、1px 细边框、
+ * 蓝紫强调色与 12px 卡片圆角；亮色主题是对应的白底版本。
+ *
  * - 原语（--neutral-*、--accent-*）只在这里出现，组件不许直接用。
  * - 语义（--color-*）是组件唯一可用的颜色来源，每个角色都有亮/暗两值。
  * - 亮暗只靠 color-scheme 切换，不要再写 `@media (prefers-color-scheme)` 去改令牌。
@@ -11,47 +14,58 @@
 :root {
   color-scheme: light dark;
 
-  /* 中性色：色相固定 265，步长按感知亮度排布 */
+  /* 中性色：色相固定 265，接近 zinc 的冷灰 */
   --neutral-0: oklch(1 0 0);
-  --neutral-25: oklch(0.945 0.006 265);
-  --neutral-50: oklch(0.985 0.003 265);
-  --neutral-100: oklch(0.965 0.006 265);
-  --neutral-200: oklch(0.865 0.012 265);
-  --neutral-300: oklch(0.725 0.012 265);
-  --neutral-500: oklch(0.505 0.012 265);
-  --neutral-700: oklch(0.345 0.01 265);
-  --neutral-800: oklch(0.265 0.008 265);
-  --neutral-850: oklch(0.222 0.007 265);
-  --neutral-900: oklch(0.175 0.008 265);
+  --neutral-25: oklch(0.96 0.002 265);
+  --neutral-50: oklch(0.967 0.003 265);
+  --neutral-100: oklch(0.94 0.004 265);
+  --neutral-200: oklch(0.88 0.006 265);
+  --neutral-300: oklch(0.72 0.01 265);
+  --neutral-500: oklch(0.45 0.012 265);
+  --neutral-700: oklch(0.31 0.006 265);
+  --neutral-800: oklch(0.235 0.006 265);
+  --neutral-850: oklch(0.175 0.004 265);
+  --neutral-900: oklch(0.145 0.003 265);
 
-  /* 强调色：只表示「可交互」 */
-  --accent-300: oklch(0.755 0.09 252);
-  --accent-600: oklch(0.51 0.145 252);
+  /* 强调色：链接与可交互元素；亮色用饱和蓝，暗色提亮保证对比度 */
+  --accent-300: oklch(0.72 0.14 258);
+  --accent-600: oklch(0.55 0.24 264);
 
   /* 语义色：组件只用这一层 */
-  --color-bg: light-dark(var(--neutral-50), var(--neutral-900));
+  --color-bg: light-dark(var(--neutral-0), var(--neutral-900));
   --color-surface: light-dark(var(--neutral-0), var(--neutral-850));
-  --color-surface-muted: light-dark(var(--neutral-100), var(--neutral-800));
+  --color-surface-muted: light-dark(var(--neutral-50), var(--neutral-800));
   --color-border: light-dark(var(--neutral-200), var(--neutral-700));
   --color-text-primary: light-dark(var(--neutral-800), var(--neutral-25));
   --color-text-secondary: light-dark(var(--neutral-500), var(--neutral-300));
   --color-accent: light-dark(var(--accent-600), var(--accent-300));
+  /* 实心按钮：亮暗都用更深的蓝，配白字；与「链接用的 accent」分开，避免暗色下白字对比度不足 */
+  --color-accent-strong: light-dark(var(--accent-600), var(--accent-600));
+  --color-on-accent: light-dark(var(--neutral-0), var(--neutral-0));
 
-  /* 排版：不加载 Web 字体，中文走系统字体栈 */
+  /* 排版：不加载 Web 字体，中文走系统字体栈（Inter 只在系统已安装时参与） */
   --font-sans:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
     "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif;
-  --text-xs: 0.8125rem;
+  --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, Consolas, monospace;
+  /* 关于页的展示字体：不加载 Web 字体，优先系统里有的中文衬线 */
+  --font-serif:
+    "Noto Serif SC", "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", "SimSun",
+    serif;
+  --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
   --text-lg: 1.125rem;
-  --text-xl: 1.375rem;
-  --text-2xl: 1.75rem;
-  --text-3xl: clamp(1.75rem, 1.2rem + 2.2vw, 2.5rem);
-  --leading-tight: 1.2;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: clamp(1.625rem, 1.35rem + 1.1vw, 1.875rem);
+  --leading-tight: 1.25;
   --leading-normal: 1.6;
   --weight-normal: 400;
+  --weight-medium: 500;
   --weight-semibold: 600;
+  --weight-bold: 700;
+  --tracking-tight: -0.015em;
 
   /* 间距 */
   --space-2xs: 0.25rem;
@@ -64,14 +78,17 @@
   --space-3xl: 4rem;
 
   /* 形状与布局 */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 999px;
   --width-page: 72rem;
-  --width-measure: 34em;
-  --gutter: clamp(1rem, 4vw, 2.5rem);
+  --width-measure: 42em;
+  --sidebar-width: 16rem;
+  --gutter: clamp(1rem, 3vw, 1.5rem);
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
+  --transition-fast: 120ms ease;
 }
 
 /* 主题覆盖：值只有 light / dark，缺省即跟随系统 */
