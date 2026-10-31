@@ -83,6 +83,7 @@ sources                        -- 一个公司可能有多个发布渠道
   company_id    integer fk
   name          text             -- 美团技术团队
   slug          text unique
+  lang          text             -- 内容语言，默认 'zh-CN'（见 §9）
   list_url      text
   adapter       text             -- 适配器标识，对应 scripts/crawler/adapters/*
   enabled       boolean
@@ -95,6 +96,7 @@ posts
   canonical_url text unique
   title         text
   summary       text             -- ≤ 200 字，页面展示用
+  lang          text             -- 原文语言，默认 'zh-CN'（见 §9）
   author        text?
   published_at  text             -- ISO 8601, UTC
   cover_url     text?
@@ -215,10 +217,60 @@ const tokens = jieba.cut(text).join(" ");
 4. 每个页面输出唯一的 `<title>`、`description`、`canonical`、OG 标签。
 5. 列表页输出 `ItemList` / `CollectionPage` 结构化数据。
 6. 外链跳转使用 `rel="noopener"`；如需统计点击，用显式跳转参数而非 `nofollow`。
+7. 多语言页面互相声明：每页输出各语言的 `hreflang` 与 `x-default`，canonical 指自己。见 §9。
 
 ---
 
-## 9. 部署
+## 9. 国际化（i18n）
+
+**决策：从第一天就按双语结构开发。界面语言是 zh-CN（默认）+ en；被抓取的文章内容保持原文，不做翻译。**
+
+### 语言与 URL
+
+- 语言清单是唯一事实源：`src/lib/i18n/config.ts` 与 `astro.config.mjs` 的 `i18n.locales` 必须一致（加语言时两处一起改）。
+- 默认语言不带前缀，其它语言带前缀，**同一份内容共享 slug**：
+
+| URL                           | 语言  |
+| :---------------------------- | :---- |
+| `/`、`/company/meituan`       | zh-CN |
+| `/en/`、`/en/company/meituan` | en    |
+
+- **一份页面 × 所有语言**：所有页面都写在 `src/pages/[...lang]/` 下，用 `localeRoutes()` 生成 `getStaticPaths`，语言只当参数：
+
+  | 文件                                       | 生成的 URL                                |
+  | :----------------------------------------- | :---------------------------------------- |
+  | `src/pages/[...lang]/index.astro`          | `/`、`/en/`                               |
+  | `src/pages/[...lang]/company/[slug].astro` | `/company/meituan`、`/en/company/meituan` |
+
+  默认语言用 `lang: undefined` 生成无前缀路径，其它语言用 `lang: '<prefix>'`，与 `prefixDefaultLocale: false` 对齐。
+
+- **不为某种语言复制页面文件**。Astro 文档也给了 `src/pages/en/*.astro` 的复制方案，但那样每个页面都得复制数据查询与 `getStaticPaths`，语言越多越容易漂移；而 hreflang 是按路径前缀推的，一漏就是指向 404 的死链。
+- hreflang 只声明本页真正生成过的语言（`BaseLayout` 的 `alternateLocales`）。「所有页面都在 `[...lang]/` 下」由 `i18n.test.ts` 的目录约定测试守护。
+- 语言切换是普通 `<a>` 链接，路径由 `localizePath()` / `alternateLinks()` 算出，不引入客户端状态。
+
+### 取词
+
+- 唯一的取词入口是 `useTranslations(locale)` 返回的 `t('key')`；文案在 `src/lib/i18n/messages/{locale}.json`，key 用扁平 `area.name` 写法。
+- **页面、组件里不写裸字符串**：硬编码的界面文案 CI 管不了，但会在加语言时全部漏掉。
+- 缺词不静默：默认语言也没有该 key 时 `t()` 直接抛错让构建失败；其它语言缺 key 回退到 zh-CN（同步由 `i18n:check` 拦截）。
+- 品牌名「博观」是常量（`src/lib/site.ts`），不进 messages。
+
+### 内容语言
+
+- 文章标题、摘要、正文永远是原文。`en` 页面把标题包在 `lang="zh-CN"` 的元素里，避免被搜索引擎当成英文内容。
+- `en` 版本的价值在界面与浏览结构，不产生「翻译稿」，因此不会与原文构成重复内容竞争。
+- 数据层预留 `posts.lang` / `sources.lang`（默认 `zh-CN`）；将来收英文源时，FTS 分词按 `lang` 选择分词器（中文走 nodejieba）。
+
+### 工具
+
+- `x18n`（devDependency，只做校验，不进运行时）：`vp run i18n:check` 检查缺 key、漏翻、未使用 key，CI 必跑；`vp run i18n:ui` 起浏览器界面批量改文案。
+- 语言相关的单元测试在 `src/lib/i18n/i18n.test.ts`（key 对齐、占位符一致、路径前缀互转）。
+
+> **为什么默认语言不带前缀**：中文站的主场是 `/`，也是所有外链与分享的入口。代价是将来更换默认语言需要处理 301，可以接受。
+
+---
+
+## 10. 部署
 
 ```
 香港轻量云服务器（1C2G 起步）
@@ -234,20 +286,20 @@ const tokens = jieba.cut(text).join(" ");
 
 ---
 
-## 10. 里程碑
+## 11. 里程碑
 
-| #   | 内容            | 验收标准                         |
-| :-- | :-------------- | :------------------------------- |
-| 0   | 数据源可行性    | 3 家公司可稳定抓到标题/时间/正文 |
-| 1   | 数据模型 + 管道 | `vpr crawl` 可重复执行且幂等     |
-| 2   | 只读站点        | 四类列表页可访问，构建通过       |
-| 3   | 搜索            | 中文两字词可命中，结果相关       |
-| 4   | SEO             | sitemap、canonical、JSON-LD 齐全 |
-| 5   | 上线            | 域名可访问，每日自动更新         |
+| #   | 内容            | 验收标准                          |
+| :-- | :-------------- | :-------------------------------- |
+| 0   | 数据源可行性    | 3 家公司可稳定抓到标题/时间/正文  |
+| 1   | 数据模型 + 管道 | `vpr crawl` 可重复执行且幂等      |
+| 2   | 只读站点        | 四类列表页可访问，i18n 骨架就位   |
+| 3   | 搜索            | 中文两字词可命中，结果相关        |
+| 4   | SEO             | sitemap、canonical、hreflang 齐全 |
+| 5   | 上线            | 域名可访问，每日自动更新          |
 
 ---
 
-## 11. 未决问题
+## 12. 未决问题
 
 - **标签来源**：源站自带标签 / 规则匹配 / LLM 抽取。倾向 v1 规则匹配 + 人工维护映射表。
 - **数据源可抓性**：掘金、公众号、知乎等渠道的抓取稳定性需逐个验证，优先有 RSS 或静态 HTML 的站点。

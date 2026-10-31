@@ -1,0 +1,96 @@
+---
+import LanguageSwitch from "../components/LanguageSwitch.astro";
+import {
+	alternateLinks,
+	localizePath,
+	resolveLocale,
+	useTranslations,
+} from "../lib/i18n";
+import { defaultLocale, locales, ogLocales, type Locale } from "../lib/i18n/config";
+import { site } from "../lib/site";
+
+interface Props {
+	/** 页面自己的标题，不含站名；`<title>` 由 layout 统一拼上站名。 */
+	title: string;
+	description: string;
+	/** 搜索页、筛选组合页等薄页面传 true。 */
+	noindex?: boolean;
+	/** 默认从 `Astro.currentLocale` 推导，一般不用传。 */
+	locale?: Locale;
+	/**
+	 * 本页实际生成的语言，默认全部。页面只在部分语言下存在时（例如某个只有中文的专题），
+	 * 在这里收窄，否则 hreflang 、语言切换都会指向 404。
+	 */
+	alternateLocales?: readonly Locale[];
+}
+
+const {
+	title,
+	description,
+	noindex = false,
+	locale = resolveLocale(Astro.currentLocale),
+	alternateLocales = locales,
+} = Astro.props;
+
+const t = useTranslations(locale);
+const pageTitle = `${title} · ${site.name}`;
+const pathname = Astro.url.pathname;
+const canonical = new URL(pathname, site.url).href;
+const alternates = alternateLinks(pathname, alternateLocales);
+const xDefault = alternates.find((alternate) => alternate.locale === defaultLocale);
+const robots = noindex ? "noindex, follow" : "index, follow";
+---
+
+<!doctype html>
+<html lang={locale}>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>{pageTitle}</title>
+		<meta name="description" content={description} />
+		<link rel="canonical" href={canonical} />
+		{
+			alternates.map((alternate) => (
+				<link
+					rel="alternate"
+					hreflang={alternate.hreflang}
+					href={new URL(alternate.href, site.url).href}
+				/>
+			))
+		}
+		{xDefault && (
+			<link rel="alternate" hreflang="x-default" href={new URL(xDefault.href, site.url).href} />
+		)}
+		<meta name="robots" content={robots} />
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content={site.name} />
+		<meta property="og:title" content={pageTitle} />
+		<meta property="og:description" content={description} />
+		<meta property="og:url" content={canonical} />
+		<meta property="og:locale" content={ogLocales[locale]} />
+		{
+			alternates
+				.filter((alternate) => alternate.locale !== locale)
+				.map((alternate) => (
+					<meta property="og:locale:alternate" content={ogLocales[alternate.locale]} />
+				))
+		}
+		<meta name="twitter:card" content="summary" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" href="/favicon.ico" />
+		<meta name="generator" content={Astro.generator} />
+	</head>
+
+	<body>
+		<header>
+			<a href={localizePath("/", locale)}>{site.name}</a>
+			<LanguageSwitch locale={locale} />
+		</header>
+		<main>
+			<slot />
+		</main>
+		<footer>
+			<p>{t("footer.note")}</p>
+		</footer>
+	</body>
+</html>

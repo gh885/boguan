@@ -23,20 +23,22 @@
 4. **每个可索引页面必须有唯一的 `<title>`、`description` 和 canonical。** 搜索页与任意筛选组合页默认 `noindex`。
 5. **不引入客户端全局状态。** 筛选、分页、搜索一律走 URL 查询参数，保证可分享、可索引、可后退。
 6. **不改动 `docs/ARCHITECTURE.md` 中的决策，除非先更新文档并说明理由。**
+7. **界面文案必须走 i18n，不得硬编码。** 页面与组件里的可见字符串一律通过 `useTranslations(locale)` 的 `t('key')` 取得，文案存在 `src/lib/i18n/messages/{locale}.json`；新增 key 时同步所有语言并跑 `vpr i18n:check`。
 
 ---
 
 ## 技术栈与边界
 
-| 层              | 选型                                 |
-| :-------------- | :----------------------------------- |
-| 框架            | Astro 7（默认静态输出，按需 SSR）    |
-| 语言            | TypeScript strict                    |
-| 运行时 / 包管理 | Bun 1.4                              |
-| 工具链          | Vite+（`vp` / `vpx`）                |
-| 数据库          | SQLite + Drizzle ORM                 |
-| 检索            | SQLite FTS5，中文先经 nodejieba 分词 |
-| 样式            | 待定                                 |
+| 层              | 选型                                               |
+| :-------------- | :------------------------------------------------- |
+| 框架            | Astro 7（默认静态输出，按需 SSR）                  |
+| 语言            | TypeScript strict                                  |
+| 运行时 / 包管理 | Bun 1.4                                            |
+| 工具链          | Vite+（`vp` / `vpx`）                              |
+| 数据库          | SQLite + Drizzle ORM                               |
+| 检索            | SQLite FTS5，中文先经 nodejieba 分词               |
+| 多语言          | `src/lib/i18n`（zh-CN 默认 + en），`x18n` 校验文案 |
+| 样式            | 待定                                               |
 
 依赖方向：`pages → components → lib`。`lib/` 放数据访问与纯函数，禁止在组件里直接拼 SQL。所有数据库访问经由 `src/lib/db/` 暴露的函数。
 
@@ -45,9 +47,10 @@
 ## 目录约定
 
 ```text
-src/pages/          路由，文件即路由
+src/pages/[...lang]/  路由，一份页面 × 所有语言（`localeRoutes()`）
 src/layouts/        页面骨架，全局 <head> 在 BaseLayout 统一维护
 src/components/     展示组件，不含数据访问
+src/lib/i18n/       语言清单、messages、`t()`、路径前缀与日期格式化
 src/lib/db/         Drizzle schema 与查询函数
 src/lib/domain/     纯逻辑：slug、日期、标签归一化、摘要截断
 scripts/crawler/    抓取管道，独立进程，不 import 任何 src/ 下的 Astro 代码
@@ -64,6 +67,8 @@ vpr dev              # 开发服务器 :4321
 vpr build            # 生产构建
 vp check                 # 格式化 + lint + 类型检查（提交前必跑）
 vp test                  # 测试
+vpr i18n:check           # 校验文案：缺 key、漏翻、未使用 key（CI 必跑）
+vpr i18n:ui              # 浏览器里浏览 / 编辑文案
 vpx scripts/crawler/...  # 运行抓取脚本，替代 tsx
 ```
 
@@ -101,6 +106,21 @@ vpr dev stop           # 停止
 /search             站内搜索（noindex）
 ```
 
+同一套路由在另一种语言下面带前缀，**slug 与语言无关**：
+
+```text
+/en/  /en/companies  /en/company/[slug]  /en/tags  /en/tag/[slug]  /en/year/[year]  /en/search
+```
+
+- 所有页面都写在 `src/pages/[...lang]/` 下（目录里的 `[...lang]` 就是语言段），用 `localeRoutes()` 生成 `getStaticPaths`：
+
+  ```astro
+  export const getStaticPaths = (() => localeRoutes({ slug })) satisfies GetStaticPaths;
+  const { locale } = Astro.props; // 不要自己从 URL 猜语言
+  ```
+
+- **不要为某种语言复制页面文件**（不要 `src/pages/en/*.astro`，也不要 `src/pages/index.astro`）；目录约定由 `i18n.test.ts` 守。
+- 页面只在部分语言下存在时，给 `BaseLayout` 传 `alternateLocales`，否则 hreflang 会指向 404。
 - 文章卡片直接外链原文，**v1 不做中转详情页**。若日后需要分享卡片，再加 `noindex` 的预览页。
 - slug 一律小写、短横线连接、不含中文；生成规则写在 `src/lib/domain/slug.ts`。
 
@@ -110,7 +130,8 @@ vpr dev stop           # 停止
 
 - 组件优先 `.astro`；只有在确实需要客户端交互时才引入岛屿，并明确写出为什么。
 - 数据查询函数返回已确定的类型，类型从 Drizzle schema 推导，不手写重复 interface。
-- 日期统一以 UTC 存储，展示时按 `Asia/Shanghai` 格式化。
+- 日期统一以 UTC 存储，展示时用 `formatDate(value, locale)`（内部按 `Asia/Shanghai`）。
+- 站内链接用 `localizePath(path, locale)`，不要在模板里手拼 `/en` 前缀。
 - 不要用 `any`；确需逃逸时写 `unknown` + 收窄。
 - 提交前跑 `vp check`，构建必须通过 `vpr build`。
 
