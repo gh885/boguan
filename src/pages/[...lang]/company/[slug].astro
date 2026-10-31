@@ -7,12 +7,13 @@ import {
 	companyCards,
 	companyTopTags,
 	openWebDatabase,
+	postYearsByFilters,
 	postsByCompany,
 } from "../../../lib/db/queries";
 import { localizePath, localeRoutes, useTranslations } from "../../../lib/i18n";
 import { companyDisplayName } from "../../../lib/i18n/company";
 import type { Locale } from "../../../lib/i18n/config";
-import { PAGE_SIZE, pageCount, pagePath } from "../../../lib/pagination";
+import { INDEX_PAGE_SIZE, pageCount, pagePath } from "../../../lib/pagination";
 import { collectionJsonLd } from "../../../lib/structured-data";
 import { site } from "../../../lib/site";
 
@@ -33,9 +34,13 @@ const company = companyBySlug(db, slug);
 
 if (!company) throw new Error(`公司不存在：${slug}`);
 
-const topTags = companyTopTags(db, slug);
-const { items, total } = postsByCompany(db, slug, { limit: PAGE_SIZE });
-const totalPages = pageCount(total);
+const topTags = companyTopTags(db, slug, 8);
+const years = postYearsByFilters(db, { companySlug: slug });
+const { items, total } = postsByCompany(db, slug, { limit: INDEX_PAGE_SIZE });
+const totalPages = pageCount(total, INDEX_PAGE_SIZE);
+const navYearsHref = years[0]
+	? localizePath(`/year/${years[0].year}`, locale)
+	: localizePath("/tags", locale);
 const name = companyDisplayName(company, locale);
 const title = t("meta.company.title", { name });
 const description = t("meta.company.description", { name });
@@ -45,6 +50,7 @@ const description = t("meta.company.description", { name });
 	locale={locale}
 	title={title}
 	description={description}
+	chrome="bare"
 	nextHref={totalPages > 1 ? localizePath(pagePath(`/company/${slug}`, 2), locale) : undefined}
 	jsonLd={collectionJsonLd({
 		name: title,
@@ -57,9 +63,12 @@ const description = t("meta.company.description", { name });
 		locale={locale}
 		company={company}
 		topTags={topTags}
+		years={years}
 		posts={items}
+		total={total}
 		page={1}
 		totalPages={totalPages}
 		nextHref={totalPages > 1 ? localizePath(pagePath(`/company/${slug}`, 2), locale) : undefined}
+		navYearsHref={navYearsHref}
 	/>
 </BaseLayout>

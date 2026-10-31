@@ -1,0 +1,288 @@
+---
+import type { PostCard, SiteStats, TagCard } from "../lib/db/queries";
+import { tagGroupOf } from "../lib/domain/tag-group";
+import {
+  formatCount,
+  formatDate,
+  formatLongDate,
+  formatNumber,
+  localizePath,
+  useTranslations,
+  type MessageKey,
+} from "../lib/i18n";
+import { companyDisplayName } from "../lib/i18n/company";
+import type { Locale } from "../lib/i18n/config";
+import { searchHref } from "../lib/search-url";
+import { site } from "../lib/site";
+import "../styles/paper.css";
+import "../styles/home.css";
+import Icon from "./Icon.astro";
+import LanguageSwitch from "./LanguageSwitch.astro";
+import PaperFooter from "./PaperFooter.astro";
+import ThemeToggle from "./ThemeToggle.astro";
+
+interface Props {
+  locale: Locale;
+  /** 最新收录网格；首页第一页不含头条，其余页就是本页全部条目。 */
+  items: PostCard[];
+  /** 首页第一页的头条；分页页不传。 */
+  lead?: PostCard;
+  /** 首页第一页的「本期要目」；分页页不传。 */
+  topics?: TagCard[];
+  stats: SiteStats;
+  page: number;
+  totalPages: number;
+  prevHref?: string;
+  nextHref?: string;
+  /** 「年份」导航的落点；没有年份归档时退化到标签索引。 */
+  yearHref?: string;
+}
+
+const {
+  locale,
+  items,
+  lead,
+  topics = [],
+  stats,
+  page,
+  totalPages,
+  prevHref,
+  nextHref,
+  yearHref,
+} = Astro.props;
+
+const t = useTranslations(locale);
+const homeHref = localizePath("/", locale);
+const companiesHref = localizePath("/companies", locale);
+const tagsHref = localizePath("/tags", locale);
+const aboutHref = localizePath("/about", locale);
+const yearsHref = yearHref ?? tagsHref;
+
+const editionDate = formatLongDate(new Date(), locale);
+const issue = t("home.issue", { count: formatNumber(locale, stats.posts) });
+const issueWithPage = page > 1 ? `${issue} · ${t("home.page", { page })}` : issue;
+const latestMark = t("home.latestMark", { count: String(items.length).padStart(2, "0") });
+const pageOf = t("pagination.pageOf", { page, total: totalPages });
+
+const leadLang = lead && lead.lang !== locale ? lead.lang : undefined;
+const leadCompanyName = lead
+  ? companyDisplayName({ name: lead.companyName, nameEn: lead.companyNameEn }, locale)
+  : "";
+const leadCompanyHref = lead ? localizePath(`/company/${lead.companySlug}`, locale) : "";
+
+const topicItems = topics.map((topic) => ({
+  ...topic,
+  group: t(`tags.group.${tagGroupOf(topic.slug)}` as MessageKey),
+}));
+---
+
+<div class="home-page paper-page">
+	<div class="home-sheet">
+		<h1 class="visually-hidden">{t("home.title")}</h1>
+
+		<header class="home-masthead">
+			<div class="home-date">{editionDate}</div>
+			<div class="home-brand">
+				<a class="home-wordmark" href={homeHref} aria-label={t("nav.brandHome")}>{site.name}</a>
+				<p class="home-motto">{t("home.motto")}</p>
+			</div>
+			<div class="home-edition">
+				<span>{t("meta.home.title")}</span>
+				<span>{issueWithPage}</span>
+			</div>
+		</header>
+		<div class="home-rule"></div>
+
+		<div class="home-navrow">
+			<nav class="home-nav" aria-label={t("nav.primary")}>
+				<a href={homeHref} aria-current={page === 1 ? "page" : undefined}>{t("breadcrumb.home")}</a>
+				<a href={companiesHref}>{t("nav.companies")}</a>
+				<a href={tagsHref}>{t("nav.tags")}</a>
+				<a href={yearsHref}>{t("nav.years")}</a>
+				<a href={aboutHref}>{t("nav.about")}</a>
+			</nav>
+
+			<form class="home-search paper-search" action={searchHref(locale)} method="get" role="search">
+				<label class="visually-hidden" for="home-search-input">{t("search.placeholder")}</label>
+				<input
+					id="home-search-input"
+					name="q"
+					type="search"
+					placeholder={t("search.placeholder")}
+					autocomplete="off"
+					spellcheck="false"
+				/>
+				<button type="submit" aria-label={t("search.title")}>
+					<Icon name="search" size={16} />
+				</button>
+			</form>
+
+			<div class="home-utility paper-utility">
+				<ThemeToggle locale={locale} />
+				<LanguageSwitch locale={locale} />
+			</div>
+		</div>
+
+		{
+			lead && (
+				<div class:list={["home-main", { "home-main--single": topicItems.length === 0 }]}>
+					<section class="home-lead" aria-labelledby="home-lead-title">
+						<p class="home-kicker">
+							<span class="home-seal">{t("home.leadKicker")}</span>
+						</p>
+						<h2 id="home-lead-title" lang={leadLang}>
+							<a href={lead.url} target="_blank" rel="noopener noreferrer">{lead.title}</a>
+						</h2>
+						{lead.summary && <p class="home-summary" lang={leadLang}>{lead.summary}</p>}
+						<p class="home-byline">
+							<a href={leadCompanyHref}>{leadCompanyName}</a>
+							{lead.author && <span class="home-dot" lang={leadLang}>{lead.author}</span>}
+							{lead.readingMinutes !== null && (
+								<span class="home-dot">
+									{t("card.readingTime", { minutes: lead.readingMinutes })}
+								</span>
+							)}
+							{lead.hasCode === true && (
+								<span class="home-dot">{t("card.includesCode")}</span>
+							)}
+							{lead.publishedAt && (
+								<span class="home-dot">
+									<time datetime={lead.publishedAt}>{formatDate(lead.publishedAt, locale)}</time>
+								</span>
+							)}
+						</p>
+						{lead.tags.length > 0 && (
+							<ul class="home-tags" aria-label={t("card.tags")}>
+								{lead.tags.map((tag) => (
+									<li>
+										<a href={localizePath(`/tag/${tag.slug}`, locale)} lang={leadLang}>{tag.name}</a>
+									</li>
+								))}
+							</ul>
+						)}
+					</section>
+
+					{topicItems.length > 0 && (
+						<aside class="home-contents" aria-labelledby="home-contents-title">
+							<div class="home-contents-head">
+								<h2 id="home-contents-title">{t("home.contents")}</h2>
+								<span>{t("home.contentsMark", { count: topicItems.length })}</span>
+							</div>
+							<ol>
+								{topicItems.map((topic, index) => (
+									<li>
+										<span class="home-contents-num" aria-hidden="true">
+											{String(index + 1).padStart(2, "0")}
+										</span>
+										<div>
+											<h3>
+												<a
+													href={localizePath(`/tag/${topic.slug}`, locale)}
+													lang={locale === "en" ? "zh-CN" : undefined}>{topic.name}</a>
+											</h3>
+											<p>{formatCount(locale, "articles", topic.count)} · {topic.group}</p>
+										</div>
+									</li>
+								))}
+							</ol>
+							<a class="home-contents-browse" href={tagsHref}>{t("home.browseAll")} →</a>
+						</aside>
+					)}
+				</div>
+			)
+		}
+
+		<section class="home-latest" aria-labelledby="home-latest-title">
+			<div class="home-latest-head">
+				<h2 id="home-latest-title">{t("home.latestIndex")}</h2>
+				<span class="home-latest-mark">{latestMark}</span>
+				<a class="home-filter" href={searchHref(locale, { has_code: true })}>
+					<Icon name="code" size={12} />
+					<span>{t("filter.hasCode")}</span>
+				</a>
+			</div>
+
+			{
+				items.length > 0 ? (
+					<div class="home-grid">
+						{items.map((post, index) => {
+							const contentLang = post.lang !== locale ? post.lang : undefined;
+							const companyName = companyDisplayName(
+								{ name: post.companyName, nameEn: post.companyNameEn },
+								locale,
+							);
+							const companyHref = localizePath(`/company/${post.companySlug}`, locale);
+							return (
+								<article class="home-item">
+									<h3 lang={contentLang}>
+										<span class="home-item-num" aria-hidden="true">
+											{String(index + 1).padStart(2, "0")}
+										</span>
+										<a href={post.url} target="_blank" rel="noopener noreferrer">{post.title}</a>
+									</h3>
+									<p class="home-item-meta">
+										<a href={companyHref}>{companyName}</a>
+										{post.readingMinutes !== null && (
+											<span class="home-dot">
+												{t("card.readingTime", { minutes: post.readingMinutes })}
+											</span>
+										)}
+										{post.hasCode === true && (
+											<span class="home-dot">{t("card.includesCode")}</span>
+										)}
+										{post.publishedAt && (
+											<span class="home-dot">
+												<time datetime={post.publishedAt}>{formatDate(post.publishedAt, locale)}</time>
+											</span>
+										)}
+									</p>
+								</article>
+							);
+						})}
+						{nextHref && items.length % 5 !== 0 && (
+							<a class="home-more" href={nextHref}>
+								<strong>{t("home.more")} →</strong>
+								<span>{t("home.page", { page: page + 1 })}</span>
+							</a>
+						)}
+					</div>
+				) : (
+					<div class="home-empty">
+						<h2>{t("list.empty")}</h2>
+						<p>{t("search.noQuery.body")}</p>
+					</div>
+				)
+			}
+
+			<nav class="home-pagination" aria-label={t("pagination.label")}>
+				<span>{pageOf}</span>
+				<div class="home-pagination-links">
+					{prevHref ? (
+						<a href={prevHref} rel="prev">
+							<Icon name="arrow-left" size={13} />
+							<span>{t("pagination.previous")}</span>
+						</a>
+					) : (
+						<span class="is-disabled" aria-disabled="true">
+							<Icon name="arrow-left" size={13} />
+							<span>{t("pagination.previous")}</span>
+						</span>
+					)}
+					{nextHref ? (
+						<a href={nextHref} rel="next">
+							<span>{t("pagination.next")}</span>
+							<Icon name="arrow-right" size={13} />
+						</a>
+					) : (
+						<span class="is-disabled" aria-disabled="true">
+							<span>{t("pagination.next")}</span>
+							<Icon name="arrow-right" size={13} />
+						</span>
+					)}
+				</div>
+			</nav>
+		</section>
+
+		<PaperFooter locale={locale} note={issue} />
+	</div>
+</div>

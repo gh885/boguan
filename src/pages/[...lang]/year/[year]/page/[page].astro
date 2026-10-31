@@ -2,10 +2,15 @@
 import type { GetStaticPaths } from "astro";
 import BaseLayout from "../../../../../layouts/BaseLayout.astro";
 import YearView from "../../../../../components/YearView.astro";
-import { openWebDatabase, postYears, postsByYear } from "../../../../../lib/db/queries";
+import { openWebDatabase, postYears, postsByYear, topCompaniesByYear, topTagsByYear } from "../../../../../lib/db/queries";
 import { localizePath, localeRoutes, useTranslations } from "../../../../../lib/i18n";
 import type { Locale } from "../../../../../lib/i18n/config";
-import { PAGE_SIZE, pageCount, pageOffset, pagePath } from "../../../../../lib/pagination";
+import {
+	INDEX_PAGE_SIZE,
+	pageCount,
+	pageOffset,
+	pagePath,
+} from "../../../../../lib/pagination";
 import { collectionJsonLd } from "../../../../../lib/structured-data";
 import { site } from "../../../../../lib/site";
 
@@ -16,7 +21,7 @@ interface Props {
 export const getStaticPaths = (() => {
 	const years = postYears(openWebDatabase());
 	return years.flatMap((entry) => {
-		const pages = pageCount(entry.count);
+		const pages = pageCount(entry.count, INDEX_PAGE_SIZE);
 		return Array.from({ length: Math.max(0, pages - 1) }, (_, index) => index + 2).flatMap((page) =>
 			localeRoutes({ year: String(entry.year), page: String(page) }),
 		);
@@ -28,12 +33,19 @@ const t = useTranslations(locale);
 const db = openWebDatabase();
 const year = Number(Astro.params.year);
 const page = Math.max(2, Number(Astro.params.page));
-const yearRow = postYears(db).find((entry) => entry.year === year);
+const years = postYears(db);
+const yearRow = years.find((entry) => entry.year === year);
 
 if (!yearRow) throw new Error(`年份不存在：${year}`);
 
-const { items, total } = postsByYear(db, year, { limit: PAGE_SIZE, offset: pageOffset(page) });
-const totalPages = pageCount(total);
+const topTags = topTagsByYear(db, year, 6);
+const topCompanies = topCompaniesByYear(db, year, 5);
+const { items, total } = postsByYear(db, year, {
+	limit: INDEX_PAGE_SIZE,
+	offset: pageOffset(page, INDEX_PAGE_SIZE),
+});
+const totalPages = pageCount(total, INDEX_PAGE_SIZE);
+const navYearsHref = localizePath(`/year/${year}`, locale);
 const title = `${t("meta.year.title", { year })}${t("meta.page.suffix", { page })}`;
 const description = `${t("meta.year.description", { year })}${t("meta.page.suffix", { page })}`;
 
@@ -46,6 +58,7 @@ const nextHref =
 	locale={locale}
 	title={title}
 	description={description}
+	chrome="bare"
 	prevHref={prevHref}
 	nextHref={nextHref}
 	jsonLd={collectionJsonLd({
@@ -58,11 +71,15 @@ const nextHref =
 	<YearView
 		locale={locale}
 		year={year}
-		count={yearRow.count}
+		years={years}
+		topTags={topTags}
+		topCompanies={topCompanies}
 		posts={items}
+		total={total}
 		page={page}
 		totalPages={totalPages}
 		prevHref={prevHref}
 		nextHref={nextHref}
+		navYearsHref={navYearsHref}
 	/>
 </BaseLayout>

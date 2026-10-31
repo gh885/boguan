@@ -315,6 +315,75 @@ export function companiesByTag(db: Db, tagSlug: string, limit = 12): CompanyCard
     .all(tagSlug, limit) as CompanyCard[];
 }
 
+/** 某个切片（标签 / 公司 / 全部）下的年份分布，供索引页的年份筛选使用。 */
+export function postYearsByFilters(
+  db: Db,
+  filters: ListFilters = {},
+): { year: number; count: number }[] {
+  const { where, params } = filterSql(filters);
+  return db.$client
+    .prepare(
+      `select p.published_year as year, count(*) as count
+       ${FROM}
+       where ${VISIBLE} ${where} and p.published_year is not null
+       group by p.published_year
+       order by p.published_year desc`,
+    )
+    .all(...params) as { year: number; count: number }[];
+}
+
+/** 全局热门标签；索引页右栏与搜索着陆页用，避免每次都查完整 tagIndex。 */
+export function topTags(db: Db, limit = 12): TagCard[] {
+  return db.$client
+    .prepare(
+      `select t.slug as slug, t.name as name, count(p.id) as count
+       from tags t
+       join post_tags pt on pt.tag_id = t.id
+       join posts p on p.id = pt.post_id
+       where ${VISIBLE}
+       group by t.id
+       order by count(p.id) desc, t.name asc
+       limit ?`,
+    )
+    .all(limit) as TagCard[];
+}
+
+/** 某一年里的热门标签 */
+export function topTagsByYear(db: Db, year: number, limit = 8): TagCard[] {
+  return db.$client
+    .prepare(
+      `select t.slug as slug, t.name as name, count(p.id) as count
+       from tags t
+       join post_tags pt on pt.tag_id = t.id
+       join posts p on p.id = pt.post_id
+       where ${VISIBLE} and p.published_year = ?
+       group by t.id
+       order by count(p.id) desc, t.name asc
+       limit ?`,
+    )
+    .all(year, limit) as TagCard[];
+}
+
+/** 某一年里收录最多的公司 */
+export function topCompaniesByYear(db: Db, year: number, limit = 6): CompanyCard[] {
+  return db.$client
+    .prepare(
+      `select c.slug as slug,
+              c.name as name,
+              c.name_en as nameEn,
+              c.homepage as homepage,
+              c.logo_url as logoUrl,
+              count(p.id) as count
+       from companies c
+       join posts p on p.company_id = c.id
+       where ${VISIBLE} and p.published_year = ?
+       group by c.id
+       order by count(p.id) desc, c.name asc
+       limit ?`,
+    )
+    .all(year, limit) as CompanyCard[];
+}
+
 export interface SiteStats {
   posts: number;
   companies: number;

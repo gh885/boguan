@@ -1,0 +1,84 @@
+---
+import { localizePath, useTranslations } from "../lib/i18n";
+import type { Locale } from "../lib/i18n/config";
+import { searchHref } from "../lib/search-url";
+import { site } from "../lib/site";
+import Icon from "./Icon.astro";
+import LanguageSwitch from "./LanguageSwitch.astro";
+import ThemeToggle from "./ThemeToggle.astro";
+
+interface Props {
+  locale: Locale;
+  /** 当前所在栏目；用于给主导航加 aria-current。 */
+  current?: "home" | "companies" | "tags" | "years" | "about";
+  searchValue?: string;
+  /** 在切片内继续搜索时要保留的条件。 */
+  searchHidden?: Record<string, string>;
+  /** 「年份」导航的落点；不传则退化到标签索引。 */
+  navYearsHref?: string;
+}
+
+const {
+  locale,
+  current,
+  searchValue = "",
+  searchHidden = {},
+  navYearsHref,
+} = Astro.props;
+const t = useTranslations(locale);
+const homeHref = localizePath("/", locale);
+const companiesHref = localizePath("/companies", locale);
+const tagsHref = localizePath("/tags", locale);
+const aboutHref = localizePath("/about", locale);
+const yearsHref = navYearsHref ?? tagsHref;
+---
+
+<div class="paper-runninghead">
+	<div class="paper-runninghead-inner">
+		<a class="paper-wordmark" href={homeHref} aria-label={t("nav.brandHome")}>{site.name}</a>
+
+		<nav class="paper-nav" aria-label={t("nav.primary")}>
+			<a href={homeHref} aria-current={current === "home" ? "page" : undefined}>
+				{t("breadcrumb.home")}
+			</a>
+			<a href={companiesHref} aria-current={current === "companies" ? "page" : undefined}>
+				{t("nav.companies")}
+			</a>
+			<a href={tagsHref} aria-current={current === "tags" ? "page" : undefined}>
+				{t("nav.tags")}
+			</a>
+			<a href={yearsHref} aria-current={current === "years" ? "page" : undefined}>
+				{t("nav.years")}
+			</a>
+			<a href={aboutHref} aria-current={current === "about" ? "page" : undefined}>
+				{t("nav.about")}
+			</a>
+		</nav>
+
+		<form class="paper-searchbar paper-search" action={searchHref(locale)} method="get" role="search">
+			<label class="visually-hidden" for="paper-search-input">{t("search.placeholder")}</label>
+			<input
+				id="paper-search-input"
+				name="q"
+				type="search"
+				value={searchValue}
+				placeholder={t("search.placeholder")}
+				autocomplete="off"
+				spellcheck="false"
+			/>
+			{
+				Object.entries(searchHidden).map(([name, value]) => (
+					<input type="hidden" name={name} value={value} />
+				))
+			}
+			<button type="submit" aria-label={t("search.title")}>
+				<Icon name="search" size={16} />
+			</button>
+		</form>
+
+		<div class="paper-utility">
+			<ThemeToggle locale={locale} />
+			<LanguageSwitch locale={locale} />
+		</div>
+	</div>
+</div>

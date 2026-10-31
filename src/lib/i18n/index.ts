@@ -72,8 +72,21 @@ export function formatCount(locale: Locale, unit: CountUnit, count: number): str
     pluralRules.set(locale, rules);
   }
   const form = rules.select(count) === "one" ? "one" : "other";
-  const key = `count.${unit}.${form}` as MessageKey;
-  return translate(locale, key, { count });
+
+  // 每种单位写死两条 translate 调用：动态拼 key 会让 x18n 把文案误判为未使用。
+  if (unit === "articles") {
+    return form === "one"
+      ? translate(locale, "count.articles.one", { count })
+      : translate(locale, "count.articles.other", { count });
+  }
+  if (unit === "companies") {
+    return form === "one"
+      ? translate(locale, "count.companies.one", { count })
+      : translate(locale, "count.companies.other", { count });
+  }
+  return form === "one"
+    ? translate(locale, "count.tags.one", { count })
+    : translate(locale, "count.tags.other", { count });
 }
 
 const listFormatters = new Map<Locale, Intl.ListFormat>();
@@ -103,6 +116,43 @@ export function formatDate(value: Date | string, locale: Locale): string {
     dateFormatters.set(locale, formatter);
   }
   return formatter.format(date);
+}
+
+const longDateFormatters = new Map<Locale, Intl.DateTimeFormat>();
+const weekdayFormatters = new Map<Locale, Intl.DateTimeFormat>();
+
+/** 报纸刊头的「日期 · 星期」，同样按北京时间。 */
+export function formatLongDate(value: Date | string, locale: Locale): string {
+  const date = typeof value === "string" ? new Date(value) : value;
+  let dateFormatter = longDateFormatters.get(locale);
+  if (!dateFormatter) {
+    dateFormatter = new Intl.DateTimeFormat(locale, {
+      dateStyle: "long",
+      timeZone: displayTimeZone,
+    });
+    longDateFormatters.set(locale, dateFormatter);
+  }
+  let weekdayFormatter = weekdayFormatters.get(locale);
+  if (!weekdayFormatter) {
+    weekdayFormatter = new Intl.DateTimeFormat(locale, {
+      weekday: "long",
+      timeZone: displayTimeZone,
+    });
+    weekdayFormatters.set(locale, weekdayFormatter);
+  }
+  return `${dateFormatter.format(date)} · ${weekdayFormatter.format(date)}`;
+}
+
+const numberFormatters = new Map<Locale, Intl.NumberFormat>();
+
+/** 期号、计数等需要本地化数字分组的场景。 */
+export function formatNumber(locale: Locale, value: number): string {
+  let formatter = numberFormatters.get(locale);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(locale);
+    numberFormatters.set(locale, formatter);
+  }
+  return formatter.format(value);
 }
 
 function ensureLeadingSlash(value: string): string {

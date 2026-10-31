@@ -5,14 +5,16 @@ import TagView from "../../../components/TagView.astro";
 import {
 	companiesByTag,
 	openWebDatabase,
+	postYearsByFilters,
 	postsByTag,
 	tagBySlug,
 	tagIndex,
 } from "../../../lib/db/queries";
+import { tagGroupOf } from "../../../lib/domain/tag-group";
 import { localizePath, localeRoutes, useTranslations } from "../../../lib/i18n";
 import { isIndexableTag } from "../../../lib/tags";
 import type { Locale } from "../../../lib/i18n/config";
-import { PAGE_SIZE, pageCount, pagePath } from "../../../lib/pagination";
+import { INDEX_PAGE_SIZE, pageCount, pagePath } from "../../../lib/pagination";
 import { collectionJsonLd } from "../../../lib/structured-data";
 import { site } from "../../../lib/site";
 
@@ -33,9 +35,17 @@ const tag = tagBySlug(db, slug);
 
 if (!tag || tag.count === 0) throw new Error(`标签不存在：${slug}`);
 
-const companies = companiesByTag(db, slug);
-const { items, total } = postsByTag(db, slug, { limit: PAGE_SIZE });
-const totalPages = pageCount(total);
+const companies = companiesByTag(db, slug, 6);
+const years = postYearsByFilters(db, { tagSlug: slug });
+const relatedTags = tagIndex(db)
+	.filter((candidate) => candidate.slug !== slug)
+	.filter((candidate) => tagGroupOf(candidate.slug) === tagGroupOf(slug))
+	.slice(0, 6);
+const { items, total } = postsByTag(db, slug, { limit: INDEX_PAGE_SIZE });
+const totalPages = pageCount(total, INDEX_PAGE_SIZE);
+const navYearsHref = years[0]
+	? localizePath(`/year/${years[0].year}`, locale)
+	: localizePath("/tags", locale);
 const title = t("meta.tag.title", { name: tag.name });
 const description = t("meta.tag.description", { name: tag.name });
 ---
@@ -44,6 +54,7 @@ const description = t("meta.tag.description", { name: tag.name });
 	locale={locale}
 	title={title}
 	description={description}
+	chrome="bare"
 	noindex={!isIndexableTag(tag.count)}
 	nextHref={totalPages > 1 ? localizePath(pagePath(`/tag/${slug}`, 2), locale) : undefined}
 	jsonLd={collectionJsonLd({
@@ -57,9 +68,13 @@ const description = t("meta.tag.description", { name: tag.name });
 		locale={locale}
 		tag={tag}
 		companies={companies}
+		relatedTags={relatedTags}
+		years={years}
 		posts={items}
+		total={total}
 		page={1}
 		totalPages={totalPages}
 		nextHref={totalPages > 1 ? localizePath(pagePath(`/tag/${slug}`, 2), locale) : undefined}
+		navYearsHref={navYearsHref}
 	/>
 </BaseLayout>

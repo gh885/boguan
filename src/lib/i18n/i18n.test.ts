@@ -6,6 +6,8 @@ import {
   formatCount,
   formatDate,
   formatList,
+  formatLongDate,
+  formatNumber,
   localizePath,
   localeFromPathname,
   localeRoutes,
@@ -130,6 +132,21 @@ describe("formatDate", () => {
     expect(formatDate(date, "zh-CN")).toContain("2024");
     expect(formatDate(date, "zh-CN")).toContain("2");
     expect(formatDate(date, "en")).toContain("2024");
+  });
+});
+
+describe("formatLongDate / formatNumber", () => {
+  it("刊头日期同时给出日期与星期", () => {
+    // UTC 2024-01-01 20:00 → 北京时间 2024-01-02，星期二
+    const date = "2024-01-01T20:00:00.000Z";
+    expect(formatLongDate(date, "zh-CN")).toContain("星期二");
+    expect(formatLongDate(date, "zh-CN")).toContain("·");
+    expect(formatLongDate(date, "en")).toContain("Tuesday");
+  });
+
+  it("期号数字跟随语言分组", () => {
+    expect(formatNumber("zh-CN", 12345)).toBe("12,345");
+    expect(formatNumber("en", 12345)).toBe("12,345");
   });
 });
 

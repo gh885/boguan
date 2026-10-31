@@ -1,0 +1,39 @@
+---
+import { localizePath, useTranslations } from "../lib/i18n";
+import type { Locale } from "../lib/i18n/config";
+import { site } from "../lib/site";
+
+interface Props {
+  locale: Locale;
+  /** 页脚右下角的补充信息；首页传期号，索引页可以留空。 */
+  note?: string;
+}
+
+const { locale, note } = Astro.props;
+const t = useTranslations(locale);
+const homeHref = localizePath("/", locale);
+const companiesHref = localizePath("/companies", locale);
+const tagsHref = localizePath("/tags", locale);
+const aboutHref = localizePath("/about", locale);
+const rssHref = localizePath("/rss.xml", locale);
+---
+
+<footer class="paper-footer">
+	<div class="paper-footer-main">
+		<a class="paper-footer-brand" href={homeHref}>{site.name}</a>
+		<nav class="paper-footer-nav" aria-label={t("nav.primary")}>
+			<a href={aboutHref}>{t("nav.about")}</a>
+			<a href={tagsHref}>{t("nav.tags")}</a>
+			<a href={companiesHref}>{t("nav.companies")}</a>
+			<a href={rssHref}>{t("nav.digestAction")}</a>
+			<a href={site.repo} target="_blank" rel="noopener noreferrer">{t("nav.repo")}</a>
+		</nav>
+	</div>
+	<div class="paper-footer-bottom">
+		<span>
+			{t("notice.text")}{" "}
+			<a href={site.issues} target="_blank" rel="noopener noreferrer">{t("notice.action")}</a>
+		</span>
+		<span>{note ? `${t("home.motto")} · ${note}` : t("home.motto")}</span>
+	</div>
+</footer>

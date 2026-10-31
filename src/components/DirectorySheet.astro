@@ -1,0 +1,51 @@
+---
+import type { Locale } from "../lib/i18n/config";
+import "../styles/paper.css";
+import "../styles/directory.css";
+import PaperFooter from "./PaperFooter.astro";
+import PaperRunningHead from "./PaperRunningHead.astro";
+import PaperSectionHead from "./PaperSectionHead.astro";
+
+interface Props {
+  locale: Locale;
+  current: "companies" | "tags";
+  kicker: string;
+  title: string;
+  titleLang?: string;
+  facts?: string[];
+  description?: string;
+  navYearsHref?: string;
+}
+
+const {
+  locale,
+  current,
+  kicker,
+  title,
+  titleLang,
+  facts,
+  description,
+  navYearsHref,
+} = Astro.props;
+---
+
+<div class="directory-page paper-page">
+	<PaperRunningHead locale={locale} current={current} navYearsHref={navYearsHref} />
+
+	<div class="directory-sheet">
+		<PaperSectionHead
+			locale={locale}
+			kicker={kicker}
+			title={title}
+			titleLang={titleLang}
+			facts={facts}
+			description={description}
+		/>
+
+		<div class="directory-body">
+			<slot />
+		</div>
+
+		<PaperFooter locale={locale} />
+	</div>
+</div>

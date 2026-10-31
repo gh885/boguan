@@ -1,15 +1,14 @@
 ---
 import type { GetStaticPaths } from "astro";
+import DirectorySheet from "../../components/DirectorySheet.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import EmptyState from "../../components/EmptyState.astro";
-import PageHeader from "../../components/PageHeader.astro";
-import { openWebDatabase, tagIndex } from "../../lib/db/queries";
+import { openWebDatabase, postYears, tagIndex } from "../../lib/db/queries";
 import { groupTags, type TagGroupId } from "../../lib/domain/tag-group";
-import { isIndexableTag } from "../../lib/tags";
 import { formatCount, localizePath, localeRoutes, useTranslations } from "../../lib/i18n";
 import type { Locale } from "../../lib/i18n/config";
 import { collectionJsonLd } from "../../lib/structured-data";
 import { site } from "../../lib/site";
+import { isIndexableTag } from "../../lib/tags";
 
 export const getStaticPaths = (() => localeRoutes()) satisfies GetStaticPaths;
 
@@ -23,10 +22,12 @@ const db = openWebDatabase();
 // 只列 ≥3 篇的标签：薄标签页是 noindex 的，从这里连过去只会制造孤岛
 const tags = tagIndex(db).filter((tag) => isIndexableTag(tag.count));
 const groups = groupTags(tags);
-const description = t("tags.description", {
-	count: formatCount(locale, "tags", tags.length),
-});
+const years = postYears(db);
+const navYearsHref = years[0]
+	? localizePath(`/year/${years[0].year}`, locale)
+	: localizePath("/tags", locale);
 const url = new URL(localizePath("/tags", locale), site.url).href;
+const description = t("meta.tags.description");
 
 const groupLabels: Record<TagGroupId, string> = {
 	ai: t("tags.group.ai"),
@@ -42,8 +43,8 @@ const groupLabels: Record<TagGroupId, string> = {
 <BaseLayout
 	locale={locale}
 	title={t("meta.tags.title")}
-	description={t("meta.tags.description")}
-	showNotice
+	description={description}
+	chrome="bare"
 	jsonLd={collectionJsonLd({
 		name: t("tags.title"),
 		description,
@@ -54,121 +55,67 @@ const groupLabels: Record<TagGroupId, string> = {
 		})),
 	})}
 >
-	<PageHeader locale={locale} title={t("tags.title")} description={description} />
+	<DirectorySheet
+		locale={locale}
+		current="tags"
+		kicker={t("directory.kicker.tags")}
+		title={t("tags.title")}
+		facts={[formatCount(locale, "tags", tags.length)]}
+		description={t("directory.tagsNote")}
+		navYearsHref={navYearsHref}
+	>
+		{
+			groups.length === 0 ? (
+				<div class="directory-empty">
+					<h2>{t("tags.empty")}</h2>
+					<p>{t("list.empty")}</p>
+				</div>
+			) : (
+				<>
+					<nav class="directory-jump" aria-label={t("directory.groupNav")}>
+						{groups.map((group) => (
+							<a href={`#tag-group-${group.id}`}>
+								<span>{groupLabels[group.id]}</span>
+								<span class="directory-jump-count" aria-hidden="true">
+									{group.count}
+								</span>
+								<span class="visually-hidden">{formatCount(locale, "tags", group.count)}</span>
+							</a>
+						))}
+					</nav>
 
-	{
-		groups.length === 0 ? (
-			<div class="tags-empty">
-				<EmptyState title={t("tags.empty")} body={t("list.empty")} icon="hash" />
-			</div>
-		) : (
-			<div class="tag-groups">
-				{groups.map((group) => (
-					<section class="tag-group">
-						<h2>
-							{groupLabels[group.id]}
-							<span class="tag-group__count">({formatCount(locale, "tags", group.count)})</span>
-						</h2>
-						<div class="tag-grid">
-							{group.tags.map((tag) => (
-								<a class="tag-card" href={localizePath(`/tag/${tag.slug}`, locale)}>
-									<span class="tag-card__name">{tag.name}</span>
-									<span class="tag-card__count">{formatCount(locale, "articles", tag.count)}</span>
-								</a>
-							))}
-						</div>
-					</section>
-				))}
-			</div>
-		)
-	}
+					<div class="directory-groups">
+						{groups.map((group) => (
+							<section class="directory-group" id={`tag-group-${group.id}`}>
+								<div class="directory-group-head">
+									<h2>{groupLabels[group.id]}</h2>
+									<span>{formatCount(locale, "tags", group.count)}</span>
+								</div>
+								<ul class="directory-tags">
+									{group.tags.map((tag) => (
+										<li>
+											<a href={localizePath(`/tag/${tag.slug}`, locale)}>
+												<span
+													class="directory-tag-name"
+													lang={locale === "en" ? "zh-CN" : undefined}
+												>
+													{tag.name}
+												</span>
+												<span class="directory-count" aria-hidden="true">
+													{tag.count}
+												</span>
+												<span class="visually-hidden">
+													{formatCount(locale, "articles", tag.count)}
+												</span>
+											</a>
+										</li>
+									))}
+								</ul>
+							</section>
+						))}
+					</div>
+				</>
+			)
+		}
+	</DirectorySheet>
 </BaseLayout>
-
-<style>
-	.tag-groups {
-		margin-block-start: 1.5rem;
-	}
-
-	.tag-group {
-		margin-block-end: 2rem;
-	}
-
-	.tag-group h2 {
-		display: flex;
-		align-items: baseline;
-		gap: 0.5rem;
-		margin-block-end: 0.75rem;
-		font-size: var(--text-xl);
-	}
-
-	.tag-group__count {
-		color: var(--color-text-secondary);
-		font-size: var(--text-xs);
-		font-weight: var(--weight-normal);
-	}
-
-	.tag-grid {
-		display: grid;
-		grid-template-columns: repeat(4, minmax(0, 1fr));
-		gap: 0.55rem;
-	}
-
-	.tag-card {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: var(--space-sm);
-		min-height: 3.1rem;
-		padding: 0.6rem 0.75rem;
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-lg);
-		background-color: var(--color-surface);
-		color: var(--color-text-primary);
-		text-decoration: none;
-		transition: border-color var(--transition-fast), background-color var(--transition-fast);
-	}
-
-	.tag-card:hover {
-		border-color: color-mix(in oklab, var(--color-border) 55%, var(--color-text-secondary));
-		background-color: var(--color-surface-muted);
-		text-decoration: none;
-	}
-
-	.tag-card__name {
-		padding: 0.1rem 0.4rem;
-		border-radius: var(--radius-sm);
-		background-color: var(--color-surface-muted);
-		font-size: var(--text-sm);
-		font-weight: var(--weight-medium);
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.tag-card:hover .tag-card__name {
-		background-color: var(--color-surface);
-	}
-
-	.tag-card__count {
-		flex-shrink: 0;
-		color: var(--color-text-secondary);
-		font-size: var(--text-xs);
-		font-variant-numeric: tabular-nums;
-	}
-
-	.tags-empty {
-		margin-block-start: 1.5rem;
-	}
-
-	@media (max-width: 1023px) {
-		.tag-grid {
-			grid-template-columns: repeat(2, minmax(0, 1fr));
-		}
-	}
-
-	@media (max-width: 479px) {
-		.tag-grid {
-			grid-template-columns: minmax(0, 1fr);
-		}
-	}
-</style>
