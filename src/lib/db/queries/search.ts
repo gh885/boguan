@@ -1,6 +1,13 @@
 import { toMatchQuery } from "../../search/tokenize";
 import type { Db } from "../index";
-import { attachPostTags, type PostCard } from "./posts";
+import {
+  attachPostTags,
+  CARD_COLUMNS,
+  filterSql,
+  VISIBLE,
+  type ListFilters,
+  type PostCard,
+} from "./posts";
 
 /**
  * 站内搜索。设计见 docs/ARCHITECTURE.md §7，要点：
@@ -10,6 +17,8 @@ import { attachPostTags, type PostCard } from "./posts";
  * - **不给命中上下文**：`posts_fts` 是 contentless 表，`snippet()` / `highlight()` 取不到值，
  *   而硬性规则 1 也只允许渲染摘要。想提示「为什么命中」就用列过滤判断是不是标题命中。
  * - 不返回正文：这张库里没有正文，正文在 crawler 的私有目录。
+ *
+ * 可见性、过滤条件与卡片列与列表查询共用同一份实现（`posts.ts`），改动不会漏一边。
  */
 
 export interface SearchHit extends PostCard {
@@ -18,14 +27,10 @@ export interface SearchHit extends PostCard {
   score: number;
 }
 
-export interface SearchOptions {
+export interface SearchOptions extends ListFilters {
   q: string;
   limit?: number;
   offset?: number;
-  companySlug?: string;
-  tagSlug?: string;
-  year?: number;
-  hasCode?: boolean;
 }
 
 export interface SearchResult {
@@ -38,54 +43,8 @@ export interface SearchResult {
 /** 查询串上限：超过这个长度的输入按截断处理，避免把整段正文塞进 MATCH */
 const MAX_QUERY_CHARS = 120;
 
-const VISIBLE = "p.is_visible = 1 and p.duplicate_of_id is null";
-
-const HIT_COLUMNS = `p.id as id,
-       p.title as title,
-       p.summary as summary,
-       p.canonical_url as url,
-       p.author as author,
-       p.cover_url as coverUrl,
-       p.published_at as publishedAt,
-       p.published_year as publishedYear,
-       p.lang as lang,
-       p.reading_minutes as readingMinutes,
-       p.has_code as hasCode,
-       c.slug as companySlug,
-       c.name as companyName,
-       c.name_en as companyNameEn,
-       c.logo_url as companyLogoUrl,
+const HIT_COLUMNS = `${CARD_COLUMNS},
        bm25(posts_fts, 5.0, 1.0) as score`;
-
-function filterSql(options: SearchOptions): { where: string; params: (string | number)[] } {
-  const clauses: string[] = [];
-  const params: (string | number)[] = [];
-
-  if (options.companySlug) {
-    clauses.push("c.slug = ?");
-    params.push(options.companySlug);
-  }
-  if (options.tagSlug) {
-    clauses.push(`exists (
-       select 1 from post_tags pt join tags t on t.id = pt.tag_id
-       where pt.post_id = p.id and t.slug = ?
-     )`);
-    params.push(options.tagSlug);
-  }
-  if (options.year !== undefined) {
-    clauses.push("p.published_year = ?");
-    params.push(options.year);
-  }
-  if (options.hasCode !== undefined) {
-    clauses.push("p.has_code = ?");
-    params.push(options.hasCode ? 1 : 0);
-  }
-
-  return {
-    where: clauses.length > 0 ? `and ${clauses.join(" and ")}` : "",
-    params,
-  };
-}
 
 export function searchPosts(db: Db, options: SearchOptions): SearchResult {
   const limit = Math.max(1, Math.min(options.limit ?? 20, 100));
@@ -95,15 +54,22 @@ export function searchPosts(db: Db, options: SearchOptions): SearchResult {
   if (!query) return { total: 0, hits: [], normalizedQuery: "" };
 
   const { where, params } = filterSql(options);
+  // count 里 companies join 只在按公司过滤时才用得上；行查询的卡片列要 c.*，
+  // 得始终带上
+  const countFrom = options.companySlug
+    ? `posts_fts
+       join posts p on p.id = posts_fts.rowid
+       join companies c on c.id = p.company_id`
+    : `posts_fts
+       join posts p on p.id = posts_fts.rowid`;
+  const rowFrom = `posts_fts
+       join posts p on p.id = posts_fts.rowid
+       join companies c on c.id = p.company_id`;
 
   const total = (
     db.$client
       .prepare(
-        `select count(*) as n
-         from posts_fts
-         join posts p on p.id = posts_fts.rowid
-         join companies c on c.id = p.company_id
-         where posts_fts match ? and ${VISIBLE} ${where}`,
+        `select count(*) as n from ${countFrom} where posts_fts match ? and ${VISIBLE} ${where}`,
       )
       .get(query, ...params) as { n: number }
   ).n;
@@ -111,11 +77,9 @@ export function searchPosts(db: Db, options: SearchOptions): SearchResult {
   const rows = db.$client
     .prepare(
       `select ${HIT_COLUMNS}
-       from posts_fts
-       join posts p on p.id = posts_fts.rowid
-       join companies c on c.id = p.company_id
+       from ${rowFrom}
        where posts_fts match ? and ${VISIBLE} ${where}
-       order by score asc, coalesce(p.published_at, '') desc, p.id desc
+       order by score asc, p.published_at desc, p.id desc
        limit ? offset ?`,
     )
     .all(query, ...params, limit, offset) as (Omit<SearchHit, "tags" | "titleHit"> & {

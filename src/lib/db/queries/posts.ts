@@ -22,7 +22,6 @@ export interface PostCard {
   summary: string;
   url: string;
   author: string | null;
-  coverUrl: string | null;
   publishedAt: string | null;
   publishedYear: number | null;
   /** 文章内容语言；在另一种语言的界面上给标题/摘要加 lang 属性 */
@@ -55,15 +54,16 @@ export interface ListFilters {
   hasCode?: boolean;
 }
 
-const VISIBLE = "p.is_visible = 1 and p.duplicate_of_id is null";
-const ORDER = "order by coalesce(p.published_at, '') desc, p.id desc";
+export const VISIBLE = "p.is_visible = 1 and p.duplicate_of_id is null";
+// 语义与 coalesce(published_at, '') 一致:ISO 串字典序,DESC 时 NULL 排最后(缺时间沉底)。
+// 不用 coalesce 表达式排序,否则 posts_visible_published_idx 的有序扫描用不上。
+const ORDER = "order by p.published_at desc, p.id desc";
 
-const CARD_COLUMNS = `p.id as id,
+export const CARD_COLUMNS = `p.id as id,
        p.title as title,
        p.summary as summary,
        p.canonical_url as url,
        p.author as author,
-       p.cover_url as coverUrl,
        p.published_at as publishedAt,
        p.published_year as publishedYear,
        p.lang as lang,
@@ -76,6 +76,11 @@ const CARD_COLUMNS = `p.id as id,
 
 const FROM = "from posts p join companies c on c.id = p.company_id";
 
+/** companies join 只在按公司过滤时才用得上:count / 年份分布不必陪跑 */
+function fromFor(filters: ListFilters): string {
+  return filters.companySlug ? FROM : "from posts p";
+}
+
 function page(options: PageOptions): { limit: number; offset: number } {
   return {
     limit: Math.max(1, Math.min(options.limit ?? 20, 100)),
@@ -83,7 +88,7 @@ function page(options: PageOptions): { limit: number; offset: number } {
   };
 }
 
-function filterSql(filters: ListFilters): { where: string; params: (string | number)[] } {
+export function filterSql(filters: ListFilters): { where: string; params: (string | number)[] } {
   const clauses: string[] = [];
   const params: (string | number)[] = [];
 
@@ -142,6 +147,16 @@ export function attachPostTags(rows: Omit<PostCard, "tags">[], db: Db): PostCard
   }));
 }
 
+/** 满足过滤条件的可见帖子数。分页页只需要 total 时用它,别为个数拉整行卡片。 */
+export function countPosts(db: Db, filters: ListFilters = {}): number {
+  const { where, params } = filterSql(filters);
+  return (
+    db.$client
+      .prepare(`select count(*) as n ${fromFor(filters)} where ${VISIBLE} ${where}`)
+      .get(...params) as { n: number }
+  ).n;
+}
+
 export function listPosts(
   db: Db,
   filters: ListFilters = {},
@@ -149,11 +164,7 @@ export function listPosts(
 ): Paged<PostCard> {
   const { limit, offset } = page(options);
   const { where, params } = filterSql(filters);
-  const total = (
-    db.$client.prepare(`select count(*) as n ${FROM} where ${VISIBLE} ${where}`).get(...params) as {
-      n: number;
-    }
-  ).n;
+  const total = countPosts(db, filters);
   const rows = db.$client
     .prepare(`select ${CARD_COLUMNS} ${FROM} where ${VISIBLE} ${where} ${ORDER} limit ? offset ?`)
     .all(...params, limit, offset) as Omit<PostCard, "tags">[];
@@ -324,7 +335,7 @@ export function postYearsByFilters(
   return db.$client
     .prepare(
       `select p.published_year as year, count(*) as count
-       ${FROM}
+       ${fromFor(filters)}
        where ${VISIBLE} ${where} and p.published_year is not null
        group by p.published_year
        order by p.published_year desc`,

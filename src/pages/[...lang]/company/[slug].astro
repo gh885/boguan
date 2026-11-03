@@ -3,12 +3,12 @@ import type { GetStaticPaths } from "astro";
 import BaseLayout from "../../../layouts/BaseLayout.astro";
 import CompanyView from "../../../components/CompanyView.astro";
 import {
-	companyBySlug,
 	companyCards,
 	companyTopTags,
 	openWebDatabase,
 	postYearsByFilters,
 	postsByCompany,
+	type CompanyCard,
 } from "../../../lib/db/queries";
 import { localizePath, localeRoutes, useTranslations } from "../../../lib/i18n";
 import { companyDisplayName } from "../../../lib/i18n/company";
@@ -19,20 +19,24 @@ import { site } from "../../../lib/site";
 
 interface Props {
 	locale: Locale;
+	/** getStaticPaths 已经查过全量 companyCards,这里拿现成的,不再重跑 left join 聚合 */
+	company: CompanyCard;
 }
 
 export const getStaticPaths = (() => {
 	const companies = companyCards(openWebDatabase());
-	return companies.flatMap((company) => localeRoutes({ slug: company.slug }));
+	return companies.flatMap((company) =>
+		localeRoutes({ slug: company.slug }).map((route) => ({
+			...route,
+			props: { ...route.props, company },
+		})),
+	);
 }) satisfies GetStaticPaths;
 
-const { locale } = Astro.props;
+const { locale, company } = Astro.props;
 const t = useTranslations(locale);
 const db = openWebDatabase();
 const slug = String(Astro.params.slug);
-const company = companyBySlug(db, slug);
-
-if (!company) throw new Error(`公司不存在：${slug}`);
 
 const topTags = companyTopTags(db, slug, 8);
 const years = postYearsByFilters(db, { companySlug: slug });
