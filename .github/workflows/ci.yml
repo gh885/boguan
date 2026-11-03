@@ -13,11 +13,13 @@ concurrency:
 permissions:
   contents: read
 
+# 检查（lint/类型/文案/测试）与构建（fixture + astro build）互不依赖，并行跑；
+# 分支保护的 required check 锁的是「检查与构建」这个名字，由末尾的聚合 job 承担。
 jobs:
   check:
-    name: 检查与构建
+    name: 检查（格式、Lint、类型、文案、测试）
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     steps:
       - name: 检出代码
@@ -30,14 +32,26 @@ jobs:
           node-version: "24"
           cache: true
 
-      - name: 格式、Lint 与类型检查
-        run: vp check
-
-      - name: 国际化文案检查
-        run: vp run i18n:check
+      - name: 格式、Lint、类型与文案检查
+        run: vp check && vp run i18n:check
 
       - name: 单元测试
         run: vp test
+
+  build:
+    name: 构建
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v7
+
+      - name: 安装 Vite+ 与依赖
+        uses: voidzero-dev/setup-vp@v1.22.0
+        with:
+          node-version: "24"
+          cache: true
 
       # 站点是数据驱动的，构建前先造一份固定数据集：
       # CI 里不跑抓取（没网、也不该在 CI 骚扰源站），构建结果与源站改版解耦
@@ -48,3 +62,13 @@ jobs:
         run: vpr build
         env:
           BOGUAN_DB: data/fixture.db
+
+  gate:
+    # 分支保护的 required context 名字就是 job 的 name;id 必须是 ASCII
+    name: 检查与构建
+    needs: [check, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 两个并行 job 均已通过
+        run: echo "check 与 build 全部通过"

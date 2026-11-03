@@ -2,8 +2,7 @@
 import sitemap from "@astrojs/sitemap";
 import node from "@astrojs/node";
 import { defineConfig } from "astro/config";
-import { tagIndex } from "./src/lib/db/queries";
-import { openWebDatabase } from "./src/lib/db/queries";
+import { openWebDatabase, tagIndex } from "./src/lib/db/queries";
 import { isIndexableTag } from "./src/lib/tags";
 
 // 薄标签页只有站内入口，不进 sitemap：门槛常量在 src/lib/tags.ts，页面侧用的也是它
@@ -14,6 +13,8 @@ const indexableTags = new Set(
 );
 
 // https://astro.build/config
+// 样式表保持外链（不设 build.inlineStylesheets: "always"）：本站是几百个静态页共享
+// 同一批 CSS，外链可跨页缓存；内联会让每页 HTML 各带一份，搜索引擎爬取白白变大。
 export default defineConfig({
   site: "https://boguan.dev",
   // URL 语言策略：默认语言（中文）不带前缀，其它语言带前缀。
