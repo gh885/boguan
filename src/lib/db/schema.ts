@@ -164,7 +164,7 @@ export const tagAliases = sqliteTable("tag_aliases", {
     .default("auto"),
 });
 
-/** 条件请求缓存：列表页与详情页都带 ETag / If-Modified-Since，304 就跳过解析 */
+/** 条件请求缓存：只用于列表页（详情页不带条件请求，理由见 ARCHITECTURE §5「传输层」） */
 export const httpCache = sqliteTable("http_cache", {
   url: text("url").primaryKey(),
   etag: text("etag"),

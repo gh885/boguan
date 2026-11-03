@@ -1,6 +1,7 @@
 import Parser from "rss-parser";
 import { hasCodeInHtml } from "../../../src/lib/domain/code";
 import { htmlToText } from "../extract";
+import { requirePageText } from "../fetch";
 import type { Detail, ListItem, TagRef } from "../types";
 import type { SourceAdapter } from "./types";
 
@@ -64,9 +65,10 @@ export function createRssAdapter(options: RssAdapterOptions): SourceAdapter {
       if (page > 1) return [];
 
       const response = await ctx.fetcher.page(ctx.source.listUrl);
-      if (!response.text) throw new Error(response.error ?? "feed 为空");
-
-      const feed = await parser.parseString(response.text);
+      // 304 = feed 没更新：返回空列表，管道当「没有下一页」自然收尾
+      const xml = requirePageText(response, "feed");
+      if (xml === null) return [];
+      const feed = await parser.parseString(xml);
       if (feed.items.length === 0) {
         ctx.log("feed 里没有条目，检查 listUrl 是否还是订阅地址");
         return [];
@@ -104,9 +106,10 @@ export function createRssAdapter(options: RssAdapterOptions): SourceAdapter {
     },
 
     async fetchDetail(ctx, url): Promise<Detail> {
-      const response = await ctx.fetcher.page(url);
-      if (!response.text) throw new Error(response.error ?? "详情页为空");
-      return { body: htmlToText(response.text), hasCode: hasCodeInHtml(response.text) };
+      const response = await ctx.fetcher.page(url, { conditional: false });
+      const html = requirePageText(response, "详情页");
+      if (html === null) throw new Error(`详情页未变化但本地没有正文：${url}`);
+      return { body: htmlToText(html), hasCode: hasCodeInHtml(html) };
     },
   };
 }

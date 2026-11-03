@@ -38,6 +38,7 @@ export interface FetchedPage {
 }
 
 export interface FetchStats {
+  /** 尝试次数（含重试），不等于实际发出的页面数 */
   requests: number;
   notModified: number;
   denied: number;
@@ -45,6 +46,20 @@ export interface FetchStats {
 
 const RETRYABLE = new Set([408, 425, 429, 500, 502, 503, 504]);
 const DEFAULT_INTERVAL_MS = 1000;
+
+/** 单个响应的体积上限：误配的下载链接不该拖爆进程（正文入库时另有 6 万字截断） */
+const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
+
+/**
+ * 适配器取正文用：304 = 内容没变，返回 null 让调用方走「跳过」路径；
+ * 其他失败（网络错、HTTP 4xx/5xx）抛错。适配器不得自己判 `!response.text`——
+ * 那会把 304 当成「页面为空」抛错，条件请求缓存就成了一颗雷。
+ */
+export function requirePageText(response: FetchedPage, what: string): string | null {
+  if (response.notModified) return null;
+  if (!response.text) throw new Error(response.error ?? `${what}为空`);
+  return response.text;
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -56,6 +71,18 @@ function retryAfterMs(header: string | null): number | null {
   if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
   const date = Date.parse(header);
   return Number.isNaN(date) ? null : Math.max(0, date - Date.now());
+}
+
+/** 超大响应不值得重试，直接记失败 */
+function tooLarge(url: string, status: number, bytes: number): FetchedPage {
+  return {
+    url,
+    status,
+    text: null,
+    notModified: false,
+    denied: false,
+    error: `响应体 ${bytes} 字节，超过上限 ${MAX_RESPONSE_BYTES}`,
+  };
 }
 
 /** Content-Type 与 `<meta charset>` 双保险：不少老站点仍是 GBK */
@@ -118,17 +145,20 @@ export class PoliteFetcher {
     this.stats = { requests: 0, notModified: 0, denied: 0 };
   }
 
-  /** robots.txt 自身，不经过 robots 判定，但仍走 host 排队 */
+  /** robots.txt 自身，不经过 robots 判定，但仍走 host 排队与限速 */
   private async rawGet(url: string) {
     const origin = originOf(url);
     if (!origin) throw new Error(`非法 URL：${url}`);
-    return this.withHost(origin, 0, async () => {
+    return this.withHost(origin, this.minIntervalMs, async () => {
       const response = await fetch(url, {
         headers: { "user-agent": USER_AGENT, accept: "text/plain,*/*" },
         redirect: "follow",
         signal: AbortSignal.timeout(this.timeoutMs),
       });
       const bytes = new Uint8Array(await response.arrayBuffer());
+      if (bytes.byteLength > MAX_RESPONSE_BYTES) {
+        throw new Error(`robots.txt 超过 ${MAX_RESPONSE_BYTES} 字节，按没有处理`);
+      }
       return {
         status: response.status,
         text: decode(bytes, response.headers.get("content-type")),
@@ -189,7 +219,14 @@ export class PoliteFetcher {
         }
 
         if (response.ok) {
+          const declared = Number(response.headers.get("content-length") ?? 0);
+          if (declared > MAX_RESPONSE_BYTES) {
+            return tooLarge(url, response.status, declared);
+          }
           const bytes = new Uint8Array(await response.arrayBuffer());
+          if (bytes.byteLength > MAX_RESPONSE_BYTES) {
+            return tooLarge(url, response.status, bytes.byteLength);
+          }
           const contentType = response.headers.get("content-type");
           this.storeCache(url, response.headers.get("etag"), response.headers.get("last-modified"));
           return {

@@ -24,15 +24,19 @@ const fts = checkFts(db);
 console.log(`索引对账：缺失 ${fts.missing.length} / 孤儿 ${fts.orphan.length}`);
 
 if (fix) {
-  for (const id of fts.orphan) deletePostFts(db, id);
-  let rebuilt = 0;
-  for (const id of fts.missing) {
-    const post = db.select().from(posts).where(eq(posts.id, id)).get();
-    if (!post) continue;
-    upsertPostFts(db, post.id, post.title, readBody(post.id) ?? "");
-    rebuilt += 1;
-  }
-  console.log(`已修复：补写 ${rebuilt}，删除 ${fts.orphan.length}`);
+  // 修复是一个整体：要么全补上，要么一条不动，中途崩了索引也不会停在半态
+  const repaired = db.$client.transaction(() => {
+    for (const id of fts.orphan) deletePostFts(db, id);
+    let rebuilt = 0;
+    for (const id of fts.missing) {
+      const post = db.select().from(posts).where(eq(posts.id, id)).get();
+      if (!post) continue;
+      upsertPostFts(db, post.id, post.title, readBody(post.id) ?? "");
+      rebuilt += 1;
+    }
+    return rebuilt;
+  })();
+  console.log(`已修复：补写 ${repaired}，删除 ${fts.orphan.length}`);
 } else if (fts.missing.length + fts.orphan.length > 0) {
   issues.push("索引与 posts 不一致（用 --fix 修复）");
 }

@@ -1,7 +1,7 @@
 import { load, type Cheerio } from "cheerio";
 import type { Element } from "domhandler";
 import { hasCodeInHtml } from "../../../src/lib/domain/code";
-import { htmlToText } from "../extract";
+import { fetchDetailContent } from "./detail";
 import type { Detail, ListItem, TagRef } from "../types";
 import type { SourceAdapter } from "./types";
 
@@ -16,9 +16,6 @@ import type { SourceAdapter } from "./types";
  *   是中文名，靠 `SEED_TAG_ALIASES` 映射到已有标签，跨公司也能对齐（大前端 → 前端、测试 → 测试）。
  * - 详情页正文是 `#articleCont`（markdown 渲染结果），标题 `h1.title`，作者与时间在 `.author` / `.created-at`。
  */
-
-/** 正文短于这个长度就当作解析失败，而不是「一篇很短的文章」 */
-const MIN_BODY_CHARS = 200;
 
 /** 「编辑：技术运营」→「技术运营」；「归类：大前端」→「大前端」 */
 function stripLabel(text: string, label: string): string {
@@ -77,19 +74,7 @@ export const dewuAdapter: SourceAdapter = {
   },
 
   async fetchDetail(ctx, url): Promise<Detail> {
-    const response = await ctx.fetcher.page(url);
-    if (!response.text) throw new Error(response.error ?? `详情页为空：${url}`);
-
-    const $ = load(response.text);
-    const content = $("#articleCont").first();
-    if (content.length === 0) throw new Error(`详情页缺少 #articleCont：${url}`);
-
-    const contentHtml = content.html() ?? "";
-    const body = htmlToText(contentHtml);
-    if (body.length < MIN_BODY_CHARS) {
-      throw new Error(`详情页正文只有 ${body.length} 字，选择器可能失效：${url}`);
-    }
-
+    const { $, contentHtml, body } = await fetchDetailContent(ctx, url, "#articleCont");
     const category = stripLabel($(".category").first().text().trim(), "归类");
     return {
       title: $("h1.title").first().text().trim() || undefined,
