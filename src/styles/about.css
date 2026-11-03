@@ -3,7 +3,8 @@
  *
  * 这是一张固定的「印刷页」：暖色纸面与工程图纸，不跟随站点主题。
  * 页面内的 --about-* 是这一页自己的语义色，亮暗对比在 4.5:1 以上；
- * 不要把这里的值用到全站组件上。
+ * 不要把这里的值用到全站组件上。定义在 :root 而不是 .about-page，
+ * 因为 body:has(.about-page) 要在祖先元素上用 --about-bg。
  */
 
 :root {
@@ -492,10 +493,6 @@ body:has(.about-page) .skip-link {
 }
 
 .about-footer a {
-  color: var(--about-bg);
-}
-
-.about-footer a:hover {
   color: var(--about-bg);
 }
 

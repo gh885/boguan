@@ -161,15 +161,3 @@ export function seed(db: Db): SeedReport {
     tags: allRuleTags().length,
   };
 }
-
-/** 便于脚本确认 seed 后的状态（不参与抓取） */
-export function seedSummary(db: Db): { sources: { slug: string; adapter: string }[] } {
-  return {
-    sources: db
-      .select()
-      .from(sources)
-      .where(eq(sources.enabled, true))
-      .all()
-      .map((row) => ({ slug: row.slug, adapter: row.adapter })),
-  };
-}

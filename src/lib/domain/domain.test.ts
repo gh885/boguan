@@ -9,7 +9,7 @@ import {
   truncateSummary,
 } from "./text";
 import { slugify, titleNorm } from "./title";
-import { canonicalizeUrl, hostOf } from "./url";
+import { canonicalizeUrl } from "./url";
 
 describe("canonicalizeUrl", () => {
   it("去掉追踪参数、锚点与末尾斜杠", () => {
@@ -37,11 +37,6 @@ describe("canonicalizeUrl", () => {
 
   it("不跨域改协议（http 不擅自升 https）", () => {
     expect(canonicalizeUrl("http://a.com/p")).toBe("http://a.com/p");
-  });
-
-  it("hostOf 提取串行作用域", () => {
-    expect(hostOf("https://tech.youzan.com/a")).toBe("tech.youzan.com");
-    expect(hostOf("nonsense")).toBeNull();
   });
 });
 

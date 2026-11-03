@@ -62,7 +62,7 @@ const description = t("meta.companies.description");
 					<p>{t("list.empty")}</p>
 				</div>
 			) : (
-				<ol class="directory-companies" role="list" start={1}>
+				<ol class="directory-companies" role="list">
 					{companies.map((company, index) => {
 						const name = companyDisplayName(company, locale);
 						return (

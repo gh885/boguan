@@ -18,7 +18,6 @@
   --neutral-0: oklch(1 0 0);
   --neutral-25: oklch(0.96 0.002 265);
   --neutral-50: oklch(0.967 0.003 265);
-  --neutral-100: oklch(0.94 0.004 265);
   --neutral-200: oklch(0.88 0.006 265);
   --neutral-300: oklch(0.72 0.01 265);
   --neutral-500: oklch(0.45 0.012 265);
@@ -39,9 +38,6 @@
   --color-text-primary: light-dark(var(--neutral-800), var(--neutral-25));
   --color-text-secondary: light-dark(var(--neutral-500), var(--neutral-300));
   --color-accent: light-dark(var(--accent-600), var(--accent-300));
-  /* 实心按钮：亮暗都用更深的蓝，配白字；与「链接用的 accent」分开，避免暗色下白字对比度不足 */
-  --color-accent-strong: light-dark(var(--accent-600), var(--accent-600));
-  --color-on-accent: light-dark(var(--neutral-0), var(--neutral-0));
 
   /* 排版：不加载 Web 字体，中文走系统字体栈（Inter 只在系统已安装时参与） */
   --font-sans:
@@ -52,40 +48,26 @@
   --font-serif:
     "Noto Serif SC", "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", "SimSun",
     serif;
-  --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
   --text-lg: 1.125rem;
   --text-xl: 1.25rem;
-  --text-2xl: 1.5rem;
   --text-3xl: clamp(1.625rem, 1.35rem + 1.1vw, 1.875rem);
   --leading-tight: 1.25;
   --leading-normal: 1.6;
   --weight-normal: 400;
-  --weight-medium: 500;
   --weight-semibold: 600;
-  --weight-bold: 700;
   --tracking-tight: -0.015em;
 
   /* 间距 */
-  --space-2xs: 0.25rem;
   --space-xs: 0.5rem;
   --space-sm: 0.75rem;
   --space-md: 1rem;
-  --space-lg: 1.5rem;
   --space-xl: 2rem;
-  --space-2xl: 3rem;
-  --space-3xl: 4rem;
 
   /* 形状与布局 */
   --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
   --radius-full: 999px;
-  --width-page: 72rem;
-  --width-measure: 42em;
-  --sidebar-width: 16rem;
-  --gutter: clamp(1rem, 3vw, 1.5rem);
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
   --transition-fast: 120ms ease;

@@ -423,8 +423,3 @@ export function siteStats(db: Db): SiteStats {
   ).n;
   return { posts: row.posts, companies: row.companies, tags, years: row.years };
 }
-
-/** 兼容旧调用：只返回公司名 / 数量，不含 logo 与主页 */
-export function companyIndex(db: Db): { slug: string; name: string; count: number }[] {
-  return companyCards(db).map(({ slug, name, count }) => ({ slug, name, count }));
-}

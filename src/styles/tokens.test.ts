@@ -80,6 +80,12 @@ for (const match of flat.matchAll(
   semantic.set(match[1]!, { light: match[2]!, dark: match[3]! });
 }
 
+/** tokens.css 里定义的全部令牌名(不含颜色值解析,任何类型的令牌都算) */
+const definedTokens = new Set<string>();
+for (const match of tokenCss.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/^\s*--([a-z0-9-]+):/gm)) {
+  definedTokens.add(match[1]!);
+}
+
 function color(role: string, scheme: "light" | "dark"): Oklch {
   const token = semantic.get(role);
   if (!token) throw new Error(`Missing semantic color: --color-${role}`);
@@ -92,10 +98,8 @@ describe("设计令牌", () => {
   it("每个角色都有亮/暗两套值", () => {
     expect([...semantic.keys()].sort()).toEqual([
       "accent",
-      "accent-strong",
       "bg",
       "border",
-      "on-accent",
       "surface",
       "surface-muted",
       "text-primary",
@@ -138,6 +142,17 @@ describe("设计令牌", () => {
     expect([...used].filter((role) => !semantic.has(role))).toEqual([]);
   });
 
+  it("定义了的令牌都有人引用（反向：不留死令牌）", () => {
+    const referenced = new Set<string>();
+    for (const source of Object.values(allCss)) {
+      for (const match of source.matchAll(/var\(--([a-z0-9-]+)[,)]/g)) {
+        referenced.add(match[1]!);
+      }
+    }
+    const dead = [...definedTokens].filter((name) => !referenced.has(name));
+    expect(dead, "tokens.css 里这些令牌没有任何 var() 引用，删掉或用起来").toEqual([]);
+  });
+
   /** 正文 ≥ 4.5:1，边框/分隔 ≥ 1.4:1（分隔线是装饰性弱边界，但必须看得见） */
   const checkedPairs: Array<[string, string, number]> = [
     ["text-primary", "bg", 4.5],
@@ -147,7 +162,6 @@ describe("设计令牌", () => {
     ["text-secondary", "surface", 4.5],
     ["text-secondary", "surface-muted", 4.5],
     ["accent", "surface-muted", 4.5],
-    ["on-accent", "accent-strong", 4.5],
     ["border", "surface", 1.4],
     ["border", "bg", 1.4],
   ];

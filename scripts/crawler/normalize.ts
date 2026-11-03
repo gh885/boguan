@@ -68,14 +68,6 @@ export function contentHash(title: string, summary: string, body: string): strin
   return createHash("sha256").update(`${title}\n${summary}\n${body}`).digest("hex");
 }
 
-/**
- * 列表层指纹：只有标题与摘要。
- * 增量运行时用它判断「是否值得再进详情页」——不落列，直接拿库里的 title/summary 重算。
- */
-export function listHash(title: string, summary: string): string {
-  return createHash("sha256").update(`${title}\n${summary}`).digest("hex");
-}
-
 export function normalizePost(input: NormalizeInput): NormalizedPost | null {
   const { item, detail, timezone, base, brands = [] } = input;
 

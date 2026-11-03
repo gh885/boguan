@@ -58,6 +58,9 @@ const tagsHref = localizePath("/tags", locale);
 const aboutHref = localizePath("/about", locale);
 const yearsHref = yearHref ?? tagsHref;
 
+/** 头版网格一行 5 个版位;「更多」卡片是补空的,最后一行已满就不再渲染 */
+const GRID_COLUMNS = 5;
+
 const editionDate = formatLongDate(new Date(), locale);
 const issue = t("home.issue", { count: formatNumber(locale, stats.posts) });
 const issueWithPage = page > 1 ? `${issue} · ${t("home.page", { page })}` : issue;
@@ -239,7 +242,7 @@ const topicItems = topics.map((topic) => ({
 								</article>
 							);
 						})}
-						{nextHref && items.length % 5 !== 0 && (
+						{nextHref && items.length % GRID_COLUMNS !== 0 && (
 							<a class="home-more" href={nextHref}>
 								<strong>{t("home.more")} →</strong>
 								<span>{t("home.page", { page: page + 1 })}</span>
