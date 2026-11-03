@@ -30,8 +30,13 @@ function fileOf(postId: number, dir: string): string {
   return join(dir, `${postId}.txt.gz`);
 }
 
+/** 目录只需要建一次；putBody 每篇都调用，mkdirSync 的系统调用能省则省 */
+const ensured = new Set<string>();
+
 function ensureDir(dir: string): void {
+  if (ensured.has(dir)) return;
   mkdirSync(dir, { recursive: true });
+  ensured.add(dir);
 }
 
 /** 写入（覆盖）。先写临时文件再 rename，避免进程中途挂掉留下半个 gzip */

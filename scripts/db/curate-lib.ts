@@ -72,54 +72,58 @@ export function curate(db: Db, options: CurateOptions = {}): CurateReport {
     duplicates: 0,
   };
 
-  for (const post of db.select().from(posts).all()) {
-    const brands = companyBrands.get(post.companyId) ?? [];
-    const title = stripSiteSuffix(post.title, brands);
+  // 批量写进一个事务：存量清洗动辄几百行，逐条自动提交在 WAL 下开销可观
+  const apply = db.$client.transaction(() => {
+    for (const post of db.select().from(posts).all()) {
+      const brands = companyBrands.get(post.companyId) ?? [];
+      const title = stripSiteSuffix(post.title, brands);
 
-    // 标题进了 content_hash：改标题就要一起重算
-    const body = readBody(post.id) ?? "";
-    const hash = contentHash(title, post.summary, body);
-    const titleChanged = title !== post.title;
-    const hashStale = hash !== post.contentHash;
+      // 标题进了 content_hash：改标题就要一起重算
+      const body = readBody(post.id) ?? "";
+      const hash = contentHash(title, post.summary, body);
+      const titleChanged = title !== post.title;
+      const hashStale = hash !== post.contentHash;
 
-    if (titleChanged) {
-      report.retitled += 1;
-      log(`  标题  ${post.title}\n     →  ${title}`);
-    } else if (hashStale) {
-      report.rehashed += 1;
-      log(`  指纹  ${title}（库里的指纹和正文对不上，重算）`);
-    }
-    if ((titleChanged || hashStale) && !dryRun) {
-      db.update(posts)
-        .set({ title, titleNorm: titleNorm(title), contentHash: hash })
-        .where(eq(posts.id, post.id))
-        .run();
-    }
-
-    // 人工下架（原因不是 non-article）不碰，规则只管自己那一类
-    if (post.hiddenReason && post.hiddenReason !== HIDDEN_NON_ARTICLE) continue;
-
-    const shouldHide = isNonArticle(title, tagSlugsByPost.get(post.id) ?? []);
-    if (shouldHide && post.isVisible) {
-      report.hidden += 1;
-      log(`  下架  ${title}`);
-      if (!dryRun) {
+      if (titleChanged) {
+        report.retitled += 1;
+        log(`  标题  ${post.title}\n     →  ${title}`);
+      } else if (hashStale) {
+        report.rehashed += 1;
+        log(`  指纹  ${title}（库里的指纹和正文对不上，重算）`);
+      }
+      if ((titleChanged || hashStale) && !dryRun) {
         db.update(posts)
-          .set({ isVisible: false, hiddenReason: HIDDEN_NON_ARTICLE })
+          .set({ title, titleNorm: titleNorm(title), contentHash: hash })
           .where(eq(posts.id, post.id))
           .run();
       }
-    } else if (!shouldHide && !post.isVisible) {
-      report.restored += 1;
-      log(`  恢复  ${title}`);
-      if (!dryRun) {
-        db.update(posts)
-          .set({ isVisible: true, hiddenReason: null })
-          .where(eq(posts.id, post.id))
-          .run();
+
+      // 人工下架（原因不是 non-article）不碰，规则只管自己那一类
+      if (post.hiddenReason && post.hiddenReason !== HIDDEN_NON_ARTICLE) continue;
+
+      const shouldHide = isNonArticle(title, tagSlugsByPost.get(post.id) ?? []);
+      if (shouldHide && post.isVisible) {
+        report.hidden += 1;
+        log(`  下架  ${title}`);
+        if (!dryRun) {
+          db.update(posts)
+            .set({ isVisible: false, hiddenReason: HIDDEN_NON_ARTICLE })
+            .where(eq(posts.id, post.id))
+            .run();
+        }
+      } else if (!shouldHide && !post.isVisible) {
+        report.restored += 1;
+        log(`  恢复  ${title}`);
+        if (!dryRun) {
+          db.update(posts)
+            .set({ isVisible: true, hiddenReason: null })
+            .where(eq(posts.id, post.id))
+            .run();
+        }
       }
     }
-  }
+  });
+  if (!dryRun) apply();
 
   // 标题变了就要重算索引：FTS 是 contentless，改不了单列，只能整表重建（正文从私有文件读）
   if (report.retitled > 0 && !dryRun) {

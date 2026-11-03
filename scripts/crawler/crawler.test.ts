@@ -7,9 +7,10 @@ import { describe, expect, it } from "vite-plus/test";
 import { upsertPostFts } from "../../src/lib/db/fts";
 import type { Db } from "../../src/lib/db/index";
 import * as schema from "../../src/lib/db/schema";
-import { companies, posts, sources } from "../../src/lib/db/schema";
+import { companies, posts, sources, tags } from "../../src/lib/db/schema";
 import { isPostUrl } from "./adapters/youzan";
-import { dedupe } from "./pipeline";
+import { requirePageText, type FetchedPage } from "./fetch";
+import { dedupe, TagResolver } from "./pipeline";
 import { parseSitemapUrls } from "./sitemap";
 import { contentHash, listHash, normalizePost } from "./normalize";
 import { ruleTags } from "./rules/tags";
@@ -214,6 +215,57 @@ function seedPost(db: Db, args: SeedArgs): number {
   upsertPostFts(db, row.id, row.title, "正文");
   return row.id;
 }
+
+describe("requirePageText", () => {
+  const page = (overrides: Partial<FetchedPage>): FetchedPage => ({
+    url: "https://a.com/",
+    status: 200,
+    text: "正文",
+    notModified: false,
+    denied: false,
+    error: null,
+    ...overrides,
+  });
+
+  it("200 返回正文，304 返回 null（走跳过路径，不当成错误）", () => {
+    expect(requirePageText(page({}), "feed")).toBe("正文");
+    expect(
+      requirePageText(page({ status: 304, text: null, notModified: true }), "feed"),
+    ).toBeNull();
+  });
+
+  it("其他失败抛错，错误串用 fetch 层给出的", () => {
+    expect(() => requirePageText(page({ text: null, error: "HTTP 403" }), "feed")).toThrow(
+      "HTTP 403",
+    );
+    expect(() => requirePageText(page({ text: null, error: null }), "feed")).toThrow("feed为空");
+  });
+});
+
+describe("TagResolver", () => {
+  it("alias 命中、按中文名建 alias、未映射收集，且 slug 一并给出", () => {
+    const db = freshDb();
+    const resolver = new TagResolver(db);
+    db.insert(tags).values({ slug: "frontend", name: "前端" }).returning().get();
+
+    const unmapped = new Set<string>();
+    const resolved = resolver.resolve(
+      [
+        { raw: "前端", name: "前端" },
+        { raw: "Da-Shu-Ju", name: "大数据" },
+        { raw: "内部拼音别名" },
+      ],
+      unmapped,
+    );
+
+    expect(resolved.map((tag) => tag.slug)).toEqual(["frontend", "da-shu-ju"]);
+    expect(unmapped.has("内部拼音别名")).toBe(true);
+    // 大数据：先建 tag，再写 alias，第二轮直接命中且不重复建
+    const second = resolver.resolve([{ raw: "大数据", name: "大数据" }], new Set());
+    expect(second.map((tag) => tag.slug)).toEqual(["da-shu-ju"]);
+    expect(db.select().from(tags).all()).toHaveLength(2);
+  });
+});
 
 const noop = () => {};
 

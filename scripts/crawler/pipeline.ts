@@ -1,4 +1,4 @@
-import { and, eq, ne } from "drizzle-orm";
+import { and, desc, eq, isNotNull, ne } from "drizzle-orm";
 import { hasBody, putBody, readBody } from "../../src/lib/db/bodies";
 import { upsertPostFts } from "../../src/lib/db/fts";
 import type { Db } from "../../src/lib/db/index";
@@ -100,11 +100,28 @@ export async function crawl(options: CrawlOptions): Promise<CrawlReport> {
   log(`抓取批次 #${job.id}（${options.mode}，${selected.length} 个源）`);
 
   const reports: SourceReport[] = [];
+  // 单源崩溃不挡批次：源与源之间互不依赖，坏一个记录一个，其余照常
   for (const source of selected) {
-    reports.push(await crawlSource(db, fetcher, source, options, job.id, log));
+    try {
+      reports.push(await crawlSource(db, fetcher, source, options, job.id, log));
+    } catch (failed) {
+      const message = failed instanceof Error ? failed.message : String(failed);
+      log(`[${source.slug}] 单源处理崩溃，跳过：${message}`);
+      reports.push({
+        slug: source.slug,
+        name: source.name,
+        status: "failed",
+        inserted: 0,
+        updated: 0,
+        unchanged: 0,
+        failed: 0,
+        requests: 0,
+        notModified: 0,
+        pages: 0,
+        note: message,
+      });
+    }
   }
-
-  const duplicates = dedupe(db, log);
 
   const totals = reports.reduce(
     (sum, report) => ({
@@ -115,6 +132,9 @@ export async function crawl(options: CrawlOptions): Promise<CrawlReport> {
     }),
     { inserted: 0, updated: 0, failed: 0, requests: 0 },
   );
+
+  // 没有任何写入时，全表去重的结论不可能变，不必再扫一遍
+  const duplicates = totals.inserted + totals.updated > 0 ? dedupe(db, log) : 0;
 
   const status = reports.every((report) => report.status === "failed")
     ? "failed"
@@ -148,6 +168,62 @@ export async function crawl(options: CrawlOptions): Promise<CrawlReport> {
 
 type SourceRow = typeof sources.$inferSelect;
 
+/** 公司名（中英）用于剥掉标题里的站点后缀（`｜得物技术`） */
+function brandNames(company: typeof companies.$inferSelect | undefined): string[] {
+  return [company?.name, company?.nameEn].filter((name): name is string => !!name);
+}
+
+/** 增量判定要用的存量帖子字段。canonicalUrl 全局唯一，作 Map 键。 */
+interface KnownPost {
+  id: number;
+  title: string;
+  summary: string;
+  publishedAt: string | null;
+  publishedYear: number | null;
+  readingMinutes: number | null;
+  hasCode: boolean | null;
+  contentHash: string;
+  hiddenReason: string | null;
+}
+
+/** 存量帖子一次性载入：一轮抓取几千次点查换成一个全表扫描 */
+function knownPosts(db: Db): Map<string, KnownPost> {
+  const rows = db
+    .select({
+      id: posts.id,
+      canonicalUrl: posts.canonicalUrl,
+      title: posts.title,
+      summary: posts.summary,
+      publishedAt: posts.publishedAt,
+      publishedYear: posts.publishedYear,
+      readingMinutes: posts.readingMinutes,
+      hasCode: posts.hasCode,
+      contentHash: posts.contentHash,
+      hiddenReason: posts.hiddenReason,
+    })
+    .from(posts)
+    .all();
+  return new Map(rows.map((row) => [row.canonicalUrl, row]));
+}
+
+/** fetch 层对不重试的 4xx 记 `HTTP 403` 这样的错误串 */
+function isForbiddenError(error: string): boolean {
+  return /\bHTTP 403\b/.test(error);
+}
+
+/** 上一轮这个源是不是也 403：连续两轮基本就是被屏蔽了 */
+function wasForbiddenLastRun(db: Db, sourceId: number, runId: number): boolean {
+  const prev = db
+    .select({ error: crawlRuns.error })
+    .from(crawlRuns)
+    .where(
+      and(eq(crawlRuns.sourceId, sourceId), ne(crawlRuns.id, runId), isNotNull(crawlRuns.error)),
+    )
+    .orderBy(desc(crawlRuns.id))
+    .get();
+  return !!prev?.error && isForbiddenError(prev.error);
+}
+
 async function crawlSource(
   db: Db,
   fetcher: PoliteFetcher,
@@ -174,21 +250,12 @@ async function crawlSource(
     return { ...base, status: "skipped", note: `blocked: ${source.blockedReason}` };
   }
 
-  const adapter = adapterFor(source.adapter);
-  // 公司名用于剥掉标题里的站点后缀（`｜得物技术`）
-  const company = db.select().from(companies).where(eq(companies.id, source.companyId)).get();
-  const brands = [company?.name, company?.nameEn].filter((name): name is string => !!name);
+  // run 先建好：无论后面在哪一步炸（未注册的适配器、解析崩溃），crawl_runs 都不会停在 running
   const run = db
     .insert(crawlRuns)
     .values({ jobId, sourceId: source.id, mode: options.mode })
     .returning()
     .get();
-  // 「只给 URL」的列表（sitemap）切片之间不发请求，已知条目在 processItem 里就跳过了，
-  // 所以增量时必须走完全部切片才能发现新文章——`--max-pages` 在那里只约束回填
-  // （回填的每个新条目都要抓一次详情，才是真正要设上限的成本）。
-  const urlOnlyList = adapter.capabilities.list === "sitemap";
-  const pageLimit =
-    options.mode === "incremental" && urlOnlyList ? Number.POSITIVE_INFINITY : options.maxPages;
 
   const startedAt = Date.now();
   const ctx: AdapterContext = {
@@ -203,12 +270,29 @@ async function crawlSource(
   let watermark = source.watermarkAt;
   let maxSeen = source.watermarkAt;
   let denied = false;
+  let forbidden = false;
   let stopSignals = 0;
   let page = 1;
   let stopped = false;
   let error: string | null = null;
+  // catch 里还要用：adapterFor 失败时是 undefined
+  let adapter: SourceAdapter | undefined;
+  let pageLimit: number = options.maxPages;
 
   try {
+    adapter = adapterFor(source.adapter);
+    // 「只给 URL」的列表（sitemap）切片之间不发请求，已知条目在 processItem 里就跳过了，
+    // 所以增量时必须走完全部切片才能发现新文章——`--max-pages` 在那里只约束回填
+    // （回填的每个新条目都要抓一次详情，才是真正要设上限的成本）。
+    const urlOnlyList = adapter.capabilities.list === "sitemap";
+    pageLimit =
+      options.mode === "incremental" && urlOnlyList ? Number.POSITIVE_INFINITY : options.maxPages;
+    const known = knownPosts(db);
+    const tagResolver = new TagResolver(db);
+    const brands = brandNames(
+      db.select().from(companies).where(eq(companies.id, source.companyId)).get(),
+    );
+
     while (page <= pageLimit && !stopped) {
       const items = await adapter.fetchList(ctx, page);
       if (items.length === 0) break;
@@ -223,17 +307,21 @@ async function crawlSource(
 
       for (const item of items) {
         const outcome = await processItem(
-          db,
-          adapter,
-          ctx,
-          source,
-          run.id,
+          {
+            db,
+            adapter,
+            ctx,
+            source,
+            runId: run.id,
+            brands,
+            force: options.force ?? false,
+            known,
+            tags: tagResolver,
+            unmapped,
+            seen,
+            log,
+          },
           item,
-          unmapped,
-          seen,
-          log,
-          options.force ?? false,
-          brands,
         );
         if (!outcome) continue;
         seen.add(outcome.canonicalUrl);
@@ -271,11 +359,17 @@ async function crawlSource(
   } catch (failed) {
     error = failed instanceof Error ? failed.message : String(failed);
     if (error.startsWith("robots:")) denied = true;
+    if (isForbiddenError(error)) forbidden = wasForbiddenLastRun(db, source.id, run.id);
     recordFailure(
       db,
       run.id,
       "list",
-      adapter.pageUrl(source.listUrl, pageLimit === Infinity ? page : Math.min(page, pageLimit)),
+      adapter
+        ? adapter.pageUrl(
+            source.listUrl,
+            pageLimit === Number.POSITIVE_INFINITY ? page : Math.min(page, pageLimit),
+          )
+        : source.listUrl,
       null,
       error,
     );
@@ -308,9 +402,11 @@ async function crawlSource(
   db.update(sources)
     .set({
       lastRunAt: new Date().toISOString(),
-      watermarkAt: maxSeen,
-      blockedAt: denied ? new Date().toISOString() : null,
-      blockedReason: denied ? "robots" : null,
+      // 部分失败的轮次不前移水位：列表后段「已看见但没入库」的条目，下轮还能被处理到
+      watermarkAt: error ? source.watermarkAt : maxSeen,
+      // 连续两轮 403 基本是被源站屏蔽了，标记后停止每天撞（--force 可强行跑一次）
+      blockedAt: denied || forbidden ? new Date().toISOString() : null,
+      blockedReason: denied ? "robots" : forbidden ? "forbidden" : null,
     })
     .where(eq(sources.id, source.id))
     .run();
@@ -329,7 +425,7 @@ async function crawlSource(
     status,
     requests: fetcher.stats.requests,
     notModified: fetcher.stats.notModified,
-    note: error ?? (denied ? "robots 拒绝" : undefined),
+    note: error ?? (denied ? "robots 拒绝" : forbidden ? "连续 403，标记 forbidden" : undefined),
   };
 }
 
@@ -339,30 +435,36 @@ interface ItemOutcome {
   publishedAt: string | null;
 }
 
+/** processItem 的一轮上下文：整个源共用，逐条只传 item */
+interface ItemEnv {
+  db: Db;
+  adapter: SourceAdapter;
+  ctx: AdapterContext;
+  source: SourceRow;
+  runId: number;
+  brands: string[];
+  force: boolean;
+  /** 存量帖子（canonicalUrl 键），进程内一次载入 */
+  known: Map<string, KnownPost>;
+  tags: TagResolver;
+  unmapped: Set<string>;
+  seen: Set<string>;
+  log: Log;
+}
+
 /**
  * 单条处理。增量判定的关键在「能不打开详情页就不打开」：
  * 列表页的标题 + 摘要没变、正文文件也在，就直接算未变——每天省掉全站详情页的请求。
  * 代价是「正文静默改字」不会被发现，这个取舍写在 ARCHITECTURE §3。
  */
-async function processItem(
-  db: Db,
-  adapter: SourceAdapter,
-  ctx: AdapterContext,
-  source: SourceRow,
-  runId: number,
-  item: ListItem,
-  unmapped: Set<string>,
-  seen: Set<string>,
-  log: Log,
-  force: boolean,
-  brands: string[],
-): Promise<ItemOutcome | null> {
+async function processItem(env: ItemEnv, item: ListItem): Promise<ItemOutcome | null> {
+  const { db, adapter, ctx, source, runId, brands, force, known, tags: tagResolver } = env;
   const canonicalUrl = canonicalizeUrl(item.url, source.listUrl);
   if (!canonicalUrl) return null;
   // 同一轮里列表可能重复给出同一条（置顶、跨页重叠），处理过就别再来一次
-  if (seen.has(canonicalUrl)) return null;
+  if (env.seen.has(canonicalUrl)) return null;
 
-  const existing = db.select().from(posts).where(eq(posts.canonicalUrl, canonicalUrl)).get();
+  const existing = known.get(canonicalUrl) ?? null;
   const canDetail =
     adapter.capabilities.detail !== "none" && typeof adapter.fetchDetail === "function";
 
@@ -386,8 +488,25 @@ async function processItem(
     existing.title !== listLevel.title ||
     existing.summary !== listLevel.summary ||
     existing.publishedAt !== listLevel.publishedAt;
-  // 能不打开详情页就不打开：只有「新条目 / 元数据变了 / 正文文件丢了」才去
-  const needsDetail = canDetail && !item.body && metadataChanged;
+  // 能不打开详情页就不打开：新条目 / 元数据变了 / 正文文件丢了。
+  // 最后一类包含「上次详情页抓失败、按列表层入了库」的条目——不重试，正文与索引正文就永久为空。
+  const needsDetail =
+    canDetail && !item.body && (metadataChanged || (!!existing && !hasBody(existing.id)));
+
+  // 元数据没变、详情也不用抓、正文文件还在：内容不可能变（正文只有 crawler 写），
+  // 直接按未变处理——省掉每轮对全站正文的 gunzip + sha256
+  if (existing && listLevel && !needsDetail && !metadataChanged && hasBody(existing.id)) {
+    db.update(posts)
+      .set({
+        lastSeenAt: new Date().toISOString(),
+        publishedYear: existing.publishedYear ?? listLevel.publishedYear,
+        readingMinutes: existing.readingMinutes ?? listLevel.readingMinutes,
+        hasCode: listLevel.hasCode ?? existing.hasCode,
+      })
+      .where(eq(posts.id, existing.id))
+      .run();
+    return { kind: "unchanged", canonicalUrl, publishedAt: listLevel.publishedAt };
+  }
 
   // 抓取用列表里给的原始地址，canonical 地址只做身份：有赞对去掉结尾斜杠的地址
   // 会 301 回来，拿 canonical 去抓等于每篇多一次请求（回填 351 篇就是双倍）
@@ -403,7 +522,7 @@ async function processItem(
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       recordFailure(db, runId, "detail", canonicalUrl, null, message);
-      log(`  [${source.slug}] 详情页失败：${canonicalUrl}（${message}）`);
+      env.log(`  [${source.slug}] 详情页失败：${canonicalUrl}（${message}）`);
     }
   }
 
@@ -411,54 +530,63 @@ async function processItem(
   if (!normalized) {
     if (!needsDetail) {
       recordFailure(db, runId, "detail", canonicalUrl, null, "列表与详情页都没有标题");
-      log(`  [${source.slug}] 拿不到标题，跳过：${canonicalUrl}`);
+      env.log(`  [${source.slug}] 拿不到标题，跳过：${canonicalUrl}`);
     }
     return null;
   }
+  const post = normalized;
 
   // 可见性：非文章页（活动报名、团队介绍）不入列表/搜索/sitemap，但数据保留（ARCHITECTURE §3）
-  const resolvedTags = resolveTags(db, normalized.tags, unmapped);
-  const hidden = isNonArticle(normalized.title, resolvedTagSlugs(db, resolvedTags));
+  const resolvedTags = tagResolver.resolve(post.tags, env.unmapped);
+  const hidden = isNonArticle(
+    post.title,
+    resolvedTags.map((tag) => tag.slug),
+  );
   const visibility = hidden
     ? { isVisible: false, hiddenReason: HIDDEN_NON_ARTICLE }
     : { isVisible: true, hiddenReason: null };
 
   // 详情页没拿到就沿用库里已有的正文，避免把好的正文覆盖成空
-  const body = normalized.body || (existing ? (readBody(existing.id) ?? "") : "");
-  const hash = contentHash(normalized.title, normalized.summary, body);
+  const body = post.body || (existing ? (readBody(existing.id) ?? "") : "");
+  const hash = contentHash(post.title, post.summary, body);
   const now = new Date().toISOString();
 
   if (!existing) {
-    const inserted = db
-      .insert(posts)
-      .values({
-        sourceId: source.id,
-        companyId: source.companyId,
-        canonicalUrl: normalized.canonicalUrl,
-        title: normalized.title,
-        titleNorm: normalized.titleNorm,
-        summary: normalized.summary,
-        lang: source.lang,
-        author: normalized.author,
-        publishedAt: normalized.publishedAt,
-        publishedAtRaw: normalized.publishedAtRaw,
-        publishedYear: normalized.publishedYear,
-        readingMinutes: normalized.readingMinutes,
-        hasCode: normalized.hasCode,
-        coverUrl: normalized.coverUrl,
-        contentHash: hash,
-        ...visibility,
-      })
-      .returning()
-      .get();
-
-    putBody(inserted.id, body);
-    upsertPostFts(db, inserted.id, normalized.title, body);
-    writePostTags(db, inserted.id, resolvedTags, normalized);
+    // 单篇的「posts + 正文 + FTS + 标签」是一个逻辑写入，包进事务：
+    // 中途崩溃不会留下 posts 有、索引缺的半态；正文文件不是事务性的，
+    // 回滚最多留个孤文件，`vpr db:check --prune` 会清
+    const inserted = db.$client.transaction(() => {
+      const row = db
+        .insert(posts)
+        .values({
+          sourceId: source.id,
+          companyId: source.companyId,
+          canonicalUrl: post.canonicalUrl,
+          title: post.title,
+          titleNorm: post.titleNorm,
+          summary: post.summary,
+          lang: source.lang,
+          author: post.author,
+          publishedAt: post.publishedAt,
+          publishedAtRaw: post.publishedAtRaw,
+          publishedYear: post.publishedYear,
+          readingMinutes: post.readingMinutes,
+          hasCode: post.hasCode,
+          coverUrl: post.coverUrl,
+          contentHash: hash,
+          ...visibility,
+        })
+        .returning()
+        .get();
+      putBody(row.id, body);
+      upsertPostFts(db, row.id, post.title, body);
+      writePostTags(db, row.id, resolvedTags, post);
+      return row;
+    })();
     return {
       kind: "inserted",
-      canonicalUrl: normalized.canonicalUrl,
-      publishedAt: normalized.publishedAt,
+      canonicalUrl: inserted.canonicalUrl,
+      publishedAt: post.publishedAt,
     };
   }
 
@@ -467,129 +595,47 @@ async function processItem(
     db.update(posts)
       .set({
         lastSeenAt: now,
-        publishedAt: existing.publishedAt ?? normalized.publishedAt,
-        publishedYear: existing.publishedYear ?? normalized.publishedYear,
-        readingMinutes: existing.readingMinutes ?? normalized.readingMinutes,
-        hasCode: normalized.hasCode ?? existing.hasCode,
+        publishedAt: existing.publishedAt ?? post.publishedAt,
+        publishedYear: existing.publishedYear ?? post.publishedYear,
+        readingMinutes: existing.readingMinutes ?? post.readingMinutes,
+        hasCode: post.hasCode ?? existing.hasCode,
       })
       .where(eq(posts.id, existing.id))
       .run();
-    return {
-      kind: "unchanged",
-      canonicalUrl: normalized.canonicalUrl,
-      publishedAt: normalized.publishedAt,
-    };
+    return { kind: "unchanged", canonicalUrl, publishedAt: post.publishedAt };
   }
 
-  db.update(posts)
-    .set({
-      title: normalized.title,
-      titleNorm: normalized.titleNorm,
-      summary: normalized.summary,
-      author: normalized.author,
-      publishedAt: normalized.publishedAt,
-      publishedAtRaw: normalized.publishedAtRaw,
-      publishedYear: normalized.publishedYear,
-      readingMinutes: normalized.readingMinutes ?? existing.readingMinutes,
-      hasCode: normalized.hasCode ?? existing.hasCode,
-      coverUrl: normalized.coverUrl,
-      contentHash: hash,
-      lastSeenAt: now,
-      // 人工下架（原因不是 non-article）不被规则覆盖，规则只管自己那一类
-      ...(existing.hiddenReason && existing.hiddenReason !== HIDDEN_NON_ARTICLE ? {} : visibility),
-      // 内容变了，之前判重的结论可能不再成立
-      duplicateOfId: null,
-    })
-    .where(eq(posts.id, existing.id))
-    .run();
-
-  if (body) putBody(existing.id, body);
-  upsertPostFts(db, existing.id, normalized.title, body);
-  writePostTags(db, existing.id, resolvedTags, normalized);
-
-  return {
-    kind: "updated",
-    canonicalUrl: normalized.canonicalUrl,
-    publishedAt: normalized.publishedAt,
-  };
-}
-
-/** 已解析的标签 id → slug，用于可见性判定 */
-function resolvedTagSlugs(db: Db, resolved: ResolvedTag[]): string[] {
-  if (resolved.length === 0) return [];
-  const placeholders = resolved.map(() => "?").join(", ");
-  const rows = db.$client
-    .prepare(`select slug from tags where id in (${placeholders})`)
-    .all(...resolved.map((tag) => tag.id)) as { slug: string }[];
-  return rows.map((row) => row.slug);
-}
-
-interface ResolvedTag {
-  id: number;
-  origin: "source" | "rule";
-}
-
-/**
- * 源站标签优先，拿不到就用关键词规则。
- * 只有「能对上中文名」的源站标签才入库——对不上说明它是源站内部的拼音别名，猜不如不猜。
- */
-function resolveTags(db: Db, refs: TagRef[], unmapped: Set<string>): ResolvedTag[] {
-  const resolved: ResolvedTag[] = [];
-  const seen = new Set<number>();
-
-  for (const ref of refs) {
-    const raw = normalizeRawTag(ref.raw);
-    if (!raw) continue;
-
-    const alias = db.select().from(tagAliases).where(eq(tagAliases.raw, raw)).get();
-    if (alias) {
-      if (!seen.has(alias.tagId)) {
-        seen.add(alias.tagId);
-        resolved.push({ id: alias.tagId, origin: "source" });
-      }
-      continue;
-    }
-
-    // 同一个概念在源站可能有多个 slug（big-data 与 da-shu-ju 都叫「大数据」）：
-    // 规范身份是中文名，slug 取先建出来的那个，避免同一个标签开两个页面
-    const byName = ref.name
-      ? db.select().from(tags).where(eq(tags.name, ref.name)).get()
-      : undefined;
-    if (byName) {
-      db.insert(tagAliases)
-        .values({ raw, tagId: byName.id, source: "auto" })
-        .onConflictDoUpdate({ target: tagAliases.raw, set: { tagId: byName.id } })
-        .run();
-      if (!seen.has(byName.id)) {
-        seen.add(byName.id);
-        resolved.push({ id: byName.id, origin: "source" });
-      }
-      continue;
-    }
-
-    const slug = slugify(ref.raw) ?? (ref.name ? slugify(ref.name) : null);
-    if (!ref.name || !slug) {
-      unmapped.add(raw);
-      continue;
-    }
-
-    const tag = db
-      .insert(tags)
-      .values({ slug, name: ref.name })
-      .onConflictDoUpdate({ target: tags.slug, set: { name: ref.name } })
-      .returning()
-      .get();
-    db.insert(tagAliases)
-      .values({ raw, tagId: tag.id, source: "auto" })
-      .onConflictDoUpdate({ target: tagAliases.raw, set: { tagId: tag.id } })
+  db.$client.transaction(() => {
+    db.update(posts)
+      .set({
+        title: post.title,
+        titleNorm: post.titleNorm,
+        summary: post.summary,
+        author: post.author,
+        publishedAt: post.publishedAt,
+        publishedAtRaw: post.publishedAtRaw,
+        publishedYear: post.publishedYear,
+        readingMinutes: post.readingMinutes ?? existing.readingMinutes,
+        hasCode: post.hasCode ?? existing.hasCode,
+        coverUrl: post.coverUrl,
+        contentHash: hash,
+        lastSeenAt: now,
+        // 人工下架（原因不是 non-article）不被规则覆盖，规则只管自己那一类
+        ...(existing.hiddenReason && existing.hiddenReason !== HIDDEN_NON_ARTICLE
+          ? {}
+          : visibility),
+        // 内容变了，之前判重的结论可能不再成立
+        duplicateOfId: null,
+      })
+      .where(eq(posts.id, existing.id))
       .run();
-    if (!seen.has(tag.id)) {
-      seen.add(tag.id);
-      resolved.push({ id: tag.id, origin: "source" });
-    }
-  }
 
-  return resolved;
+    if (body) putBody(existing.id, body);
+    upsertPostFts(db, existing.id, post.title, body);
+    writePostTags(db, existing.id, resolvedTags, post);
+  })();
+
+  return { kind: "updated", canonicalUrl: post.canonicalUrl, publishedAt: post.publishedAt };
 }
 
 function writePostTags(
@@ -608,7 +654,7 @@ function writePostTags(
             .onConflictDoUpdate({ target: tags.slug, set: { name: tag.name } })
             .returning()
             .get();
-          return { id: row.id, origin: "rule" as const };
+          return { id: row.id, slug: row.slug, origin: "rule" as const };
         });
 
   // 人工指定的标签不动（origin = 'manual'）
@@ -621,6 +667,110 @@ function writePostTags(
     .values(final.map((tag) => ({ postId, tagId: tag.id, origin: tag.origin })))
     .onConflictDoNothing()
     .run();
+}
+
+interface TagRecord {
+  id: number;
+  slug: string;
+}
+
+interface ResolvedTag extends TagRecord {
+  origin: "source" | "rule";
+}
+
+/**
+ * 源站标签 → 规范标签的解析，带进程内缓存。
+ * alias 映射基本静态，逐条 item 逐个标签点查数据库纯属浪费——一轮增量是上千次点查。
+ * 缓存语义：alias 未命中（null）也是结论，resolver 自己才会写 alias，本轮内持续有效；
+ * 按中文名查 tags 不缓存未命中，规则标签可能在本轮中途新建同名 tag。
+ */
+export class TagResolver {
+  private aliases = new Map<string, TagRecord | null>();
+  private byName = new Map<string, TagRecord>();
+
+  constructor(private readonly db: Db) {}
+
+  resolve(refs: TagRef[], unmapped: Set<string>): ResolvedTag[] {
+    const resolved: ResolvedTag[] = [];
+    const seen = new Set<number>();
+    const push = (record: TagRecord) => {
+      if (seen.has(record.id)) return;
+      seen.add(record.id);
+      resolved.push({ ...record, origin: "source" });
+    };
+
+    for (const ref of refs) {
+      const raw = normalizeRawTag(ref.raw);
+      if (!raw) continue;
+
+      const alias = this.aliasFor(raw);
+      if (alias) {
+        push(alias);
+        continue;
+      }
+
+      // 同一个概念在源站可能有多个 slug（big-data 与 da-shu-ju 都叫「大数据」）：
+      // 规范身份是中文名，slug 取先建出来的那个，避免同一个标签开两个页面
+      let known = ref.name ? this.byName.get(ref.name) : undefined;
+      if (!known && ref.name) {
+        known =
+          this.db
+            .select({ id: tags.id, slug: tags.slug })
+            .from(tags)
+            .where(eq(tags.name, ref.name))
+            .get() ?? undefined;
+        if (known) this.byName.set(ref.name, known);
+      }
+      if (known) {
+        this.db
+          .insert(tagAliases)
+          .values({ raw, tagId: known.id, source: "auto" })
+          .onConflictDoUpdate({ target: tagAliases.raw, set: { tagId: known.id } })
+          .run();
+        this.aliases.set(raw, known);
+        push(known);
+        continue;
+      }
+
+      const slug = slugify(ref.raw) ?? (ref.name ? slugify(ref.name) : null);
+      if (!ref.name || !slug) {
+        unmapped.add(raw);
+        continue;
+      }
+
+      const tag = this.db
+        .insert(tags)
+        .values({ slug, name: ref.name })
+        .onConflictDoUpdate({ target: tags.slug, set: { name: ref.name } })
+        .returning()
+        .get();
+      this.db
+        .insert(tagAliases)
+        .values({ raw, tagId: tag.id, source: "auto" })
+        .onConflictDoUpdate({ target: tagAliases.raw, set: { tagId: tag.id } })
+        .run();
+      const record = { id: tag.id, slug: tag.slug };
+      this.aliases.set(raw, record);
+      this.byName.set(ref.name, record);
+      push(record);
+    }
+
+    return resolved;
+  }
+
+  private aliasFor(raw: string): TagRecord | null {
+    const cached = this.aliases.get(raw);
+    if (cached !== undefined) return cached;
+    const row = this.db
+      .select({ id: tags.id, slug: tags.slug })
+      .from(tagAliases)
+      .innerJoin(tags, eq(tags.id, tagAliases.tagId))
+      .where(eq(tagAliases.raw, raw))
+      .get();
+    const record = row ?? null;
+    this.aliases.set(raw, record);
+    return record;
+  }
 }
 
 function recordFailure(
@@ -757,7 +907,7 @@ export async function inspect(
         detail,
         timezone: source.timezone,
         base: source.listUrl,
-        brands: [company?.name, company?.nameEn].filter((name): name is string => !!name),
+        brands: brandNames(company),
       });
       if (!normalized) {
         log(`   ✗ 归一失败：${item.url}`);

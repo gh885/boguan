@@ -1,6 +1,8 @@
-import { load, type CheerioAPI } from "cheerio";
+import type { CheerioAPI } from "cheerio";
 import { hasCodeInHtml } from "../../../src/lib/domain/code";
-import { firstTextNode, htmlToText } from "../extract";
+import { fetchDetailContent } from "./detail";
+import { firstTextNode } from "../extract";
+import { requirePageText } from "../fetch";
 import { parseSitemapUrls } from "../sitemap";
 import type { Detail, ListItem, TagRef } from "../types";
 import type { SourceAdapter } from "./types";
@@ -21,8 +23,6 @@ import type { SourceAdapter } from "./types";
  *   宁可让这一条进 `crawl_failures`，也不要静默入一条空正文。
  */
 
-/** 正文短于这个长度就当作解析失败，而不是「一篇很短的文章」 */
-const MIN_BODY_CHARS = 200;
 const TAG_PREFIX = "tag-";
 
 /**
@@ -57,9 +57,11 @@ async function sitemapUrls(ctx: Parameters<SourceAdapter["fetchList"]>[0]): Prom
   if (cache?.source === source) return cache.urls;
 
   const response = await ctx.fetcher.page(source);
-  if (!response.text) throw new Error(response.error ?? `站点地图为空：${source}`);
+  // 304 = 站点地图没更新，当「没有新文章」处理
+  const xml = requirePageText(response, `站点地图（${source}）`);
+  if (xml === null) return [];
 
-  const urls = parseSitemapUrls(response.text, source, { keep: isPostUrl });
+  const urls = parseSitemapUrls(xml, source, { keep: isPostUrl });
   // 200 但一条都没解析出来，几乎一定是站点结构变了——让它响，不要静默当成「没有文章」
   if (urls.length === 0) {
     throw new Error(`站点地图里没有文章 URL，路径或格式可能变了：${source}`);
@@ -120,19 +122,7 @@ export const youzanAdapter: SourceAdapter = {
   },
 
   async fetchDetail(ctx, url): Promise<Detail> {
-    const response = await ctx.fetcher.page(url);
-    if (!response.text) throw new Error(response.error ?? `详情页为空：${url}`);
-
-    const $ = load(response.text);
-    const content = $(".post-content").first();
-    if (content.length === 0) throw new Error(`详情页缺少 .post-content：${url}`);
-
-    const contentHtml = content.html() ?? "";
-    const body = htmlToText(contentHtml);
-    if (body.length < MIN_BODY_CHARS) {
-      throw new Error(`详情页正文只有 ${body.length} 字，选择器可能失效：${url}`);
-    }
-
+    const { $, contentHtml, body } = await fetchDetailContent(ctx, url, ".post-content");
     return {
       title: $(".post-title").first().text().trim() || $("h1").first().text().trim() || undefined,
       body,
