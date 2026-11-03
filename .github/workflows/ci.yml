@@ -63,7 +63,8 @@ jobs:
         env:
           BOGUAN_DB: data/fixture.db
 
-  检查与构建:
+  gate:
+    # 分支保护的 required context 名字就是 job 的 name;id 必须是 ASCII
     name: 检查与构建
     needs: [check, build]
     runs-on: ubuntu-latest
