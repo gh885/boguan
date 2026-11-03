@@ -41,9 +41,7 @@ body:has(.paper-page) .skip-link {
   background-image: radial-gradient(var(--home-texture) 0.5px, transparent 0.5px);
   background-size: 5px 5px;
   color: var(--home-ink);
-  font-family: var(--font-sans);
-  font-size: 1rem;
-  line-height: 1.6;
+  /* 字体与行高沿用 body 的全局基线,不在此重复 */
 }
 
 .paper-page ::selection {
@@ -410,16 +408,5 @@ body:has(.paper-page) .skip-link {
   .paper-footer-bottom {
     align-items: flex-start;
     flex-direction: column;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .paper-page *,
-  .paper-page *::before,
-  .paper-page *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
   }
 }

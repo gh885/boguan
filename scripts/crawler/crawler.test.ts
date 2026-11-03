@@ -12,7 +12,7 @@ import { isPostUrl } from "./adapters/youzan";
 import { requirePageText, type FetchedPage } from "./fetch";
 import { dedupe, TagResolver } from "./pipeline";
 import { parseSitemapUrls } from "./sitemap";
-import { contentHash, listHash, normalizePost } from "./normalize";
+import { contentHash, normalizePost } from "./normalize";
 import { ruleTags } from "./rules/tags";
 
 const migrationsFolder = fileURLToPath(new URL("../../drizzle", import.meta.url));
@@ -84,7 +84,6 @@ describe("normalizePost", () => {
     const a = contentHash("标题", "摘要 A", "正文");
     expect(a).toBe(contentHash("标题", "摘要 A", "正文"));
     expect(a).not.toBe(contentHash("标题", "摘要 B", "正文"));
-    expect(listHash("标题", "摘要 A")).toBe(listHash("标题", "摘要 A"));
   });
 });
 

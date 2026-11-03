@@ -82,7 +82,7 @@ const navItems = [
 					/>
 				</div>
 				<div class="about-stage__bar">
-					<a class="about-wordmark" href={homeHref} aria-label={t("nav.brandHome")}>博观</a>
+					<a class="about-wordmark" href={homeHref} aria-label={t("nav.brandHome")}>{site.name}</a>
 					<nav class="about-nav" aria-label={t("nav.primary")}>
 						{navItems.map((item) => <a href={item.href}>{item.label}</a>)}
 					</nav>
@@ -231,7 +231,7 @@ const navItems = [
 					</div>
 				</div>
 
-				<a class="about-footer__wordmark" href={homeHref} aria-label={t("nav.brandHome")}>博观</a>
+				<a class="about-footer__wordmark" href={homeHref} aria-label={t("nav.brandHome")}>{site.name}</a>
 
 				<div class="about-footer__bottom">
 					<nav aria-label={t("nav.primary")}>

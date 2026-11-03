@@ -75,15 +75,6 @@ export function canonicalizeUrl(input: string, base?: string): string | null {
   return url.toString();
 }
 
-/** 同一个 host 的请求在 crawler 里必须串行，判定用它 */
-export function hostOf(url: string): string | null {
-  try {
-    return new URL(url).host;
-  } catch {
-    return null;
-  }
-}
-
 /** origin（scheme + host），robots.txt 与限速的作用域 */
 export function originOf(url: string): string | null {
   try {

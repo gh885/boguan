@@ -216,7 +216,6 @@ export const crawlRuns = sqliteTable(
     inserted: integer("inserted").notNull().default(0),
     updated: integer("updated").notNull().default(0),
     unchanged: integer("unchanged").notNull().default(0),
-    duplicates: integer("duplicates").notNull().default(0),
     failed: integer("failed").notNull().default(0),
     error: text("error"),
   },

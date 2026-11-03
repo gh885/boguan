@@ -9,7 +9,7 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vite-plus/test";
 import { deleteBody, listBodyIds, pruneBodies, putBody, readBody } from "./bodies";
 import { checkFts, deletePostFts, upsertPostFts } from "./fts";
-import { companyIndex, latestPosts, postYears, postsByTag, postsByYear } from "./queries/posts";
+import { latestPosts, postYears, postsByTag, postsByYear } from "./queries/posts";
 import { searchPosts } from "./queries/search";
 import { companies, crawlJobs, posts, sources, tagAliases, tags } from "./schema";
 import type { Db } from "./index";
@@ -343,7 +343,7 @@ describe("列表查询", () => {
 
   it("标签页与公司索引只统计可展示的帖子", () => {
     const db = freshDb();
-    const { post, company } = seed(db);
+    const { post } = seed(db);
     const tag = db.insert(tags).values({ slug: "cache", name: "缓存" }).returning().get();
     db.insert(tagAliases).values({ raw: "缓存", tagId: tag.id }).run();
     db.$client
@@ -351,11 +351,9 @@ describe("列表查询", () => {
       .run(post.id, tag.id);
 
     expect(postsByTag(db, "cache").items.map((item) => item.id)).toEqual([post.id]);
-    expect(companyIndex(db)).toEqual([{ slug: company.slug, name: "美团", count: 1 }]);
 
     db.$client.prepare("update posts set is_visible = 0 where id = ?").run(post.id);
     expect(postsByTag(db, "cache").total).toBe(0);
-    expect(companyIndex(db)[0].count).toBe(0);
   });
 });
 

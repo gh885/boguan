@@ -22,10 +22,6 @@ import { defaultBodiesDir } from "./index";
  * 崩溃时最多留下孤文件，由 `vpr db:check --prune` 清掉。
  */
 
-export function bodiesDir(dir = defaultBodiesDir): string {
-  return dir;
-}
-
 function fileOf(postId: number, dir: string): string {
   return join(dir, `${postId}.txt.gz`);
 }
