@@ -11,18 +11,24 @@ import { site } from "../../../lib/site";
 
 interface Props {
 	locale: Locale;
+	/** getStaticPaths 已经查过全量 postYears,这里拿现成的,不再重查 */
+	years: { year: number; count: number }[];
 }
 
 export const getStaticPaths = (() => {
 	const years = postYears(openWebDatabase());
-	return years.flatMap((entry) => localeRoutes({ year: String(entry.year) }));
+	return years.flatMap((entry) =>
+		localeRoutes({ year: String(entry.year) }).map((route) => ({
+			...route,
+			props: { ...route.props, years },
+		})),
+	);
 }) satisfies GetStaticPaths;
 
-const { locale } = Astro.props;
+const { locale, years } = Astro.props;
 const t = useTranslations(locale);
 const db = openWebDatabase();
 const year = Number(Astro.params.year);
-const years = postYears(db);
 const yearRow = years.find((entry) => entry.year === year);
 
 if (!yearRow) throw new Error(`年份不存在：${year}`);

@@ -4,6 +4,7 @@ import IndexSheet from "../../../components/IndexSheet.astro";
 import BaseLayout from "../../../layouts/BaseLayout.astro";
 import {
 	companyCards,
+	countPosts,
 	latestPosts,
 	openWebDatabase,
 	postYears,
@@ -24,7 +25,7 @@ interface Props {
 }
 
 export const getStaticPaths = (() => {
-	const total = latestPosts(openWebDatabase(), { limit: 1 }).total;
+	const total = countPosts(openWebDatabase());
 	const pages = pageCount(total);
 	return Array.from({ length: Math.max(0, pages - 1) }, (_, index) => index + 2).flatMap(
 		(page) => localeRoutes({ page: String(page) }),

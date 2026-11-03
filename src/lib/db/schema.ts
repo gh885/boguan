@@ -123,8 +123,9 @@ export const posts = sqliteTable(
     index("posts_source_idx").on(t.sourceId),
     // 跨源去重的查找键：同公司 + 同归一标题（±3 天在 SQL 里用 published_at 过滤）
     index("posts_company_title_norm_idx").on(t.companyId, t.titleNorm),
-    // 列表查询要同时过滤 is_visible / duplicate_of_id
-    index("posts_visible_published_idx").on(t.isVisible, t.duplicateOfId, t.publishedAt),
+    // 列表查询要同时过滤 is_visible / duplicate_of_id；带上 id 让
+    // `published_at desc, id desc` 的排序全程走有序扫描，不必物化排序
+    index("posts_visible_published_idx").on(t.isVisible, t.duplicateOfId, t.publishedAt, t.id),
   ],
 );
 

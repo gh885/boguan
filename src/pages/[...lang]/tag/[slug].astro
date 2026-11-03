@@ -7,7 +7,7 @@ import {
 	openWebDatabase,
 	postYearsByFilters,
 	postsByTag,
-	tagBySlug,
+	type TagCard,
 	tagIndex,
 } from "../../../lib/db/queries";
 import { tagGroupOf } from "../../../lib/domain/tag-group";
@@ -20,27 +20,40 @@ import { site } from "../../../lib/site";
 
 interface Props {
 	locale: Locale;
+	/** getStaticPaths 已经查过全量 tagIndex,这里拿现成的,不再重跑聚合 */
+	tag: TagCard;
+	relatedTags: TagCard[];
 }
 
 export const getStaticPaths = (() => {
-	const tags = tagIndex(openWebDatabase());
-	return tags.flatMap((tag) => localeRoutes({ slug: tag.slug }));
+	const db = openWebDatabase();
+	const tags = tagIndex(db);
+	return tags
+		.filter((tag) => tag.count > 0)
+		.flatMap((tag) =>
+			localeRoutes({ slug: tag.slug }).map((route) => ({
+				...route,
+				props: {
+					...route.props,
+					tag,
+					relatedTags: tags
+						.filter((candidate) => candidate.slug !== tag.slug)
+						.filter((candidate) => tagGroupOf(candidate.slug) === tagGroupOf(tag.slug))
+						.slice(0, 6),
+				},
+			})),
+		);
 }) satisfies GetStaticPaths;
 
-const { locale } = Astro.props;
+const { locale, tag, relatedTags } = Astro.props;
 const t = useTranslations(locale);
 const db = openWebDatabase();
 const slug = String(Astro.params.slug);
-const tag = tagBySlug(db, slug);
 
-if (!tag || tag.count === 0) throw new Error(`标签不存在：${slug}`);
+if (tag.count === 0) throw new Error(`标签不存在：${slug}`);
 
 const companies = companiesByTag(db, slug, 6);
 const years = postYearsByFilters(db, { tagSlug: slug });
-const relatedTags = tagIndex(db)
-	.filter((candidate) => candidate.slug !== slug)
-	.filter((candidate) => tagGroupOf(candidate.slug) === tagGroupOf(slug))
-	.slice(0, 6);
 const { items, total } = postsByTag(db, slug, { limit: INDEX_PAGE_SIZE });
 const totalPages = pageCount(total, INDEX_PAGE_SIZE);
 const navYearsHref = years[0]
