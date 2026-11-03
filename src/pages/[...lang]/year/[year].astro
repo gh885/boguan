@@ -2,7 +2,7 @@
 import type { GetStaticPaths } from "astro";
 import BaseLayout from "../../../layouts/BaseLayout.astro";
 import YearView from "../../../components/YearView.astro";
-import { openWebDatabase, postsByYear, topCompaniesByYear, topTagsByYear } from "../../../lib/db/queries";
+import { openWebDatabase, postYears, postsByYear, topCompaniesByYear, topTagsByYear } from "../../../lib/db/queries";
 import { localizePath, localeRoutes, useTranslations } from "../../../lib/i18n";
 import type { Locale } from "../../../lib/i18n/config";
 import { INDEX_PAGE_SIZE, pageCount, pagePath } from "../../../lib/pagination";
