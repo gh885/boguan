@@ -1,20 +1,31 @@
 #!/usr/bin/env bash
-# 每日 SQLite 一致性备份（.backup 走 SQLite 在线备份 API，WAL 下也安全）
+# 在线一致性快照 -> 完整性/索引校验 -> gzip + SHA256 -> 原子发布；只清理已完成备份。
 set -euo pipefail
-
-APP=/home/xun/boguan
-DEST=/home/xun/backups
+umask 077
+source "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
+DEST=${BOGUAN_BACKUP_DIR:-/home/xun/backups}
 mkdir -p "$DEST"
+chmod 700 "$DEST"
+find "$DEST" -maxdepth 1 -type f \( -name 'boguan-*.db.gz' -o -name 'boguan-*.db.gz.sha256' \) -exec chmod 600 {} +
+exec 8>"$DEST/.backup.lock"
+flock -n 8 || { log '已有备份正在执行'; exit 1; }
+TEMP=$(mktemp -d "$DEST/.backup-XXXXXX")
+trap 'rm -rf -- "$TEMP"' EXIT
+NAME="boguan-$(date +%Y%m%d-%H%M%S).db.gz"
 
-STAMP=$(date +%Y%m%d-%H%M)
-sqlite3 "$APP/data/boguan.db" ".backup '$DEST/boguan-$STAMP.db'"
-gzip -f "$DEST/boguan-$STAMP.db"
+sqlite3 -cmd '.timeout 10000' "${BOGUAN_DB:-$APP/data/boguan.db}" ".backup '$TEMP/database.db'"
+verify_database "$TEMP/database.db"
+gzip -c "$TEMP/database.db" > "$TEMP/$NAME"
+(cd "$TEMP" && sha256sum "$NAME" > "$NAME.sha256")
+mv "$TEMP/$NAME.sha256" "$DEST/$NAME.sha256"
+mv "$TEMP/$NAME" "$DEST/$NAME"
+log "backup verified: $DEST/$NAME"
 
-# 只对刚生成的这份做校验：能读出表结构才算可用
-gzip -dc "$DEST/boguan-$STAMP.db.gz" > "/tmp/boguan-check.db"
-COUNT=$(sqlite3 "/tmp/boguan-check.db" "select count(*) from posts;")
-rm -f /tmp/boguan-check.db
-echo "[$(date -Is)] backup ok: $DEST/boguan-$STAMP.db.gz (posts=$COUNT)"
-
-# 保留 14 份
-ls -1t "$DEST"/boguan-*.db.gz | tail -n +15 | xargs -r rm -f
+python3 - "$DEST" <<'PY'
+from pathlib import Path
+import sys
+backups = sorted(Path(sys.argv[1]).glob('boguan-*.db.gz'), reverse=True)
+for old in backups[14:]:
+    old.unlink()
+    old.with_name(old.name + '.sha256').unlink(missing_ok=True)
+PY

@@ -1,5 +1,8 @@
 # build output
 dist/
+releases/
+.ops/
+__pycache__/
 
 # generated types
 .astro/

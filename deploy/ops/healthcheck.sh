@@ -1,59 +1,39 @@
 #!/usr/bin/env bash
-# 站点探活：从公网域名走完整链路（DNS → Caddy → TLS → Node → SQLite SSR）
-#
-# 分层定位，重启正确的那一层：
-#   - 公网失败但 127.0.0.1:4321 正常 → 问题在 Caddy/证书，重启 caddy
-#   - 公网失败且本地也失败        → 问题在 Node/DB，重启 boguan-web
-#   - 重启后仍失败               → 退出非零，systemd 记为 failed 留痕
-set -uo pipefail
+# 同时检查本地 /search（Node + SQLite）与公网链路，恢复后复查所有端点。
+set -euo pipefail
+source "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
 
-HOME_URL="https://boguan.org.cn/"
-SEARCH_URL="https://boguan.org.cn/search?q=%E5%BE%AE%E6%9C%8D%E5%8A%A1"
-LOCAL_URL="http://127.0.0.1:4321/"
-
-check() {
-  curl -s -o /dev/null -w '%{http_code}' --max-time 12 "$1" 2>/dev/null || echo 000
-}
-
-log() { echo "[$(date -Is)] $*"; }
-
-home=$(check "$HOME_URL")
-search=$(check "$SEARCH_URL")
-
-if [ "$home" = "200" ] && [ "$search" = "200" ]; then
-  log "OK home=$home search=$search"
+mkdir -p "$APP/.ops"
+exec 9>"$APP/.ops/deploy.lock"
+if ! flock -n 9; then
+  log '发布中，跳过本轮自愈，交由发布脚本校验'
   exit 0
 fi
 
-local_code=$(check "$LOCAL_URL")
-log "FAIL home=$home search=$search local=$local_code"
+if probe_all; then exit 0; fi
 
-if [ "$local_code" = "200" ]; then
-  log "Node 正常、公网不通 → 重启 caddy"
-  sudo -n /usr/bin/systemctl restart caddy || log "caddy 重启失败"
+if probe_site "$LOCAL_URL"; then
+  log '本地首页与搜索正常，重启 Caddy 后复查'
+  sudo -n /usr/bin/systemctl restart caddy
 else
-  log "Node 不通 → 重启 boguan-web"
-  sudo -n /usr/bin/systemctl restart boguan-web || log "web 重启失败"
+  log '本地首页或搜索异常，重启 Web 后复查'
+  restart_web
 fi
-
-sleep 8
-home2=$(check "$HOME_URL")
-search2=$(check "$SEARCH_URL")
-local2=$(check "$LOCAL_URL")
-
-if [ "$home2" = "200" ] && [ "$search2" = "200" ]; then
-  log "recovered home=$home2 search=$search2"
+sleep "${BOGUAN_READY_DELAY:-3}"
+if probe_all; then
+  log 'recovered: 本地与公网首页、搜索均正常'
   exit 0
 fi
 
-# 兜底：Node 起来了但公网还不通，可能刚才是两层同时异常
-if [ "$local2" = "200" ]; then
-  log "仍不通但本地 200 → 再重启 caddy"
-  sudo -n /usr/bin/systemctl restart caddy || true
-  sleep 6
-  home3=$(check "$HOME_URL")
-  [ "$home3" = "200" ] && { log "recovered after caddy restart"; exit 0; }
+# 两层同时异常时只追加一次 Caddy 重启；搜索不正常绝不报恢复。
+if probe_site "$LOCAL_URL"; then
+  sudo -n /usr/bin/systemctl restart caddy
+  sleep "${BOGUAN_READY_DELAY:-3}"
+  if probe_all; then
+    log 'recovered: 本地与公网首页、搜索均正常'
+    exit 0
+  fi
 fi
 
-log "STILL DOWN home=$home2 search=$search2 local=$local2"
+log 'STILL DOWN: 探活失败，交由 OnFailure 告警'
 exit 1

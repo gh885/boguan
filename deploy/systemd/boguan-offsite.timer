@@ -1,8 +1,8 @@
 [Unit]
-Description=Run boguan offsite backup every Sunday 05:00
+Description=Run verified offsite backup daily at 03:45
 
 [Timer]
-OnCalendar=Sun *-*-* 05:00:00
+OnCalendar=*-*-* 03:45:00
 Persistent=true
 
 [Install]

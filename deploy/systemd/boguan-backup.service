@@ -1,9 +1,13 @@
 [Unit]
-Description=Boguan SQLite backup
+Description=Boguan verified SQLite backup
+OnFailure=boguan-alert@%n.service
 
 [Service]
 Type=oneshot
 User=xun
 Group=xun
-ExecStart=/home/xun/ops/backup.sh
+EnvironmentFile=-/etc/boguan/ops.env
+ExecStart=/bin/bash /home/xun/ops/backup.sh
 TimeoutStartSec=600
+UMask=0077
+PrivateTmp=true

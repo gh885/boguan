@@ -1,0 +1,24 @@
+name: 外部可用性检查
+
+on:
+  schedule:
+    # 避开整点；GitHub 的调度可能延迟，仅作为独立于 ECS 的补充探测。
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    name: 公网首页与搜索
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: 检查 HTTPS 首页与数据库搜索
+        run: bash deploy/ops/external-check.sh

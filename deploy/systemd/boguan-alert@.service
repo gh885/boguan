@@ -1,0 +1,14 @@
+[Unit]
+Description=Boguan failure notification for %i
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=xun
+Group=xun
+EnvironmentFile=-/etc/boguan/ops.env
+ExecStart=/usr/bin/python3 /home/xun/ops/notify.py %i
+TimeoutStartSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true

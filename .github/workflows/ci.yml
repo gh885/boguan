@@ -63,12 +63,37 @@ jobs:
         env:
           BOGUAN_DB: data/fixture.db
 
-  gate:
-    # 分支保护的 required context 名字就是 job 的 name;id 必须是 ASCII
-    name: 检查与构建
-    needs: [check, build]
+  ops:
+    name: 运维脚本回归
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: 两个并行 job 均已通过
-        run: echo "check 与 build 全部通过"
+      - uses: actions/checkout@v7
+      - name: 安装运维校验工具
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sqlite3 shellcheck
+      - name: Shell 检查与故障场景测试
+        run: |
+          shellcheck -x -P deploy/ops deploy/ops/*.sh
+          python3 deploy/ops/test_ops.py
+          if [ ! -x /usr/local/bin/node ]; then
+            sudo ln -s "$(command -v node)" /usr/local/bin/node
+          fi
+          systemd-analyze verify deploy/systemd/*.service deploy/systemd/*.timer
+
+  gate:
+    # always 保证上游失败或取消时，这个 required check 也明确失败。
+    if: always()
+    name: 检查与构建
+    needs: [check, build, ops]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 所有检查均已通过
+        env:
+          CHECK_RESULT: ${{ needs.check.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          OPS_RESULT: ${{ needs.ops.result }}
+        run: |
+          test "$CHECK_RESULT" = success
+          test "$BUILD_RESULT" = success
+          test "$OPS_RESULT" = success

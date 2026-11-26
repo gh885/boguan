@@ -1,45 +1,38 @@
 #!/usr/bin/env bash
-# 每日：抓取 → 对账清理 → 收敛 WAL → 构建到 releases/<ts> → 原子切换 dist → 重启 web
-#
-# 为什么构建到 releases/ 而不是原地 dist/：Astro 构建前会清空 outDir，
-# 直接写 dist/ 会让站点 404 十几秒。构建到新目录再原子替换符号链接，中断窗口 ≤2 秒。
+# 抓取与发布共享锁；源站失败不丢旧数据，但任务必须保留失败状态。
 set -euo pipefail
-
-APP=${BOGUAN_APP:-/home/xun/boguan}
-export PATH=/usr/local/bin:$PATH
-export BOGUAN_DB="$APP/data/boguan.db"
-
+source "$(dirname -- "${BASH_SOURCE[0]}")/lib.sh"
+export BOGUAN_DB="${BOGUAN_DB:-$APP/data/boguan.db}"
 cd "$APP"
+lock_deploy
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
-log() { echo "[$(date -Is)] $*"; }
+CRAWL_FAILED=0
+log 'crawl start'
+if ! ./node_modules/.bin/vpx scripts/crawler/cli.ts --mode=incremental; then
+  CRAWL_FAILED=1
+  log '抓取失败：继续校验已有数据，本次任务最终返回失败供告警'
+fi
 
-log "crawl start"
-# 抓取失败（源站 5xx / 网络抖动）不阻断重建：库里已有内容照样发布
-./node_modules/.bin/vpx scripts/crawler/cli.ts --mode=incremental || log "crawl 返回非零，继续重建"
+log 'db check --fix --prune'
+./node_modules/.bin/vpx scripts/db/check.ts --fix --prune
+verify_database "$BOGUAN_DB"
+# PARTIAL/FAILED 不能因 CLI 返回 0 而被日常任务吞掉。
+if ! python3 - "$BOGUAN_DB" <<'PY'
+from pathlib import Path
+import sqlite3
+import sys
+with sqlite3.connect(Path(sys.argv[1]).resolve().as_uri() + '?mode=ro', uri=True) as db:
+    row = db.execute('SELECT status FROM crawl_jobs ORDER BY id DESC LIMIT 1').fetchone()
+    if not row or row[0] != 'ok':
+        sys.exit('最近抓取批次不是 ok')
+PY
+then
+  CRAWL_FAILED=1
+fi
 
-log "db check --prune"
-# 清掉孤正文文件、过期 http_cache 与抓取日志：正文是派生数据，删了不影响站点
-./node_modules/.bin/vpx scripts/db/check.ts --fix --prune || log "db:check 返回非零，继续重建"
-
-log "wal checkpoint"
-sqlite3 "$APP/data/boguan.db" "PRAGMA wal_checkpoint(TRUNCATE);" || true
-
-STAMP=$(date +%Y%m%d-%H%M%S)
-OUT="releases/$STAMP"
-log "build -> $OUT"
-rm -rf "$OUT"
-./node_modules/.bin/astro build --outDir "$OUT"
-
-log "switch dist -> $OUT"
-ln -sfn "$OUT" dist.new
-mv -T dist.new dist
-
-log "restart boguan-web"
-sudo -n /usr/bin/systemctl restart boguan-web
-sleep 2
-systemctl is-active boguan-web
-
-# 只保留最近 3 个版本，回滚用 ln -sfn 指回去即可
-ls -1dt releases/*/ 2>/dev/null | tail -n +4 | xargs -r rm -rf
-
-log "done (bodies: $(du -sh data/bodies 2>/dev/null | cut -f1))"
+sqlite3 -cmd '.timeout 5000' "$BOGUAN_DB" 'PRAGMA wal_checkpoint(PASSIVE);'
+bash "$OPS_DIR/publish.sh" --locked
+log 'daily update finished'
+exit "$CRAWL_FAILED"
