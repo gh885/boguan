@@ -403,6 +403,26 @@ body:has(.paper-page) .skip-link {
   color: var(--home-red);
 }
 
+/* 备案号：法规要求的固定展示位，居中、最轻的一层，不与正文抢注意力 */
+.paper-footer-legal {
+  margin-block: 0.5rem 0;
+  padding-block-start: 0.4rem;
+  border-block-start: 1px solid var(--home-rule-soft);
+  text-align: center;
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+}
+
+.paper-footer-legal a {
+  color: var(--home-muted);
+  text-decoration: none;
+}
+
+.paper-footer-legal a:hover {
+  color: var(--home-red);
+  text-decoration: underline;
+}
+
 @media (max-width: 680px) {
   .paper-footer-main,
   .paper-footer-bottom {

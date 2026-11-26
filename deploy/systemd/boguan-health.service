@@ -1,0 +1,13 @@
+[Unit]
+Description=Boguan availability probe (self-heal)
+After=network-online.target
+OnFailure=boguan-alert@%n.service
+
+[Service]
+Type=oneshot
+User=xun
+Group=xun
+EnvironmentFile=-/etc/boguan/ops.env
+ExecStart=/bin/bash /home/xun/ops/healthcheck.sh
+TimeoutStartSec=180
+UMask=0077

@@ -16,7 +16,7 @@ const indexableTags = new Set(
 // 样式表保持外链（不设 build.inlineStylesheets: "always"）：本站是几百个静态页共享
 // 同一批 CSS，外链可跨页缓存；内联会让每页 HTML 各带一份，搜索引擎爬取白白变大。
 export default defineConfig({
-  site: "https://boguan.dev",
+  site: "https://boguan.org.cn",
   // URL 语言策略：默认语言（中文）不带前缀，其它语言带前缀。
   //   /            /company/meituan        → zh-CN
   //   /en/         /en/company/meituan     → en

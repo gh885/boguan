@@ -1,0 +1,15 @@
+[Unit]
+Description=Boguan verified offsite backup to OSS
+After=network-online.target boguan-backup.service
+Wants=network-online.target
+OnFailure=boguan-alert@%n.service
+
+[Service]
+Type=oneshot
+User=xun
+Group=xun
+EnvironmentFile=-/etc/boguan/ops.env
+ExecStart=/bin/bash /home/xun/ops/offsite.sh
+TimeoutStartSec=900
+UMask=0077
+PrivateTmp=true

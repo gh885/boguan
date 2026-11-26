@@ -23,6 +23,7 @@
     "@astrojs/node": "11.1.9",
     "@astrojs/rss": "^4.0.19",
     "@astrojs/sitemap": "^3.7.4",
+    "@node-rs/jieba": "^2.0.4",
     "astro": "^7.4.4",
     "better-sqlite3": "^13.0.3",
     "cheerio": "^1.2.0",
@@ -32,7 +33,6 @@
     "rss-parser": "^3.13.0"
   },
   "devDependencies": {
-    "@node-rs/jieba": "^2.0.4",
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.6.6",
     "@x18n/cli": "^0.1.4",
@@ -53,5 +53,8 @@
   },
   "engines": {
     "node": ">=24"
-  }
+  },
+  "trustedDependencies": [
+    "esbuild"
+  ]
 }

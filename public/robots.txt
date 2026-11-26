@@ -3,4 +3,4 @@ Allow: /
 Disallow: /search
 Disallow: /en/search
 
-Sitemap: https://boguan.dev/sitemap-index.xml
+Sitemap: https://boguan.org.cn/sitemap-index.xml

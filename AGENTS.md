@@ -172,7 +172,7 @@ vpr dev stop           # 停止
 - **抓取侧发请求只能经 `PoliteFetcher`**：它负责 robots、限速、重试与编码。适配器里不许直接 `fetch`。
 - **通用格式不手写解析**：feed 用 `rss-parser`，HTML 用 cheerio + `entities`。新增「实体映射表」「feed 字段归一」这类胶水前先看依赖里是不是已经有。
 - **页面与 endpoint 只能通过 `src/lib/db/queries` 读库**，不许直接 `openReadonlyDatabase`（`guard.test.ts` 守）。
-- **UA 必须 ASCII**：HTTP header 不能含中文，中文说明放进 `/about` 页面。
+- **UA 必须 ASCII**：HTTP header 不能含中文，中文说明放在首页的站名与说明里。
 - 迁移先改 `src/lib/db/schema.ts` 再 `vpr db:generate`；Drizzle 生成不了的（如 FTS5 虚拟表）用 `vpr db:generate --custom` 手写。已提交的迁移文件只增不改。`vpr db:init` 会自动应用。
 - 提交前跑 `vp check`，构建必须通过 `vpr build`。
 

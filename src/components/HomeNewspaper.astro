@@ -55,7 +55,6 @@ const t = useTranslations(locale);
 const homeHref = localizePath("/", locale);
 const companiesHref = localizePath("/companies", locale);
 const tagsHref = localizePath("/tags", locale);
-const aboutHref = localizePath("/about", locale);
 const yearsHref = yearHref ?? tagsHref;
 
 /** 头版网格一行 5 个版位;「更多」卡片是补空的,最后一行已满就不再渲染 */
@@ -102,7 +101,6 @@ const topicItems = topics.map((topic) => ({
 				<a href={companiesHref}>{t("nav.companies")}</a>
 				<a href={tagsHref}>{t("nav.tags")}</a>
 				<a href={yearsHref}>{t("nav.years")}</a>
-				<a href={aboutHref}>{t("nav.about")}</a>
 			</nav>
 
 			<form class="home-search paper-search" action={searchHref(locale)} method="get" role="search">

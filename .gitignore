@@ -1,5 +1,8 @@
-# build output
-dist/
+# build output（生产 dist 是软链）
+/dist
+releases/
+.ops/
+__pycache__/
 
 # generated types
 .astro/

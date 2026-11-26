@@ -1,0 +1,14 @@
+[Unit]
+Description=Boguan disk and job freshness checks
+OnFailure=boguan-alert@%n.service
+
+[Service]
+Type=oneshot
+User=xun
+Group=xun
+EnvironmentFile=-/etc/boguan/ops.env
+ExecStart=/usr/bin/python3 /home/xun/ops/watchdog.py
+TimeoutStartSec=60
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
