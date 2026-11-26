@@ -1,0 +1,9 @@
+[Unit]
+Description=Boguan SQLite backup
+
+[Service]
+Type=oneshot
+User=xun
+Group=xun
+ExecStart=/home/xun/ops/backup.sh
+TimeoutStartSec=600

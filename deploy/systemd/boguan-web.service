@@ -1,0 +1,28 @@
+[Unit]
+Description=Boguan web (static pages + SSR search)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=xun
+Group=xun
+WorkingDirectory=/home/xun/boguan
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=4321
+Environment=BOGUAN_DB=/home/xun/boguan/data/boguan.db
+ExecStart=/usr/local/bin/node dist/server/entry.mjs
+Restart=always
+RestartSec=3
+KillSignal=SIGTERM
+TimeoutStopSec=15
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,10 @@
+[Unit]
+Description=Boguan availability probe (self-heal)
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=xun
+Group=xun
+ExecStart=/home/xun/ops/healthcheck.sh
+TimeoutStartSec=120

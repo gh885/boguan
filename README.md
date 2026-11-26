@@ -63,7 +63,7 @@ https://boguan.org.cn
 | 多语言          | `src/lib/i18n` + `x18n` 文案校验  | ✅ 已就绪     |
 | 样式            | 原生 CSS + 设计令牌，亮/暗主题    | ✅ 已就绪     |
 | 抓取管道        | 独立 TS 进程（不跑在 Web 进程里） | ✅ 两家源跑通 |
-| 部署            | 单台轻量云服务器 + Docker + Caddy | 规划中        |
+| 部署            | 单台 ECS + systemd + Caddy        | ✅ 已上线     |
 
 为什么是 Astro：这是一个以**只读内容**为主、SEO 权重很高的站点，Astro 默认输出零 JS 的静态 HTML，是这类产品的最优解。交互（筛选、搜索）通过 URL 参数驱动，不需要客户端状态。
 
@@ -180,16 +180,18 @@ vpr dev stop           # 停止
 | 2    | 只读站点        | 首页 / 公司 / 标签 / 年份页面，SSR 或 SSG 输出                   |
 | 3    | 搜索            | ✅ 查询层 + 排序 + 索引；搜索页 UI 待做（noindex）               |
 | 4    | SEO 补齐        | head 元信息、JSON-LD、sitemap、canonical、OG                     |
-| 5    | 上线            | Docker + Caddy + 定时任务 + 一键部署                             |
+| 5    | 上线            | ✅ systemd + Caddy + 定时抓取与备份（见 `deploy/`）              |
 
 ---
 
-## 部署（规划）
+## 部署
 
-- 一台轻量云服务器（首版倾向香港节点，免备案；稳定后再评估迁回国内）
-- Docker Compose 编排：Web 容器 + 抓取任务 + Caddy 反向代理（自动 HTTPS）
-- 数据库文件随镜像外挂卷，定期备份
-- 定时抓取由宿主机 cron 或容器内调度触发，抓取完成后触发站点重建
+已上线：<https://boguan.org.cn>（晋ICP备2026019879号-1）。
+
+- 单台阿里云 ECS（Ubuntu 24.04 / 2C2G / 华北2）+ systemd + Caddy，不引入 Docker
+- 静态页构建到 `releases/<时间戳>/`，`dist` 软链原子切换，发布中断 ≤2 秒
+- 每日 04:30 增量抓取 + 重建 + 重启；03:30 SQLite 备份；每 5 分钟探活自愈
+- 完整步骤、回滚方法与注意事项见 [`deploy/README.md`](deploy/README.md)
 
 ---
 
