@@ -131,4 +131,3 @@
 ## 12. 范围与下一步
 
 - 已实现：`/`、`/page/[n]`、`/tag/[slug]`、`/company/[slug]`、`/year/[year]`、`/search` 及其分页的报纸/切片版式，以及 `/tags`、`/companies` 的目录版式（含 `/en/`）。
-- `/about` 是独立的编辑页，使用 `about.css` 的固定纸面，不在报纸系统内。

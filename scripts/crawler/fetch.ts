@@ -13,9 +13,9 @@ import { RobotsCache } from "./robots";
 
 /**
  * UA 必须是 ASCII：HTTP header 字段值不能含非 ASCII 字符，否则 fetch 会直接抛错。
- * 想解释自己是谁，把说明放在 /about 页面里，别塞进 UA。
+ * 想解释自己是谁，把说明放进首页的说明段落，别塞进 UA。
  */
-export const USER_AGENT = "boguan/0.1 (+https://boguan.dev/about; aggregator; honors robots.txt)";
+export const USER_AGENT = "boguan/0.1 (+https://boguan.org.cn; aggregator; honors robots.txt)";
 
 export interface FetchOptions {
   /** 同一 host 的两次请求最小间隔；robots 的 Crawl-delay 更大时以它为准 */

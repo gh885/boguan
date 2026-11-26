@@ -14,7 +14,6 @@ const t = useTranslations(locale);
 const homeHref = localizePath("/", locale);
 const companiesHref = localizePath("/companies", locale);
 const tagsHref = localizePath("/tags", locale);
-const aboutHref = localizePath("/about", locale);
 const rssHref = localizePath("/rss.xml", locale);
 ---
 
@@ -22,7 +21,6 @@ const rssHref = localizePath("/rss.xml", locale);
 	<div class="paper-footer-main">
 		<a class="paper-footer-brand" href={homeHref}>{site.name}</a>
 		<nav class="paper-footer-nav" aria-label={t("nav.primary")}>
-			<a href={aboutHref}>{t("nav.about")}</a>
 			<a href={tagsHref}>{t("nav.tags")}</a>
 			<a href={companiesHref}>{t("nav.companies")}</a>
 			<a href={rssHref}>{t("nav.digestAction")}</a>
@@ -36,4 +34,8 @@ const rssHref = localizePath("/rss.xml", locale);
 		</span>
 		<span>{note ? `${t("home.motto")} · ${note}` : t("home.motto")}</span>
 	</div>
+	{/* 备案号按法规要求放在页脚，链接到工信部备案系统（不放 messages：官方固定字符串，不翻译） */}
+	<p class="paper-footer-legal">
+		<a href={site.icpUrl} target="_blank" rel="noopener noreferrer">{site.icp}</a>
+	</p>
 </footer>

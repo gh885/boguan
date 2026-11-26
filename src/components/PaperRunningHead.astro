@@ -10,7 +10,7 @@ import ThemeToggle from "./ThemeToggle.astro";
 interface Props {
   locale: Locale;
   /** 当前所在栏目；用于给主导航加 aria-current。 */
-  current?: "home" | "companies" | "tags" | "years" | "about";
+  current?: "home" | "companies" | "tags" | "years";
   searchValue?: string;
   /** 在切片内继续搜索时要保留的条件。 */
   searchHidden?: Record<string, string>;
@@ -29,7 +29,6 @@ const t = useTranslations(locale);
 const homeHref = localizePath("/", locale);
 const companiesHref = localizePath("/companies", locale);
 const tagsHref = localizePath("/tags", locale);
-const aboutHref = localizePath("/about", locale);
 const yearsHref = navYearsHref ?? tagsHref;
 ---
 
@@ -49,9 +48,6 @@ const yearsHref = navYearsHref ?? tagsHref;
 			</a>
 			<a href={yearsHref} aria-current={current === "years" ? "page" : undefined}>
 				{t("nav.years")}
-			</a>
-			<a href={aboutHref} aria-current={current === "about" ? "page" : undefined}>
-				{t("nav.about")}
 			</a>
 		</nav>
 

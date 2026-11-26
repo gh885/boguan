@@ -184,7 +184,7 @@ posts_fts          FTS5 虚拟表：title_tokens, body_tokens
 | :--------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 限速       | 按 **origin** 排队（不是按 source），间隔 ≥1s；robots 的 `Crawl-delay` 更大时取它                                                                                                                                                                                                                                                                          |
 | robots.txt | 每个 origin 抓一次、进程内缓存 24h，用 `robots-parser`。404/410/200-HTML 兜底页 → 允许；401/403/5xx/429 → 本轮全站禁止（保守）                                                                                                                                                                                                                             |
-| UA         | `boguan/0.1 (+https://boguan.dev/about; aggregator; honors robots.txt)`，**必须 ASCII**（HTTP header 不能含中文，否则 fetch 直接抛错），不伪装浏览器                                                                                                                                                                                                       |
+| UA         | `boguan/0.1 (+https://boguan.org.cn; aggregator; honors robots.txt)`，**必须 ASCII**（HTTP header 不能含中文，否则 fetch 直接抛错），不伪装浏览器                                                                                                                                                                                                          |
 | 条件请求   | **只用于列表页**：带 `If-None-Match` / `If-Modified-Since`，命中 304 当「没有更新」处理并计入 `not_modified`。详情页**不带**条件请求——304 时手里没有正文可算指纹，而需要进详情页的场景（新条目 / 元数据变了 / 正文文件丢了）本来就极少，省下的流量抵不上空转；真正的省请求来自「元数据没变就不进详情页」。**这是尽力而为**：实测有赞对相同 ETag 仍返回 200 |
 | 重试       | 只重试「可能是暂时的」：网络错误 / 5xx / 429，最多 3 次指数退避；429 听 `Retry-After`；**403、404 不重试**                                                                                                                                                                                                                                                 |
 | 编码       | 从 `Content-Type` 与 `<meta charset>` 判定，GBK/GB2312 统一按 GB18030 解（生僻字不变问号）                                                                                                                                                                                                                                                                 |
@@ -281,7 +281,7 @@ interface SourceAdapter {
 
 - 每日抓取完成后触发一次重建；列表页最多滞后一天，可接受。
 - 搜索是唯一必须动态渲染的页面，因此站点需要 Node 适配器（而非纯静态托管）。
-- 关于页用 `BaseLayout` 的 `chrome="bare"`：隐藏侧栏与移动栏，但 `<head>`、canonical、hreflang 仍由 layout 统一维护；页面自己提供顶部导航。不要为它复制一份 head。
+- 报纸与目录页用 `BaseLayout` 的 `chrome="bare"`：隐藏侧栏与移动栏，但 `<head>`、canonical、hreflang 仍由 layout 统一维护；页面自己提供顶部导航。不要为它复制一份 head。
 - **筛选只能走 SSR**：静态页读不到 `?company=&tag=&year=`。所以「筛选组合页」与搜索一样是 SSR + `noindex`，不要把筛选做成静态路径组合（数量爆炸且都是薄页面）。
 - 筛选状态全部在 URL 查询参数里（硬性规则 5），不引入客户端状态。
 - **页面只有一个数据库入口**：`src/lib/db/queries`。页面与 endpoint 不许直接 `openReadonlyDatabase`（`guard.test.ts` 守），查找与过滤规则也就不会各写一份。
@@ -438,21 +438,16 @@ select rowid from posts_fts where posts_fts match 'title_tokens : ("缓存")'
 ### 排版
 
 - 不加载 Web 字体：中文用系统字体栈（PingFang SC / Microsoft YaHei / Noto Sans CJK），不让字形拖首屏。
-- 关于页的展示字体走 `--font-serif`（Noto Serif SC / Songti SC / SimSun 等系统衬线），同样不加载 Web 字体。
 - 字号、行高、间距、圆角一律用令牌，组件里不出现裸色值与裸字号。
 - 正文按 `--width-measure` 收窄到 60–75 字符，标题 `text-wrap: balance`。
 
-### 关于页的固定纸面
-
-关于页是一张「印刷页」，使用 `src/styles/about.css` 里页面级的 `--about-*` 暖色令牌（纸面、墨色、橄榄绿、赭石），固定为暖色，不跟随全站亮/暗主题；这是版面决策，不是第二套全站主题。它不改变 `--color-*` 的角色定义，也不把暖色带到组件层。`about.css` 只由关于页引入，其他页面不应依赖这些变量。
-
 ### 报纸纸面：首页、索引页与目录页
 
-首页是一张全宽的「技术晨报」，由 `src/components/HomeNewspaper.astro` 与 `src/styles/home.css` 实现。纸面底层抽在 `src/styles/paper.css`：页面级 `--home-*` 语义色、纸纹、检索框、主题/语言控件与共享页脚 `PaperFooter.astro`。与关于页不同，报纸纸面通过 `light-dark()` 跟随全站亮/暗主题：亮色是暖纸 + 墨色 + 朱砂，暗色是暖炭黑 + 奶油 + 琥珀红；不另做一套布局。
+首页是一张全宽的「技术晨报」，由 `src/components/HomeNewspaper.astro` 与 `src/styles/home.css` 实现。纸面底层抽在 `src/styles/paper.css`：页面级 `--home-*` 语义色、纸纹、检索框、主题/语言控件与共享页脚 `PaperFooter.astro`。报纸纸面通过 `light-dark()` 跟随全站亮/暗主题：亮色是暖纸 + 墨色 + 朱砂，暗色是暖炭黑 + 奶油 + 琥珀红；不另做一套布局。共享页脚底部固定展示 ICP 备案号（法规要求，见 `src/lib/site.ts` 的 `icp`）。
 
 标签、公司、年份、搜索与首页分页共用 `src/components/IndexSheet.astro` 与 `src/styles/index-sheet.css`：报眉（桌面吸顶）、版头（kicker + 衬线标题 + 真实统计）、筛选条（链接驱动，无 JS）、两栏目录、右栏相关切片与分页。报眉与版头抽成 `PaperRunningHead.astro` / `PaperSectionHead.astro`，目录页复用。版头换、目录不换；静态切片页保留唯一 canonical，任何带筛选的组合与搜索页都是 `noindex`。索引页每页 20 条；`/page/[n]` 是首页续版，保持 10 条；搜索无查询时展示最近 8 条作为检索着陆页。首页与索引页都用 `chrome="bare"`，由报眉承担导航、检索、主题与语言切换。
 
-`/tags`、`/companies` 用 `DirectorySheet.astro` 与 `src/styles/directory.css` 做分组目录，共享同一套报眉、版头与页脚：公司按收录数排成索引，标签按主题分组并在顶部提供分组跳转；标签目录只列可索引标签。`/about` 使用自己的 `about.css` 固定纸面，不跟随亮/暗主题，也不属于报纸系统。
+`/tags`、`/companies` 用 `DirectorySheet.astro` 与 `src/styles/directory.css` 做分组目录，共享同一套报眉、版头与页脚：公司按收录数排成索引，标签按主题分组并在顶部提供分组跳转；标签目录只列可索引标签。
 
 > 基线：`light-dark()` 与 `oklch()` 需要 2024 年后的浏览器（Chrome 123 / Safari 17.5 / Firefox 120）。本站面向开发者，不再为更老的浏览器降级。
 
