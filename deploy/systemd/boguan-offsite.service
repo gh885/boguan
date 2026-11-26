@@ -1,0 +1,12 @@
+[Unit]
+Description=Boguan weekly offsite backup to OSS
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=xun
+Group=xun
+Environment=BOGUAN_OSS_BUCKET=
+ExecStart=/home/xun/ops/offsite.sh
+TimeoutStartSec=900

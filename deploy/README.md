@@ -66,6 +66,36 @@ cd ~/boguan && ls -1dt releases/*/ | head -3
 ln -sfn releases/<上一版> dist.new && mv -T dist.new dist && sudo systemctl restart boguan-web
 ```
 
+## 异地备份（可选，需先备好凭证）
+
+本地备份只解决「误删/写坏」，解决不了「整块盘没了」。异地走 OSS：
+
+1. 控制台创建 bucket（华北2，私有，标准存储，开版本控制更稳）
+2. 创建 **RAM 用户**（不是主账号 AK），只授予下面这条自定义策略，并**限定到该 bucket**：
+
+```json
+{
+  "Version": "1",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["oss:PutObject", "oss:GetObject", "oss:ListObjects", "oss:DeleteObject"],
+      "Resource": ["acs:oss:*:*:<bucket>", "acs:oss:*:*:<bucket>/*"]
+    }
+  ]
+}
+```
+
+3. 服务器上装 ossutil，写入 `/home/xun/.ossutilconfig`（`chmod 600`），内含该 RAM 用户的 AK
+4. 在 `boguan-offsite.service` 的 `Environment=BOGUAN_OSS_BUCKET=` 填上 bucket 名，然后：
+
+```bash
+sudo systemctl enable --now boguan-offsite.timer
+sudo systemctl start boguan-offsite.service   # 先手动跑一次验证
+```
+
+没配置时 `offsite.sh` 会打印一行提示并退出 0，定时任务不会反复失败。
+
 ## 注意事项
 
 - 部署机上的 `node_modules` 必须**在服务器上装**：`better-sqlite3`、`@node-rs/jieba` 是原生模块，
