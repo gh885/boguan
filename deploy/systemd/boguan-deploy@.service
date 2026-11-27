@@ -1,0 +1,19 @@
+[Unit]
+Description=Boguan verified code deployment for %i
+After=network-online.target
+Wants=network-online.target
+OnFailure=boguan-alert@%n.service
+
+[Service]
+Type=oneshot
+User=xun
+Group=xun
+WorkingDirectory=/home/xun/boguan
+EnvironmentFile=-/etc/boguan/ops.env
+ExecStart=/bin/bash /home/xun/ops/deploy-ref.sh %i
+TimeoutStartSec=15min
+TimeoutStopSec=150
+KillMode=control-group
+KillSignal=SIGTERM
+UMask=0022
+PrivateTmp=true

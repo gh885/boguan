@@ -66,6 +66,27 @@ bash /home/xun/ops/publish.sh
 脚本路径、账号和 systemd 单元是当前单机的固定约定。更新期间避免手动运行第二个抓取或迁移。
 `publish.sh` 和每日任务、探活使用同一把文件锁；它不会自动 `git pull` 或安装依赖。
 
+### GitHub Actions 自动部署
+
+`CI` 工作流的部署 job 依赖完整检查，只有 `main` push 且仓库变量 `BOGUAN_DEPLOY_ENABLED=true` 才执行。
+PR 只检查。main 的运行和生产部署均不取消进行中的发布，避免中断回滚。
+
+仓库需配置变量 `BOGUAN_DEPLOY_HOST`、`BOGUAN_DEPLOY_USER=xun`、`BOGUAN_DEPLOY_PORT=22`，
+以及 secrets `BOGUAN_DEPLOY_KEY`、`BOGUAN_DEPLOY_KNOWN_HOSTS`。专用 Ed25519 私钥只进入 GitHub secret；
+known_hosts 由已有可信 SSH 通道取得，工作流严格校验主机密钥，不使用 `StrictHostKeyChecking=no`。
+服务器 authorized_keys 对此公钥设置 `restrict,command="/bin/bash /home/xun/ops/deploy-ref.sh --ssh"`，
+只接受 `deploy <完整 SHA>`，不允许任意 SSH 命令、转发或交互式 shell。
+
+`deploy-ref.sh` 将固定 SHA 交给 `boguan-deploy@<SHA>.service`，服务独立于 SSH 会话。
+它最多等待发布锁 5 分钟，拒绝脏工作区、过期 SHA 和非当前版本后继；在检出前备份，
+然后复用 `publish.sh` 的构建、切换、HTTP 验证和失败回滚。失败恢复源码，并通过 `OnFailure` 通知云监控。
+GitHub 不使用 fixture 产物部署，服务器按真实数据库构建，避免 CI 的四条样例数据覆盖线上页面。
+
+常规页面、组件、业务逻辑与文档改动可自动上线。依赖清单、锁文件、数据库 schema/迁移、
+运维脚本、systemd 或 Caddy/私有配置模板变化会明确停止，需按上方人工升级步骤处理后再启用发布；
+不会自动执行数据库迁移。升级期间可设 `BOGUAN_DEPLOY_ENABLED=false` 暂停新的部署 job。
+SSH 连接故障时应先检查服务日志和 `dist/REVISION`，因为服务器上的发布仍可能继续执行。
+
 ## 调度与失败处理
 
 时间以服务器 `Asia/Shanghai` 为准。
