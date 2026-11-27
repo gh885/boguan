@@ -278,7 +278,13 @@ if [[ ${SCENARIO:-} == check-fails && $1 == *check.ts ]]; then exit 1; fi
             self.assertNotIn('SECRET-IN-SIGNED-REQUEST', str(error.exception))
 
     def test_first_ssh_deploy_does_not_reset_unloaded_unit(self):
-        revision = 'b' * 40
+        subprocess.run(['git', 'init', '-q', str(self.app)], check=True)
+        subprocess.run(['git', '-C', str(self.app), '-c', 'user.name=Ops Test',
+                        '-c', 'user.email=ops-test@example.invalid', 'commit', '-qm', 'fixture',
+                        '--allow-empty'], check=True)
+        revision = subprocess.check_output(['git', '-C', str(self.app), 'rev-parse', 'HEAD'], text=True).strip()
+        bundle = self.root / 'fixture.bundle'
+        subprocess.run(['git', '-C', str(self.app), 'bundle', 'create', str(bundle), 'HEAD'], check=True)
         (self.app / 'dist/REVISION').write_text(revision + '\n')
         self.env['SSH_ORIGINAL_COMMAND'] = 'deploy ' + revision
         mocks = self.root / 'ssh-mocks.sh'
@@ -287,11 +293,14 @@ systemctl() {
   if [[ $1 == is-failed ]]; then return 1; fi
   printf 'Result=success\nExecMainStatus=0\n'
 }
+unset -f git
 export -f systemctl
 ''')
         self.env['BASH_ENV'] = str(mocks)
-        result = self.run_script('deploy-ref.sh', '--ssh')
+        result = subprocess.run(['bash', str(OPS / 'deploy-ref.sh'), '--ssh'],
+                                input=bundle.read_bytes(), env=self.env, capture_output=True, timeout=15)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual((self.app / f'.ops/incoming/{revision}.bundle').read_bytes(), bundle.read_bytes())
         self.assertIn('start boguan-deploy@' + revision + '.service', self.restarts())
         self.assertNotIn('reset-failed', self.restarts())
 
@@ -314,8 +323,10 @@ printf '%s\\n' bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb > "$BOGUAN_APP/dist/REVI
 git() {
   case "$1" in
     status|fetch|merge-base) return 0 ;;
+    bundle)
+      if [[ $2 == list-heads ]]; then printf '%s HEAD\n' bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb; fi ;;
     rev-parse)
-      if [[ $2 == refs/remotes/origin/main ]]; then printf '%s\n' bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      if [[ $2 == FETCH_HEAD ]]; then printf '%s\n' bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
       else printf '%s\n' aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; fi ;;
     diff) [[ ${SCENARIO:-} != sensitive-change ]] ;;
     checkout) echo "${!#}" >> "$APP/.ops/checkouts" ;;
@@ -334,16 +345,22 @@ export -f git
         self.assertEqual(self.restarts(), '')
         result = self.run_script(ops / 'deploy-ref.sh', old_revision)
         self.assertNotEqual(result.returncode, 0)
+        incoming = self.app / '.ops/incoming'
+        incoming.mkdir()
+        bundle = incoming / f'{target}.bundle'
+        bundle.touch()
         result = self.run_script(ops / 'deploy-ref.sh', target, scenario='sensitive-change')
         self.assertNotEqual(result.returncode, 0)
         checkouts = self.app / '.ops/checkouts'
         self.assertFalse(checkouts.exists())
+        bundle.touch()
         result = self.run_script(ops / 'deploy-ref.sh', target, scenario='publish-fails')
         self.assertNotEqual(result.returncode, 0)
         self.assertTrue(checkouts.exists(), result.stdout + result.stderr)
         self.assertEqual(checkouts.read_text().splitlines(), [target, old_revision])
         self.assertEqual((self.app / 'dist/REVISION').read_text().strip(), old_revision)
         checkouts.unlink()
+        bundle.touch()
         result = self.run_script(ops / 'deploy-ref.sh', target)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(checkouts.read_text().splitlines(), [target])
