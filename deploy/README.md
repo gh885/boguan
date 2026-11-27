@@ -21,7 +21,8 @@
 | `/home/xun/backups`           | SQLite 压缩快照及 SHA256，保留 14 份；文件 0600 |
 | `/home/xun/ops`               | 从当前仓库安装的运维脚本                        |
 | `/etc/boguan/ops.env`         | 私有配置，root:xun 0640，不进 Git               |
-| `/etc/boguan/ossutilconfig`   | OSS 专用凭证配置，root:xun 0640 或所有者 0600   |
+| `/etc/boguan/ossutilconfig`   | OSS 实例角色配置，无长期密钥，root:xun 0640     |
+| `/home/xun/ops-python`        | 云监控官方 Python SDK 的独立虚拟环境            |
 | `/srv/boguan`                 | systemd 给 Web 的只读 bind 视图，不是第二份代码 |
 
 Web 使用无登录账号 `boguan-web`，`ProtectHome=true`，只能通过 `/srv/boguan` 只读访问应用。
@@ -85,9 +86,34 @@ bash /home/xun/ops/publish.sh
 ## 告警接通与验收
 
 项目服务有 `OnFailure=boguan-alert@%n.service`。配置缺失时告警任务明确失败，不伪装已发送。
-编辑 `/etc/boguan/ops.env` 的 `BOGUAN_ALERT_WEBHOOK`（HTTPS）和 `BOGUAN_ALERT_FORMAT`。
-支持通用 JSON、飞书、钉钉、企业微信、Slack 文本 webhook；需要签名校验的机器人需另行适配。
-只发送单元名与退出状态，不携带日志、数据库内容或凭证。成功通知按单元抑制重复一小时。
+当前采用云监控自定义事件，沿用阿里云现有的“报警”联系人组。服务器设置：
+
+```ini
+BOGUAN_ALERT_FORMAT=cloudmonitor
+BOGUAN_CMS_GROUP_ID=247878023
+BOGUAN_CMS_REGION=cn-beijing
+BOGUAN_RAM_ROLE=boguan-ops
+```
+
+在 `/home/xun/ops-python` 创建 Python 虚拟环境，并安装锁定的直接依赖：
+
+```bash
+python3 -m venv /home/xun/ops-python
+/home/xun/ops-python/bin/pip install -r /home/xun/ops/requirements.txt
+```
+
+Ubuntu 缺少 venv 时先安装 `python3-venv`。`bootstrap.sh` 只安装脚本和依赖清单，不隐式联网安装 SDK。
+通知脚本显式使用实例角色、强制 IMDSv2，不使用长期 AK，也不回退默认凭证链。Web 单元通过
+`IPAddressDeny=100.100.100.200/32` 禁止访问实例元数据；需确认宿主机支持 systemd 的 cgroup/BPF IP 过滤。
+
+云监控需先收到一次 `BoguanTaskFailed` 事件，再通过 `PutCustomEventRule` 创建规则：应用分组与配置一致、
+事件名 `BoguanTaskFailed`、Period `60`、Threshold `1`、Level `WARN`、ContactGroups 为现有联系人组。
+规则返回的真实 ID 以 `DescribeMetricRuleList(GroupId=...)` 为准（`EventFlow_...`），不等于传入的 RuleId。
+检查规则启用、事件维度、联系人组和生效时间；API 接收事件、事件入库、规则触发及人收到通知分别验收。
+
+保留 `generic`、飞书、钉钉、企业微信、Slack 文本 webhook 选项，通过 HTTPS `BOGUAN_ALERT_WEBHOOK` 配置；
+需要签名校验的机器人需另行适配。只发送主机、单元名与退出状态，不携带日志、数据库内容或凭证。
+只有平台确认接收才记录时间，按单元抑制重复一小时；这不等同于接收人已收到。
 
 ```bash
 # 配置后发送一次真实测试通知；必须由接收人确认收到。
@@ -102,12 +128,19 @@ GitHub Actions 外部探测需要工作流合并到默认分支，并在仓库 W
 
 ## 异地备份
 
-1. 创建私有 OSS bucket，开启服务端加密；设置生命周期：`boguan-backups/` 保留至少 30 天。
-   建议启用版本控制或保留策略，防止凭证泄露后覆盖备份。不要创建公开读 bucket。
-2. 使用 bucket 限权的 RAM 身份，优先实例角色；不用主账号 AK。
-3. 安装官方 ossutil v2，通过交互式 `ossutil config` 写入 `/etc/boguan/ossutilconfig`，权限 0600；
-   不要把 AK 放进命令行、代码库或聊天。设置 `BOGUAN_OSS_BUCKET`。
-4. 手动执行并验证，再开启 timer：
+1. 当前 bucket `boguan-backups-20261126` 为北京地域、私有标准存储、本地冗余、阻止公共访问、
+   OSS 托管 AES256 加密；`boguan-backups/` 最后修改 30 天后删除，生命周期规则已启用。
+   未开启版本控制；即使不给删除权限，角色仍能覆盖同名备份。同地域副本不提供跨地域灾难保护。
+2. ECS 绑定 `boguan-ops` 实例角色，只允许备份前缀读写和 `cms:PutCustomEvent`；不用主账号 AK。
+3. 安装官方 ossutil v2（当前实测 2.4.1），复制无长期密钥的实例角色配置，再设置 bucket：
+
+```bash
+sudo install -m 640 -o root -g xun deploy/ossutilconfig.example /etc/boguan/ossutilconfig
+# /etc/boguan/ops.env：BOGUAN_OSS_BUCKET=boguan-backups-20261126
+```
+
+实例角色 provider 的配置值为 `Ali-EcsRamRole`；北京内网 endpoint 只适用于同地域 ECS。
+新实例恢复时先绑定并授权角色，再下载快照。角色信任 ECS，不授予角色管理或策略管理权限。 4. 手动执行并验证，再开启 timer：
 
 ```bash
 sudo systemctl start boguan-backup
@@ -178,8 +211,8 @@ python3 deploy/ops/test_ops.py
 实际检查、应用恢复演练结果和待完成依赖见 [验收记录](ACCEPTANCE.md)。
 
 - [ ] 已合并代码、外部探测工作流执行成功，配置了失败通知接收方式。
-- [ ] 真实 webhook 通知送达，接收人确认；不能仅凭 HTTP 200 判断人已收到。
-- [ ] OSS 上传、下载、SHA256 与恢复验证成功，异地 timer 已启用。
+- [ ] 云监控事件触发通知，接收人确认；不能仅凭 API 200 判断人已收到。
+- [x] OSS 上传、下载、SHA256 与恢复验证成功，异地 timer 已启用。
 - [ ] 在新实例完成一次整机恢复并记录耗时，再承诺 RTO。
 - [ ] 首个自然日的备份、异地同步、抓取发布均成功。
 - [ ] 域名到期、ECS 续费、云监控告警联系人与规则在控制台确认。

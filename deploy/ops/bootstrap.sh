@@ -18,7 +18,7 @@ if ! sudo test -e /etc/boguan/ops.env; then
 fi
 sudo install -d -m 755 /home/xun/ops
 sudo install -m 755 "$DEPLOY_DIR"/ops/*.sh /home/xun/ops/
-sudo install -m 644 "$DEPLOY_DIR"/ops/*.py /home/xun/ops/
+sudo install -m 644 "$DEPLOY_DIR"/ops/*.py "$DEPLOY_DIR"/ops/requirements.txt /home/xun/ops/
 sudo install -m 644 "$DEPLOY_DIR"/systemd/*.service "$DEPLOY_DIR"/systemd/*.timer /etc/systemd/system/
 # 只有本项目白名单；不改动服务器上其它项目或管理员的 sudo 规则。
 TEMP=$(mktemp)
