@@ -86,6 +86,8 @@ GitHub 不使用 fixture 产物部署，服务器按真实数据库构建，避�
 运维脚本、systemd 或 Caddy/私有配置模板变化会明确停止，需按上方人工升级步骤处理后再启用发布；
 不会自动执行数据库迁移。升级期间可设 `BOGUAN_DEPLOY_ENABLED=false` 暂停新的部署 job。
 SSH 连接故障时应先检查服务日志和 `dist/REVISION`，因为服务器上的发布仍可能继续执行。
+当前 ECS 拉取 GitHub 时采用仓库本地 `protocol.version=0`，并配置 `http.lowSpeedLimit=1000`、
+`http.lowSpeedTime=15`；避免已实测出现的协议协商停滞，并在低速时明确失败。
 
 ## 调度与失败处理
 

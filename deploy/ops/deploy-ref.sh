@@ -8,7 +8,9 @@ if [[ ${1:-} == --ssh ]]; then
   TARGET=${BASH_REMATCH[1]}
   UNIT="boguan-deploy@$TARGET.service"
   # systemd 独立管理发布；SSH 断开不会打断切换或回滚。
-  sudo -n /usr/bin/systemctl reset-failed "$UNIT"
+  if systemctl is-failed --quiet "$UNIT"; then
+    sudo -n /usr/bin/systemctl reset-failed "$UNIT"
+  fi
   sudo -n /usr/bin/systemctl start "$UNIT"
   systemctl show "$UNIT" -p Result -p ExecMainStatus
   [[ -r $APP/dist/REVISION && $(<"$APP/dist/REVISION") == "$TARGET" ]]
