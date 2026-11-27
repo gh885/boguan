@@ -277,6 +277,24 @@ if [[ ${SCENARIO:-} == check-fails && $1 == *check.ts ]]; then exit 1; fi
                 notify.publish_cloudmonitor('boguan-health.service', 'test message')
             self.assertNotIn('SECRET-IN-SIGNED-REQUEST', str(error.exception))
 
+    def test_first_ssh_deploy_does_not_reset_unloaded_unit(self):
+        revision = 'b' * 40
+        (self.app / 'dist/REVISION').write_text(revision + '\n')
+        self.env['SSH_ORIGINAL_COMMAND'] = 'deploy ' + revision
+        mocks = self.root / 'ssh-mocks.sh'
+        mocks.write_text(MOCKS + r'''
+systemctl() {
+  if [[ $1 == is-failed ]]; then return 1; fi
+  printf 'Result=success\nExecMainStatus=0\n'
+}
+export -f systemctl
+''')
+        self.env['BASH_ENV'] = str(mocks)
+        result = self.run_script('deploy-ref.sh', '--ssh')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('start boguan-deploy@' + revision + '.service', self.restarts())
+        self.assertNotIn('reset-failed', self.restarts())
+
     def test_deploy_rejects_invalid_commands_and_rolls_back_source(self):
         old_revision, target = 'a' * 40, 'b' * 40
         (self.app / 'dist/REVISION').write_text(old_revision + '\n')
