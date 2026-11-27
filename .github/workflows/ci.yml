@@ -8,7 +8,8 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # PR 可取消旧检查；main 的发布和回滚不能被新提交中断。
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -97,3 +98,36 @@ jobs:
           test "$CHECK_RESULT" = success
           test "$BUILD_RESULT" = success
           test "$OPS_RESULT" = success
+
+  deploy:
+    name: 部署到 ECS
+    needs: gate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.BOGUAN_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+    env:
+      DEPLOY_HOST: ${{ vars.BOGUAN_DEPLOY_HOST }}
+      DEPLOY_USER: ${{ vars.BOGUAN_DEPLOY_USER }}
+      DEPLOY_PORT: ${{ vars.BOGUAN_DEPLOY_PORT }}
+      DEPLOY_KEY: ${{ secrets.BOGUAN_DEPLOY_KEY }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.BOGUAN_DEPLOY_KNOWN_HOSTS }}
+    steps:
+      - name: 发布已通过检查的提交并验证
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_HOST" && test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_KEY" && test -n "$DEPLOY_KNOWN_HOSTS"
+          key_dir=$(mktemp -d)
+          trap 'rm -rf -- "$key_dir"' EXIT
+          umask 077
+          printf '%s\n' "$DEPLOY_KEY" > "$key_dir/key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$key_dir/known_hosts"
+          ssh -i "$key_dir/key" -p "${DEPLOY_PORT:-22}" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$key_dir/known_hosts" \
+            -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
+            "$DEPLOY_USER@$DEPLOY_HOST" "deploy $GITHUB_SHA"

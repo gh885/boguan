@@ -23,7 +23,7 @@ sudo install -m 644 "$DEPLOY_DIR"/systemd/*.service "$DEPLOY_DIR"/systemd/*.time
 # 只有本项目白名单；不改动服务器上其它项目或管理员的 sudo 规则。
 TEMP=$(mktemp)
 trap 'rm -f -- "$TEMP"' EXIT
-printf '%s\n' 'xun ALL=(root) NOPASSWD: /usr/bin/systemctl restart boguan-web, /usr/bin/systemctl reset-failed boguan-web, /usr/bin/systemctl restart caddy' > "$TEMP"
+printf '%s\n' 'xun ALL=(root) NOPASSWD: /usr/bin/systemctl restart boguan-web, /usr/bin/systemctl reset-failed boguan-web, /usr/bin/systemctl restart caddy, /usr/bin/systemctl start boguan-deploy@*.service, /usr/bin/systemctl reset-failed boguan-deploy@*.service' > "$TEMP"
 sudo visudo -cf "$TEMP"
 sudo install -m 440 "$TEMP" /etc/sudoers.d/boguan-xun
 

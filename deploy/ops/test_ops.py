@@ -277,6 +277,60 @@ if [[ ${SCENARIO:-} == check-fails && $1 == *check.ts ]]; then exit 1; fi
                 notify.publish_cloudmonitor('boguan-health.service', 'test message')
             self.assertNotIn('SECRET-IN-SIGNED-REQUEST', str(error.exception))
 
+    def test_deploy_rejects_invalid_commands_and_rolls_back_source(self):
+        old_revision, target = 'a' * 40, 'b' * 40
+        (self.app / 'dist/REVISION').write_text(old_revision + '\n')
+        ops = self.root / 'deploy-ops'
+        ops.mkdir()
+        for name in ['deploy-ref.sh', 'lib.sh']:
+            shutil.copy2(OPS / name, ops / name)
+        (ops / 'backup.sh').write_text('#!/usr/bin/env bash\necho backup >> "$BOGUAN_APP/.ops/steps"\n')
+        (ops / 'publish.sh').write_text('''#!/usr/bin/env bash
+set -eu
+echo publish >> "$BOGUAN_APP/.ops/steps"
+[[ ${SCENARIO:-} != publish-fails ]] || exit 1
+printf '%s\\n' bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb > "$BOGUAN_APP/dist/REVISION"
+''')
+        mocks = self.root / 'deploy-mocks.sh'
+        mocks.write_text(MOCKS + r'''
+git() {
+  case "$1" in
+    status|fetch|merge-base) return 0 ;;
+    rev-parse)
+      if [[ $2 == refs/remotes/origin/main ]]; then printf '%s\n' bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      else printf '%s\n' aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; fi ;;
+    diff) [[ ${SCENARIO:-} != sensitive-change ]] ;;
+    checkout) echo "${!#}" >> "$APP/.ops/checkouts" ;;
+    *) return 1 ;;
+  esac
+}
+export -f git
+''')
+        self.env['BASH_ENV'] = str(mocks)
+        for invalid in ['', 'main', 'b' * 39, target + ';id']:
+            result = self.run_script(ops / 'deploy-ref.sh', invalid)
+            self.assertNotEqual(result.returncode, 0)
+        self.env['SSH_ORIGINAL_COMMAND'] = 'deploy ' + target + ';id'
+        result = self.run_script(ops / 'deploy-ref.sh', '--ssh')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.restarts(), '')
+        result = self.run_script(ops / 'deploy-ref.sh', old_revision)
+        self.assertNotEqual(result.returncode, 0)
+        result = self.run_script(ops / 'deploy-ref.sh', target, scenario='sensitive-change')
+        self.assertNotEqual(result.returncode, 0)
+        checkouts = self.app / '.ops/checkouts'
+        self.assertFalse(checkouts.exists())
+        result = self.run_script(ops / 'deploy-ref.sh', target, scenario='publish-fails')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue(checkouts.exists(), result.stdout + result.stderr)
+        self.assertEqual(checkouts.read_text().splitlines(), [target, old_revision])
+        self.assertEqual((self.app / 'dist/REVISION').read_text().strip(), old_revision)
+        checkouts.unlink()
+        result = self.run_script(ops / 'deploy-ref.sh', target)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(checkouts.read_text().splitlines(), [target])
+        self.assertEqual((self.app / 'dist/REVISION').read_text().strip(), target)
+
     def test_unconfigured_offsite_does_not_claim_success(self):
         self.env.pop("BOGUAN_OSS_BUCKET", None)
         result = self.run_script("offsite.sh")
