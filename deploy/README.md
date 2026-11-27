@@ -77,8 +77,10 @@ known_hosts 由已有可信 SSH 通道取得，工作流严格校验主机密钥
 服务器 authorized_keys 对此公钥设置 `restrict,command="/bin/bash /home/xun/ops/deploy-ref.sh --ssh"`，
 只接受 `deploy <完整 SHA>`，不允许任意 SSH 命令、转发或交互式 shell。
 
-`deploy-ref.sh` 将固定 SHA 交给 `boguan-deploy@<SHA>.service`，服务独立于 SSH 会话。
-它最多等待发布锁 5 分钟，拒绝脏工作区、过期 SHA 和非当前版本后继；在检出前备份，
+Actions 检出完整历史，确认 main 仍指向该 SHA，生成 Git bundle 并通过 SSH 标准输入传送。
+`deploy-ref.sh` 限时接收至私有目录（最多 50 MiB），用 Git 校验 bundle 完整性和 SHA，
+再将固定 SHA 交给 `boguan-deploy@<SHA>.service`，服务独立于 SSH 会话，服务器不联网拉取 GitHub。
+它最多等待发布锁 5 分钟，拒绝脏工作区和非当前版本后继；在检出前备份，
 然后复用 `publish.sh` 的构建、切换、HTTP 验证和失败回滚。失败恢复源码，并通过 `OnFailure` 通知云监控。
 GitHub 不使用 fixture 产物部署，服务器按真实数据库构建，避免 CI 的四条样例数据覆盖线上页面。
 
@@ -86,8 +88,8 @@ GitHub 不使用 fixture 产物部署，服务器按真实数据库构建，避�
 运维脚本、systemd 或 Caddy/私有配置模板变化会明确停止，需按上方人工升级步骤处理后再启用发布；
 不会自动执行数据库迁移。升级期间可设 `BOGUAN_DEPLOY_ENABLED=false` 暂停新的部署 job。
 SSH 连接故障时应先检查服务日志和 `dist/REVISION`，因为服务器上的发布仍可能继续执行。
-当前 ECS 拉取 GitHub 时采用仓库本地 `protocol.version=0`，并配置 `http.lowSpeedLimit=1000`、
-`http.lowSpeedTime=15`；避免已实测出现的协议协商停滞，并在低速时明确失败。
+ECS 到 GitHub 的 Git 拉取已实测不稳定，因此部署不依赖该链路；提交历史随 bundle 一同传输。
+自动化仍需 GitHub runner 能通过 SSH 连接 ECS，连接失败时工作流明确失败。
 
 ## 调度与失败处理
 
