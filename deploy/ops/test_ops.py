@@ -9,6 +9,7 @@ import shutil
 import sqlite3
 import subprocess
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest import mock
 
@@ -217,6 +218,64 @@ if [[ ${SCENARIO:-} == check-fails && $1 == *check.ts ]]; then exit 1; fi
             self.assertIn('boguan-health.service', payload['content']['text'])
             notify.main()
             self.assertEqual(request.call_count, 2)
+
+    def test_cloudmonitor_rejection_does_not_throttle_next_attempt(self):
+        spec = importlib.util.spec_from_file_location('ops_notify', OPS / 'notify.py')
+        notify = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(notify)
+        environment = dict(self.env, BOGUAN_ALERT_FORMAT='cloudmonitor')
+        with mock.patch.dict(os.environ, environment, clear=True), \
+                mock.patch.object(notify.sys, 'argv', ['notify.py', 'boguan-health.service']), \
+                mock.patch.object(notify.subprocess, 'run') as command, \
+                mock.patch.object(notify, 'publish_cloudmonitor') as publish:
+            command.return_value.stdout = 'Result=exit-code\nExecMainStatus=1'
+            publish.side_effect = SystemExit('上报失败')
+            with self.assertRaises(SystemExit):
+                notify.main()
+            marker = self.app / '.ops/alerts/boguan-health.service'
+            self.assertFalse(marker.exists())
+            publish.side_effect = None
+            notify.main()
+            self.assertTrue(marker.exists())
+            notify.main()
+            self.assertEqual(publish.call_count, 2)
+
+    def test_cloudmonitor_validates_ack_and_never_leaks_sdk_exceptions(self):
+        spec = importlib.util.spec_from_file_location('ops_notify', OPS / 'notify.py')
+        notify = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(notify)
+        client = mock.Mock()
+        credentials = mock.Mock()
+        model = mock.Mock(side_effect=lambda **kwargs: SimpleNamespace(**kwargs))
+        modules = {
+            'alibabacloud_cms20190101.client': SimpleNamespace(Client=client, RuntimeOptions=model),
+            'alibabacloud_cms20190101.models': SimpleNamespace(
+                PutCustomEventRequest=model, PutCustomEventRequestEventInfo=model),
+            'alibabacloud_credentials.client': SimpleNamespace(Client=credentials),
+            'alibabacloud_credentials.models': SimpleNamespace(Config=model),
+            'alibabacloud_tea_openapi.models': SimpleNamespace(Config=model),
+        }
+        environment = dict(self.env, BOGUAN_CMS_GROUP_ID='247878023',
+                           BOGUAN_CMS_REGION='cn-beijing', BOGUAN_RAM_ROLE='boguan-ops')
+        with mock.patch.dict(os.environ, environment, clear=True), \
+                mock.patch.dict(notify.sys.modules, modules):
+            send = client.return_value.put_custom_event_with_options
+            send.return_value = SimpleNamespace(status_code=200, body=SimpleNamespace(code='500'))
+            with self.assertRaises(SystemExit):
+                notify.publish_cloudmonitor('boguan-health.service', 'test message')
+            send.return_value.body.code = '200'
+            notify.publish_cloudmonitor('boguan-health.service', 'test message')
+            request, runtime = send.call_args.args
+            self.assertEqual(request.event_info[0].event_name, 'BoguanTaskFailed')
+            self.assertEqual(request.event_info[0].group_id, '247878023')
+            self.assertFalse(runtime.autoretry)
+            config = credentials.call_args.args[0]
+            self.assertTrue(config.enable_imds_v2)
+            self.assertTrue(config.disable_imds_v1)
+            send.side_effect = RuntimeError('SECRET-IN-SIGNED-REQUEST')
+            with self.assertRaises(SystemExit) as error:
+                notify.publish_cloudmonitor('boguan-health.service', 'test message')
+            self.assertNotIn('SECRET-IN-SIGNED-REQUEST', str(error.exception))
 
     def test_unconfigured_offsite_does_not_claim_success(self):
         self.env.pop("BOGUAN_OSS_BUCKET", None)

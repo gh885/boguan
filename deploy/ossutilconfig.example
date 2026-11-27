@@ -1,0 +1,6 @@
+# ossutil v2 的实例角色 provider 写作 Ali-EcsRamRole，不保存长期 AK。
+[default]
+mode = Ali-EcsRamRole
+ecsRoleName = boguan-ops
+region = cn-beijing
+endpoint = https://oss-cn-beijing-internal.aliyuncs.com
