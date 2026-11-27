@@ -21,7 +21,7 @@
 2. **抓取必须守规矩。** 遵守 `robots.txt`，同一域名并发 ≤ 1、请求间隔 ≥ 1s，不携带登录态，不绕过付费墙、验证码或反爬机制。
 3. **抓取逻辑只写在与 Web 进程分离的脚本里。** 任何 `src/pages/`、`src/middleware.ts` 中不得执行抓取或长时间任务。
 4. **每个可索引页面必须有唯一的 `<title>`、`description` 和 canonical。** 搜索页与任意筛选组合页默认 `noindex`。
-5. **不引入客户端全局状态。** 筛选、分页、搜索一律走 URL 查询参数，保证可分享、可索引、可后退。主题偏好的 `localStorage` 是唯一例外（见 `docs/ARCHITECTURE.md` §10）。
+5. **不引入客户端全局状态。** 筛选、分页、搜索一律走 URL 查询参数，保证可分享、可索引、可后退。主题偏好的 `localStorage` 与经授权的匿名 RUM 标识/会话存储是明确例外（见 `docs/ARCHITECTURE.md` §10）；RUM 不得承载业务状态。
 6. **不改动 `docs/ARCHITECTURE.md` 中的决策，除非先更新文档并说明理由。**
 7. **界面文案必须走 i18n，不得硬编码。** 页面与组件里的可见字符串一律通过 `useTranslations(locale)` 的 `t('key')` 取得，文案存在 `src/lib/i18n/messages/{locale}.json`；新增 key 时同步所有语言并跑 `vpr i18n:check`。
 
@@ -178,8 +178,15 @@ vpr dev stop           # 停止
 
 ---
 
+## 阿里云平台操作
+
+用户需要操作本项目的阿里云资源时，可以通过浏览器执行其请求范围内的查看、配置和运维操作，无需为已明确授权的步骤重复征求许可。控制台入口为 `https://home.console.aliyun.com/`，优先使用 ego-browser 和用户已有的登录态；开始前读取对应浏览器 skill，不依赖历史 task space ID。登录失效、验证码或 MFA 由用户完成。购买、付费开通、删除资源等操作需有对应的明确授权，本约定不构成无限制授权。
+
+ECS 日常连接使用本机 SSH 别名 `ssh aliyun`；控制台入口、连接配置与验证记录见 [`deploy/README.md`](deploy/README.md#平台操作与服务器连接)。不要将私钥、密码、Cookie 或临时令牌写入仓库或日志。
+
 ## 文档
 
+- [`deploy/README.md`](deploy/README.md) — 阿里云操作入口、服务器连接、部署、监控与运维
 - [`README.md`](README.md) — 项目定位、功能、路线图
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — 系统形状、数据模型、抓取管道、搜索与 SEO 策略、关键决策
 - [`docs/SOURCES.md`](docs/SOURCES.md) — 每个数据源的实测结论、踩过的坑、接入清单

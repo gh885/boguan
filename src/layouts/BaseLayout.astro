@@ -133,6 +133,25 @@ const robots = noindex ? "noindex, follow" : "index, follow";
 				<slot />
 			</div>
 		</main>
+		<script>
+			import { createRumConfig } from "../lib/rum";
+
+			// Only production traffic belongs in the paid workspace; respect DNT.
+			if (
+				import.meta.env.PROD &&
+				location.protocol === "https:" &&
+				["boguan.org.cn", "www.boguan.org.cn"].includes(location.hostname) &&
+				navigator.doNotTrack !== "1"
+			) {
+				Object.assign(window, { __rum: createRumConfig() });
+				const sdk = document.createElement("script");
+				sdk.src = "https://sdk.rum.aliyuncs.com/v2/browser-sdk.js";
+				sdk.async = true;
+				sdk.crossOrigin = "anonymous";
+				sdk.referrerPolicy = "no-referrer";
+				document.body.append(sdk);
+			}
+		</script>
 	</body>
 </html>
 
