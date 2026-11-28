@@ -129,14 +129,16 @@ vpr dev stop           # 停止
 /tags               标签索引
 /tag/[slug]         标签页
 /year/[year]        年份归档
-/page/[n]           首页分页（公司 / 标签 / 年份下的分页同构）
+/editions           合订本（按期回看的目录）
+/edition/[n]        某期版面（一期 = 一个自然日，期号连续；薄期 noindex）
+/page/[n]           首页分页（公司 / 标签 / 年份 / 期页下的分页同构）
 /search             站内搜索（noindex）
 ```
 
 同一套路由在另一种语言下面带前缀，**slug 与语言无关**：
 
 ```text
-/en/  /en/companies  /en/company/[slug]  /en/tags  /en/tag/[slug]  /en/year/[year]  /en/search
+/en/  /en/companies  /en/company/[slug]  /en/tags  /en/tag/[slug]  /en/year/[year]  /en/editions  /en/edition/[n]  /en/search
 ```
 
 - 所有页面都写在 `src/pages/[...lang]/` 下（目录里的 `[...lang]` 就是语言段），用 `localeRoutes()` 生成 `getStaticPaths`：

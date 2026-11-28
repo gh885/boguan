@@ -143,6 +143,22 @@ export function formatLongDate(value: Date | string, locale: Locale): string {
   return `${dateFormatter.format(date)} · ${weekdayFormatter.format(date)}`;
 }
 
+const monthFormatters = new Map<Locale, Intl.DateTimeFormat>();
+
+/** 合订本的分组标题：「2026 年 11 月」/「November 2026」；「日期键 `YYYY-MM-DD` 取该月 */
+export function formatMonth(dayKey: string, locale: Locale): string {
+  let formatter = monthFormatters.get(locale);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale, {
+      year: "numeric",
+      month: "long",
+      timeZone: displayTimeZone,
+    });
+    monthFormatters.set(locale, formatter);
+  }
+  return formatter.format(new Date(`${dayKey}T00:00:00.000Z`));
+}
+
 const numberFormatters = new Map<Locale, Intl.NumberFormat>();
 
 /** 期号、计数等需要本地化数字分组的场景。 */

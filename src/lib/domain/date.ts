@@ -209,3 +209,48 @@ export function yearInTimeZone(
   );
   return Number.isFinite(year) ? year : null;
 }
+
+const dayKeyFormatters = new Map<string, Intl.DateTimeFormat>();
+
+/**
+ * ISO 时间在某个时区的**自然日**，键形如 `2026-11-28`。
+ * 出版日的归属用它（见 `src/lib/domain/edition.ts`），不要用 UTC 日期切。
+ */
+export function dayInTimeZone(
+  iso: string | null | undefined,
+  timeZone = "Asia/Shanghai",
+): string | null {
+  if (!iso) return null;
+  const epoch = Date.parse(iso);
+  if (Number.isNaN(epoch)) return null;
+  let formatter = dayKeyFormatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    dayKeyFormatters.set(timeZone, formatter);
+  }
+  const key = formatter.format(new Date(epoch));
+  return /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : null;
+}
+
+/**
+ * 某个时区里某一天的开始时刻（UTC ISO）：`2026-11-28` → `2026-11-27T16:00:00.000Z`。
+ * 期页的时间窗用它，避免用「UTC 零点」冒充「北京零点」。
+ */
+export function startOfDayInTimeZone(dayKey: string, timeZone = "Asia/Shanghai"): string | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dayKey);
+  if (!match) return null;
+  const parts = {
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
+    hour: 0,
+    minute: 0,
+    second: 0,
+  };
+  return validParts(parts) ? new Date(zonedToUtc(parts, timeZone)).toISOString() : null;
+}

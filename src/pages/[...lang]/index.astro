@@ -3,12 +3,13 @@ import type { GetStaticPaths } from "astro";
 import HomeNewspaper from "../../components/HomeNewspaper.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import {
+	countPosts,
 	latestPosts,
 	openWebDatabase,
 	postYears,
-	siteStats,
 	tagIndex,
 } from "../../lib/db/queries";
+import { editionNumberAt, editionRange } from "../../lib/domain/edition";
 import { localizePath, localeRoutes, useTranslations } from "../../lib/i18n";
 import type { Locale } from "../../lib/i18n/config";
 import { PAGE_SIZE, pageCount, pagePath } from "../../lib/pagination";
@@ -28,7 +29,6 @@ const { locale } = Astro.props;
 const t = useTranslations(locale);
 
 const db = openWebDatabase();
-const stats = siteStats(db);
 const { items, total } = latestPosts(db, { limit: PAGE_SIZE });
 const [lead, ...latest] = items;
 const topics = tagIndex(db)
@@ -40,6 +40,16 @@ const yearHref = years[0]
 	: localizePath("/tags", locale);
 
 const totalPages = pageCount(total);
+
+// 本期：一个自然日一期（lib/domain/edition.ts）。没有新增也照样出刊，只是「本期新增 0 篇」
+const editionNumber = editionNumberAt(new Date()) ?? 1;
+const editionWindow = editionRange(editionNumber);
+const editionNew = editionWindow
+	? countPosts(db, {
+			firstSeenFrom: editionWindow.startIso,
+			firstSeenTo: editionWindow.endIso,
+		})
+	: 0;
 const description = t("meta.home.description");
 const nextHref = totalPages > 1 ? localizePath(pagePath("/", 2), locale) : undefined;
 ---
@@ -63,10 +73,11 @@ const nextHref = totalPages > 1 ? localizePath(pagePath("/", 2), locale) : undef
 		items={latest}
 		lead={lead}
 		topics={topics}
-		stats={stats}
 		page={1}
 		totalPages={totalPages}
 		nextHref={nextHref}
 		yearHref={yearHref}
+		editionNumber={editionNumber}
+		editionNew={editionNew}
 	/>
 </BaseLayout>

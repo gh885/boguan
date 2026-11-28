@@ -1,5 +1,6 @@
 ---
 import type { Locale } from "../lib/i18n/config";
+import type { PaperSection } from "../lib/index-sheet";
 import "../styles/paper.css";
 import "../styles/directory.css";
 import PaperFooter from "./PaperFooter.astro";
@@ -8,7 +9,7 @@ import PaperSectionHead from "./PaperSectionHead.astro";
 
 interface Props {
   locale: Locale;
-  current: "companies" | "tags";
+  current: PaperSection;
   kicker: string;
   title: string;
   titleLang?: string;
