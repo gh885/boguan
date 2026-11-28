@@ -1,7 +1,7 @@
 import { readdirSync } from "node:fs";
 import { relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "bun:test";
 import en from "./messages/en.json";
 import zhCN from "./messages/zh-CN.json";
 import {

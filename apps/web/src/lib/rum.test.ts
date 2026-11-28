@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "bun:test";
 import { createRumConfig, sanitizeRumPayload } from "./rum";
 
 describe("production RUM privacy", () => {

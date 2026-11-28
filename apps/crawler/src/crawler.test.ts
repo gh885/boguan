@@ -12,7 +12,7 @@ import Database from "better-sqlite3";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "bun:test";
 import * as schema from "@boguan/database/ops";
 import { migrationsFolder } from "@boguan/database/ops";
 import { isPostUrl } from "./adapters/youzan";

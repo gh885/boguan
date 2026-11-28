@@ -13,7 +13,8 @@
     "skipLibCheck": true,
     "allowJs": true,
     "jsx": "preserve",
-    "strict": true
+    "strict": true,
+    "types": ["bun"]
   },
   "include": ["apps/web/.astro/types.d.ts", "**/*"],
   "exclude": ["dist", "apps/web/dist"]

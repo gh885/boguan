@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "bun:test";
 import { checkFts, deletePostFts, upsertPostFts } from "./fts";
 import { migrationsFolder } from "./migrate";
 import {
