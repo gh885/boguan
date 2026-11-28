@@ -39,6 +39,7 @@ git() { printf 'test-revision\n'; }
 bun() {
   if [[ $* == *"apps/web"* && $* == *"build"* ]]; then
     [[ ${SCENARIO:-} != build-fails ]] || return 1
+    [[ $BOGUAN_OUT_DIR == /* ]] || { echo "BOGUAN_OUT_DIR 必须是绝对路径：$BOGUAN_OUT_DIR" >&2; return 1; }
     mkdir -p "$BOGUAN_OUT_DIR/server" "$BOGUAN_OUT_DIR/client"
     echo server > "$BOGUAN_OUT_DIR/server/entry.mjs"
     echo html > "$BOGUAN_OUT_DIR/client/index.html"
@@ -115,7 +116,11 @@ class OpsTests(unittest.TestCase):
     def test_successful_publish_switches_and_keeps_previous(self):
         result = self.run_script("publish.sh")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertNotEqual(os.readlink(self.app / "dist"), "releases/old")
+        target = os.readlink(self.app / "dist")
+        self.assertNotEqual(target, "releases/old")
+        # Web 的 systemd 单元把 $APP 只读 bind 到 /srv/boguan；绝对软链在沙箱里指不到目标。
+        self.assertFalse(os.path.isabs(target), target)
+        self.assertTrue(target.startswith("releases/"), target)
         self.assertTrue((self.app / "releases/old").is_dir())
         self.assertEqual((self.app / "dist").stat().st_mode & 0o777, 0o755)
         self.assertEqual((self.app / "dist/REVISION").read_text(), "test-revision\n")
