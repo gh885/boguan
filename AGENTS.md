@@ -81,7 +81,7 @@ vp install               # 安装 workspace 依赖
 vpr dev                  # 开发服务器 :4321
 vpr build                # 生产构建（需要数据库，见下）
 vp check                 # 格式化 + lint + 类型检查
-vp test                  # 测试
+vpr test                 # 测试（底层是 bun test）
 vpr i18n:check           # 校验文案：缺 key、漏翻、未使用 key
 vpr i18n:ui              # 浏览器里浏览 / 编辑文案
 vpr db:generate          # 生成数据库迁移
@@ -162,7 +162,7 @@ vpr dev stop           # 停止
 - 日期统一以 UTC 存储，展示时用 `formatDate(value, locale)`（内部按 `Asia/Shanghai`）。
 - 站内链接用 `localizePath(path, locale)`，不要在模板里手拼 `/en` 前缀。
 - 颜色、字号、行高、间距、圆角一律使用 Web 包的设计令牌；组件里不写裸色值和裸字号，也不直接用 `--neutral-*` / `--accent-*` 原语。
-- 改颜色：在 `tokens.css` 里给语义色补 `light-dark()` 两值，然后跑 `vp test`（`tokens.test.ts` 实测对比度与单一主题机制）。
+- 改颜色：在 `tokens.css` 里给语义色补 `light-dark()` 两值，然后跑 `vpr test`（`tokens.test.ts` 实测对比度与单一主题机制）。
 - 不要用 `any`；确需逃逸时写 `unknown` + 收窄。
 - 时间列一律是 ISO 8601 UTC 字符串（`2023-05-12T03:00:00.000Z`）。
 - **解析时间走 `@boguan/domain`**：源站时间可能是 `28 Oct 2022` / `2026年10月29日` / 无时区，统一由 `parsePublishedAt(raw, sources.timezone)` 处理；解析不出来就存 `NULL`，**不要编造**。

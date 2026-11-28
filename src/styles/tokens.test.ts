@@ -7,7 +7,7 @@ import { describe, expect, it } from "vite-plus/test";
  * 设计令牌的守卫：色板是否仍在 sRGB 内、每个角色两套值是否齐全、
  * 语义色是否只有一套切换机制、以及实测对比度是否达标。
  *
- * 改颜色后跑 `vp test`；失败就是真的不达标，不要放宽阈值。
+ * 改颜色后跑 `vpr test`；失败就是真的不达标，不要放宽阈值。
  */
 
 const stylesDir = fileURLToPath(new URL(".", import.meta.url));

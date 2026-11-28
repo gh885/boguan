@@ -114,7 +114,7 @@ vpr preview        # 本地预览构建产物
 
 ```bash
 vp check           # 格式化 + 校验 + 类型检查
-vp test            # 运行测试
+vpr test           # 运行测试
 vpx scripts/foo.ts # 直接运行 TS 脚本（替代 tsx）
 ```
 

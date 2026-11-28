@@ -37,7 +37,7 @@ jobs:
         run: vp check && vp run i18n:check
 
       - name: 单元测试
-        run: vp test
+        run: vpr test
 
   build:
     name: 构建

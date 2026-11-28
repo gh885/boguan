@@ -21,7 +21,8 @@
     "db:curate": "vpx scripts/db/curate.ts",
     "db:metrics": "vpx scripts/db/metrics.ts",
     "crawl": "vpx scripts/crawler/cli.ts",
-    "db:fixture": "vpx scripts/db/fixture.ts"
+    "db:fixture": "vpx scripts/db/fixture.ts",
+    "test": "bun test"
   },
   "dependencies": {
     "@astrojs/node": "11.1.9",

@@ -1,3 +1,6 @@
+import { readdirSync } from "node:fs";
+import { relative } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vite-plus/test";
 import en from "./messages/en.json";
 import zhCN from "./messages/zh-CN.json";
@@ -184,8 +187,11 @@ describe("alternateLinks 收窄到实际生成的语言", () => {
 
 describe("页面目录约定", () => {
   it("所有页面都在 src/pages/[...lang]/ 下，避免漏生成某种语言", () => {
-    const pages = Object.keys(import.meta.glob("/src/pages/**/*.astro"));
+    const pagesDir = fileURLToPath(new URL("../../pages", import.meta.url));
+    const pages = (readdirSync(pagesDir, { recursive: true }) as string[])
+      .filter((name) => name.endsWith(".astro"))
+      .map((name) => relative(pagesDir, `${pagesDir}/${name}`).replaceAll("\\", "/"));
     expect(pages.length).toBeGreaterThan(0);
-    expect(pages.filter((file) => !file.startsWith("/src/pages/[...lang]/"))).toEqual([]);
+    expect(pages.filter((file) => !file.startsWith("[...lang]/"))).toEqual([]);
   });
 });
