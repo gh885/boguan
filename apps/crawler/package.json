@@ -2,6 +2,9 @@
   "name": "@boguan/crawler",
   "private": true,
   "type": "module",
+  "scripts": {
+    "crawl": "bun src/cli.ts"
+  },
   "dependencies": {
     "@boguan/body-store": "workspace:*",
     "@boguan/catalog": "workspace:*",

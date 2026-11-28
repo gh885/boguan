@@ -76,10 +76,16 @@ https://boguan.org.cn
 ```text
 boguan/
 ├── public/                 # 静态资源（favicon 等）
-├── scripts/
+├── apps/
 │   ├── crawler/            # 抓取管道：fetch/robots → adapters → normalize → pipeline
-│   └── db/                 # init / seed / check / metrics
-├── packages/database/drizzle/  # SQL 迁移（FTS5 为手写迁移）
+│   ├── ops/                # init / seed / check / curate / metrics / fixture
+│   └── web/                # 站点（迁移中，当前仍在 src/）
+├── packages/
+│   ├── body-store/         # crawler 私有正文文件
+│   ├── catalog/            # 采集配置
+│   ├── database/           # schema、迁移（drizzle/）与查询
+│   ├── domain/             # 纯业务规则
+│   └── search/             # 分词与 FTS 查询表达式
 ├── data/                   # 本地 SQLite 与正文文件（不进仓库）
 ├── src/
 │   ├── assets/             # 需要被构建处理的资源
@@ -88,7 +94,6 @@ boguan/
 │   ├── pages/              # 路由：文件即路由
 │   └── env.d.ts
 ├── docs/                   # 架构与决策文档
-├── scripts/                # 独立脚本：抓取、导入、维护（规划中）
 ├── astro.config.mjs
 ├── vite.config.ts          # Vite+ 配置：fmt / lint
 ├── package.json
@@ -115,7 +120,7 @@ vpr preview        # 本地预览构建产物
 ```bash
 vp check           # 格式化 + 校验 + 类型检查
 vpr test           # 运行测试
-bun scripts/foo.ts # 直接运行 TS 脚本（vpx 走 Node，不用）
+bun apps/ops/src/check.ts # 运行 TS 入口（vpx 走 Node，不用）
 ```
 
 抓取管道（独立进程，与 Web 无关）：

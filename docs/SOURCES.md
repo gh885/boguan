@@ -98,7 +98,7 @@ batch #13 backfill --max-pages=0   dewu   197 条（197 新增 / 0 失败），2
 ## 接入一个新源的清单
 
 1. `curl` 一下 `/robots.txt`，确认目标路径没被 `Disallow`；
-2. 写适配器（`scripts/crawler/adapters/*.ts`），声明 `capabilities`；
+2. 写适配器（`apps/crawler/src/adapters/*.ts`），声明 `capabilities`；
 3. `vpr crawl --dry-run --source=<slug>`：看标题、时间（含源串）、摘要字数、标签、详情页正文长度；
 4. 在 `@boguan/catalog` 的 `SOURCES` 加一条，`vpr db:seed`；
 5. `vpr crawl --mode=backfill --max-pages=1`：确认入库 → 再跑一次确认幂等（`inserted/updated` 为 0）；

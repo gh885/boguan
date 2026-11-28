@@ -10,7 +10,7 @@ trap 'exit 143' TERM
 
 CRAWL_FAILED=0
 log 'crawl start'
-if ! bun scripts/crawler/cli.ts --mode=incremental; then
+if ! bun apps/crawler/src/cli.ts --mode=incremental; then
   CRAWL_FAILED=1
   log '抓取失败：继续校验已有数据，本次任务最终返回失败供告警'
 fi

@@ -47,7 +47,6 @@ describe("包边界", () => {
 
   it("正文存储只有 crawler 与 ops 能引用", () => {
     const allowed = new Set([
-      "scripts/crawler/pipeline.ts",
       "apps/crawler/src/pipeline.ts",
       "apps/ops/src/check.ts",
       "apps/ops/src/curate-lib.ts",
@@ -73,9 +72,7 @@ describe("包边界", () => {
 
   it("抓取与运维代码不引用渲染层", () => {
     const offenders = files
-      .filter(
-        (path) => /(^|\/)(crawler|ops)[\\/]/.test(id(path)) || id(path).startsWith("scripts/"),
-      )
+      .filter((path) => /(^|\/)(crawler|ops)[\\/]/.test(id(path)))
       .flatMap((path) =>
         importsOf(path)
           .filter((specifier) => /(src\/(pages|components|layouts)|apps\/web)/.test(specifier))

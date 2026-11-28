@@ -37,7 +37,7 @@ export const companies = sqliteTable("companies", {
 /**
  * 一个公司可以有多个发布渠道（官网博客、掘金账号、RSS），每个渠道一行。
  *
- * 「怎么解析」只有一处真相：`adapter` 指向 `scripts/crawler/adapters/` 里的文件，
+ * 「怎么解析」只有一处真相：`adapter` 指向 `apps/crawler/src/adapters/` 里的文件，
  * 列表页有没有时间、正文要不要进详情页，都由适配器的 `capabilities` 声明，不另存列。
  */
 export const sources = sqliteTable(
@@ -49,7 +49,7 @@ export const sources = sqliteTable(
       .references(() => companies.id, { onDelete: "cascade" }),
     slug: text("slug").notNull().unique(),
     name: text("name").notNull(),
-    /** 适配器 slug，对应 scripts/crawler/adapters/*.ts 导出的 adapter */
+    /** 适配器 slug，对应 apps/crawler/src/adapters/*.ts 导出的 adapter */
     adapter: text("adapter").notNull(),
     listUrl: text("list_url").notNull(),
     /** 源站本地时区：列表页给的是「无时区时间」时按它解释，也决定 published_year 的取年口径 */

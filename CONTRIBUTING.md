@@ -32,7 +32,7 @@ vpr build
 ## 新增数据源
 
 1. 先提 [数据源 Issue](https://github.com/gh885/boguan/issues/new?template=source-request.yml)，确认可抓性与合规性
-2. 在 `scripts/crawler/adapters/` 下新增适配器，实现统一接口
+2. 在 `apps/crawler/src/adapters/` 下新增适配器，实现统一接口
 3. 在 `sources` 中登记来源，本地跑通增量抓取
 4. PR 中附上抓取样本（标题、时间、摘要各若干条），便于 review
 

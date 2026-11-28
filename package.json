@@ -20,7 +20,7 @@
     "db:check": "bun apps/ops/src/check.ts",
     "db:curate": "bun apps/ops/src/curate.ts",
     "db:metrics": "bun apps/ops/src/metrics.ts",
-    "crawl": "bun scripts/crawler/cli.ts",
+    "crawl": "bun apps/crawler/src/cli.ts",
     "db:fixture": "bun apps/ops/src/fixture.ts",
     "test": "bun test"
   },
