@@ -1,0 +1,26 @@
+{
+  "name": "@boguan/ops",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./check": "./src/check.ts",
+    "./curate": "./src/curate.ts",
+    "./curate-lib": "./src/curate-lib.ts",
+    "./fixture": "./src/fixture.ts",
+    "./init": "./src/init.ts",
+    "./metrics": "./src/metrics.ts",
+    "./seed": "./src/seed.ts"
+  },
+  "dependencies": {
+    "@boguan/body-store": "workspace:*",
+    "@boguan/catalog": "workspace:*",
+    "@boguan/database": "workspace:*",
+    "@boguan/domain": "workspace:*",
+    "better-sqlite3": "^13.0.3",
+    "drizzle-kit": "^0.31.11",
+    "drizzle-orm": "^0.45.4"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0"
+  }
+}

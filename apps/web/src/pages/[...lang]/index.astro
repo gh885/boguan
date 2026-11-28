@@ -1,0 +1,73 @@
+---
+import { countPosts, latestPosts, openWebDatabase, postYears, tagIndex } from "@boguan/database/web-read";
+import { editionNumberAt, editionRange, isIndexableCollection } from "@boguan/domain";
+import type { GetStaticPaths } from "astro";
+import HomeNewspaper from "../../components/HomeNewspaper.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { localizePath, localeRoutes, useTranslations } from "../../lib/i18n";
+import type { Locale } from "../../lib/i18n/config";
+import { PAGE_SIZE, pageCount, pagePath, searchHref } from "../../lib/sheet";
+import { homeJsonLd } from "../../lib/structured-data";
+import { site } from "../../lib/site";
+
+export const getStaticPaths = (() => localeRoutes()) satisfies GetStaticPaths;
+
+interface Props {
+	locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = useTranslations(locale);
+
+const db = openWebDatabase();
+const { items, total } = latestPosts(db, { limit: PAGE_SIZE });
+const [lead, ...latest] = items;
+const topics = tagIndex(db)
+	.filter((tag) => isIndexableCollection(tag.count))
+	.slice(0, 3);
+const years = postYears(db);
+const yearHref = years[0]
+	? localizePath(`/year/${years[0].year}`, locale)
+	: localizePath("/tags", locale);
+
+const totalPages = pageCount(total);
+
+const editionNumber = editionNumberAt(new Date()) ?? 1;
+const editionWindow = editionRange(editionNumber);
+const editionNew = editionWindow
+	? countPosts(db, {
+			firstSeenFrom: editionWindow.startIso,
+			firstSeenTo: editionWindow.endIso,
+		})
+	: 0;
+const description = t("meta.home.description");
+const nextHref = totalPages > 1 ? localizePath(pagePath("/", 2), locale) : undefined;
+---
+
+<BaseLayout
+	locale={locale}
+	title={t("meta.home.title")}
+	description={description}
+	chrome="bare"
+	nextHref={nextHref}
+	jsonLd={homeJsonLd(
+		items,
+		description,
+		t("home.latestIndex"),
+		new URL(searchHref(locale), site.url).href,
+		locale,
+	)}
+>
+	<HomeNewspaper
+		locale={locale}
+		items={latest}
+		lead={lead}
+		topics={topics}
+		page={1}
+		totalPages={totalPages}
+		nextHref={nextHref}
+		yearHref={yearHref}
+		editionNumber={editionNumber}
+		editionNew={editionNew}
+	/>
+</BaseLayout>

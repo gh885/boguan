@@ -10,13 +10,13 @@ trap 'exit 143' TERM
 
 CRAWL_FAILED=0
 log 'crawl start'
-if ! ./node_modules/.bin/vpx scripts/crawler/cli.ts --mode=incremental; then
+if ! bun apps/crawler/src/cli.ts --mode=incremental; then
   CRAWL_FAILED=1
   log '抓取失败：继续校验已有数据，本次任务最终返回失败供告警'
 fi
 
 log 'db check --fix --prune'
-./node_modules/.bin/vpx scripts/db/check.ts --fix --prune
+bun apps/ops/src/check.ts --fix --prune
 verify_database "$BOGUAN_DB"
 # PARTIAL/FAILED 不能因 CLI 返回 0 而被日常任务吞掉。
 if ! python3 - "$BOGUAN_DB" <<'PY'

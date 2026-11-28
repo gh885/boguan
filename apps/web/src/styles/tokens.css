@@ -1,0 +1,62 @@
+:root {
+  color-scheme: light dark;
+
+  --neutral-0: oklch(1 0 0);
+  --neutral-25: oklch(0.96 0.002 265);
+  --neutral-50: oklch(0.967 0.003 265);
+  --neutral-200: oklch(0.88 0.006 265);
+  --neutral-300: oklch(0.72 0.01 265);
+  --neutral-500: oklch(0.45 0.012 265);
+  --neutral-700: oklch(0.31 0.006 265);
+  --neutral-800: oklch(0.235 0.006 265);
+  --neutral-850: oklch(0.175 0.004 265);
+  --neutral-900: oklch(0.145 0.003 265);
+
+  --accent-300: oklch(0.72 0.14 258);
+  --accent-600: oklch(0.55 0.24 264);
+
+  --color-bg: light-dark(var(--neutral-0), var(--neutral-900));
+  --color-surface: light-dark(var(--neutral-0), var(--neutral-850));
+  --color-surface-muted: light-dark(var(--neutral-50), var(--neutral-800));
+  --color-border: light-dark(var(--neutral-200), var(--neutral-700));
+  --color-text-primary: light-dark(var(--neutral-800), var(--neutral-25));
+  --color-text-secondary: light-dark(var(--neutral-500), var(--neutral-300));
+  --color-accent: light-dark(var(--accent-600), var(--accent-300));
+
+  --font-sans:
+    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, Consolas, monospace;
+
+  --font-serif:
+    "Noto Serif SC", "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", "SimSun",
+    serif;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-3xl: clamp(1.625rem, 1.35rem + 1.1vw, 1.875rem);
+  --leading-tight: 1.25;
+  --leading-normal: 1.6;
+  --weight-normal: 400;
+  --weight-semibold: 600;
+  --tracking-tight: -0.015em;
+
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-xl: 2rem;
+
+  --radius-sm: 4px;
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+  --transition-fast: 120ms ease;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}

@@ -1,11 +1,13 @@
 # build output（生产 dist 是软链）
 /dist
+/apps/web/dist
 releases/
 .ops/
 __pycache__/
 
 # generated types
 .astro/
+/apps/web/.astro
 
 # dependencies
 node_modules/

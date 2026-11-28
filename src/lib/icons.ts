@@ -1,2 +1,0 @@
-/** Icon 组件承认的名字。集中在这里，页面与组件可以 import type 而不复制联合类型。 */
-export type IconName = "arrow-left" | "arrow-right" | "code" | "search";

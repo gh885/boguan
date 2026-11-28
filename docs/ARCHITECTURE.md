@@ -19,45 +19,45 @@
 
 ## 2. 系统形状
 
-两个进程，一个数据库文件。
+系统由两个常驻应用、一个运维入口和五个共享能力包组成，使用同一个 SQLite 数据库文件。
 
 ```text
-                 ┌──────────────────────────┐
-                 │  crawler（独立进程/定时） │
-                 │  调度 → 抓取 → 解析 → 归一 │
-                 └────────────┬─────────────┘
-                              │ 写入
-                              ▼
-                 ┌──────────────────────────┐
-                 │        SQLite            │
-                 │  posts / tags / FTS5     │
-                 └────────────┬─────────────┘
-                              │ 只读
-                              ▼
-                 ┌──────────────────────────┐
-                 │  web（Astro）            │
-                 │  静态列表页 + SSR 搜索   │
-                 └────────────┬─────────────┘
-                              │
-                              ▼
-                        用户浏览器 → 原文
+apps/crawler ──写入──▶ packages/database ──SQLite──▶ apps/web
+      │                       ▲                         │
+      ├── packages/domain     │                         └── Astro SSR（Node）
+      ├── packages/search ────┘
+      ├── packages/catalog
+      └── packages/body-store
+
+apps/ops ──维护──▶ packages/database
+    └────────────▶ packages/body-store
 ```
 
-### 为什么是两个进程
+### 工作区包
 
-- 抓取是**批量、慢、易失败、需要重试**的任务，生命周期与 HTTP 请求完全不同。
-- 抓取脚本崩溃时，网站必须继续在线。
-- 抓取完成后需要触发站点重建，这是一个明确的边界事件。
+| 包                    | 职责                                            | 技术栈                                                                                   |
+| --------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `apps/web`            | Astro 页面、组件、布局、i18n、SEO，只读查询     | Astro 7（SSR）、`@astrojs/node`、Bun 构建、CSS、`@astrojs/sitemap`、`@astrojs/rss`、x18n |
+| `apps/crawler`        | 传输、robots、适配器、抓取管道与持久化编排      | Bun、`fetch`、Cheerio、`rss-parser`、`robots-parser`、Drizzle                            |
+| `apps/ops`            | 数据库迁移、种子、fixture、对账、清洗与维护命令 | Bun、Drizzle Kit、Vite+ 命令入口                                                         |
+| `packages/catalog`    | 代码管理的公司、数据源、标签别名与采集规则配置  | TypeScript，无运行时依赖                                                                 |
+| `packages/domain`     | 纯业务规则与日期/时区能力                       | TypeScript、Luxon                                                                        |
+| `packages/search`     | 中文分词与 FTS 查询表达式                       | `@node-rs/jieba`、SQLite FTS5                                                            |
+| `packages/database`   | schema、迁移、读写查询与能力接口                | better-sqlite3、Drizzle ORM、SQLite FTS5                                                 |
+| `packages/body-store` | crawler 私有正文的压缩文件存储                  | `node:fs`、`node:zlib`                                                                   |
 
-因此：`crawler` 不 import 任何 Astro 代码（页面、组件、layout），`web` 不执行任何抓取。二者只通过数据库交汇。
-
-共享的是**纯逻辑**，边界写在 `AGENTS.md`，并由 `src/lib/db/guard.test.ts` 守着：
+### 依赖边界
 
 ```text
-crawler → src/lib/{db,domain,search}   纯函数与 schema，没有 Astro 依赖
-web     → src/lib/db/queries/**        只读查询，不许碰正文来源
-两边都  ✗ src/pages | src/components | src/layouts
+web      → database/web-read, domain, search
+crawler  → database/crawler, domain, search, catalog, body-store
+ops      → database/ops, domain, catalog, body-store
+database → domain, search
+search   → domain
+domain / catalog / body-store → 不依赖其他包
 ```
+
+`web` 与 `crawler` 不互相调用，只通过 SQLite 交汇。Web 仅获得只读数据库能力，不依赖正文存储；Crawler 与 Ops 分别依赖所需的写入、维护与正文能力。包的公开接口和依赖约束由各包维护。
 
 ---
 
@@ -103,7 +103,7 @@ web     → src/lib/db/queries/**        只读查询，不许碰正文来源
 
 ## 4. 数据模型
 
-已落地为 `src/lib/db/schema.ts`（Drizzle + SQLite），迁移在 `drizzle/`（`vpr db:generate` 生成、`vpr db:init` 应用）。约定：**时间一律存 ISO 8601 UTC 字符串**，表名列名用 snake_case。
+数据库 schema 由 `packages/database` 的 Drizzle 模型定义；迁移由 Drizzle Kit 生成、由 Ops 命令应用。约定：**时间一律存 ISO 8601 UTC 字符串**，表名列名用 snake_case。
 
 ```text
 companies          公司
@@ -111,7 +111,7 @@ companies          公司
 
 sources            一个公司的发布渠道（官网博客 / RSS / 平台账号）
   id, company_id, slug unique, name
-  adapter           对应 scripts/crawler/adapters/*，**解析形态的唯一真相源**
+  adapter           对应 apps/crawler 的 adapters，**解析形态的唯一真相源**
   list_url, timezone (默认 Asia/Shanghai), lang, priority
   enabled, watermark_at?, blocked_at?, blocked_reason?, last_run_at?, created_at
 
@@ -143,10 +143,10 @@ posts_fts          FTS5 虚拟表：title_tokens, body_tokens
 
 几条需要解释的取舍：
 
-- **正文不在这张库里**。它在 crawler 私有的文件目录 `data/bodies/<id>.txt.gz`（`src/lib/db/bodies.ts`），web 进程既没有表也没有路径。这不是洁癖：只要正文进了同一个 SQLite 文件，硬性规则 1 就只剩「查询层不去 select 它」这一条约定；移出去之后它变成结构性的。正文是**派生数据**——最坏情况能从源站重抓，所以它不参与事务、不参与迁移，崩溃只会留下孤文件，由 `vpr db:check --prune` 清掉。
+- **正文不在这张库里**。它在 crawler 私有的文件目录 `data/bodies/<id>.txt.gz`（`packages/body-store`），web 进程既没有表也没有路径。这不是洁癖：只要正文进了同一个 SQLite 文件，硬性规则 1 就只剩「查询层不去 select 它」这一条约定；移出去之后它变成结构性的。正文是**派生数据**——最坏情况能从源站重抓，所以它不参与事务、不参与迁移，崩溃只会留下孤文件，由 `vpr db:check --prune` 清掉。
 - **`posts_fts` 是 contentless 表**：只存 term 与位置，列值取回来是 `NULL`，`snippet()` / `highlight()` 不可用。因此搜索结果**只展示摘要**，不给命中上下文（§7）。
 - **索引与可见性解耦**：不变量只有一条——「每篇帖子都有一行索引」。`is_visible` / `duplicate_of_id` 在查询时过滤，抓取与去重都不动索引。否则一次「下架再上架」就会让帖子和索引脱钩，而抓取因为内容没变不会再写索引，只能等人工发现。
-- **`published_year` 单独存一列**：SQLite 没有时区函数，而 `/year/[year]` 要按 `sources.timezone` 取年且走索引，所以抓取时就算好落列；`published_at` 仍是 UTC。不变量：**改 `published_at` 必须同时改 `published_year`**，计算集中在 `src/lib/domain/date.ts`，由 `normalizePost` 单点调用。
+- **`published_year` 单独存一列**：SQLite 没有时区函数，而 `/year/[year]` 要按 `sources.timezone` 取年且走索引，所以抓取时就算好落列；`published_at` 仍是 UTC。不变量：**改 `published_at` 必须同时改 `published_year`**，计算集中在 `packages/domain`，由 `normalizePost` 单点调用。
 - **`summary` 带 CHECK 约束**（`length ≤ 200`）：硬性规则 1 的底线不靠自觉，超了直接写不进库。**200 字是规则上限，不是展示目标**：卡片上按两行裁（`line-clamp`），列表节奏不该被摘要长度带跑。
 - **`reading_minutes` / `has_code` 是派生元数据**：前者由正文字符数估算，后者由详情页 HTML 是否含 `<pre>` / `<code>` 判断，都不包含正文片段。它们只服务于卡片上的「N 分钟」「含代码」与筛选，不参与排序。列表页拿不到正文时 `has_code` 保持 NULL（不知道就不显示），不伪装成 false。已有库用 `vpr db:metrics` 从 crawler 私有正文文件回填；这个脚本与 `db:check` 一样只读 crawler 侧文件，web 没有访问路径。
 - **`title_norm`** 是跨源去重的比对键（NFKC + 小写 + 只留字母数字汉字），配 `(company_id, title_norm)` 索引，去重不用全表扫。
@@ -176,7 +176,7 @@ posts_fts          FTS5 虚拟表：title_tokens, body_tokens
 调度 → fetchPolite → 适配器解析 → 归一 → 写入（正文文件 + 库 + FTS）→ 收尾（去重）
 ```
 
-`fetchPolite(url)`（`scripts/crawler/fetch.ts`）是**唯一**能发 HTTP 的地方。限速、robots、条件请求、重试、编码全在这一层，适配器只负责把 HTML/JSON 变成结构化字段。合规因此是结构保证的，不靠每个适配器自觉。
+`fetchPolite(url)`（crawler 的传输模块）是**唯一**能发 HTTP 的地方。限速、robots、条件请求、重试、编码全在这一层，适配器只负责把 HTML/JSON 变成结构化字段。合规因此是结构保证的，不靠每个适配器自觉。
 
 ### 传输层
 
@@ -213,7 +213,7 @@ interface SourceAdapter {
   由 `Detail.title` 补齐；对「只给 URL」的条目，管道有一个快路径：库里已有正文就算未变、一次请求都不发，
   否则 sitemap 当列表意味着每天重抓全站详情页。也因此 `--max-pages` 在增量模式下不约束这种列表
   （切片之间不发请求；它只在回填时限制要抓多少详情页）。见 `docs/SOURCES.md`。
-- **清洗规则只写一份**（`src/lib/domain/curate.ts`）：抓取入库时用一次，`vpr db:curate` 对存量数据再跑一遍。
+- **清洗规则只写一份**（`packages/domain` 的清洗规则）：抓取入库时用一次，`vpr db:curate` 对存量数据再跑一遍。
   两件事——剥标题末尾的站点名后缀（只有后缀里含公司名才剥，`｜归因篇` 这种真副标题保留），
   以及把非文章页（活动报名、团队介绍）标成 `is_visible = false` + `hidden_reason = 'non-article'`。
   下架不是删除：页面/搜索/sitemap 一起干净，数据留着，改判只改一行。
@@ -248,10 +248,10 @@ interface SourceAdapter {
 1. **源站标签**先按 `tag_aliases.raw` 查映射；
 2. 查不到就按**中文名**找已有标签（源站常有 `big-data` 与 `da-shu-ju` 两个 slug 指同一个「大数据」），找到就补一条别名，不新开标签页；
 3. 名字也没有的原始标签**不入库**，记进运行日志（`未映射的源站标签：…`）等人工补映射；
-4. 一个源站标签都没解析出来时，退到 `scripts/crawler/rules/tags.ts` 的关键词规则（`origin = 'rule'`）：标题命中直接算数，正文要出现 3 次以上，每篇最多 3 个；
+4. 一个源站标签都没解析出来时，退到 `packages/catalog` 的关键词标签规则 的关键词规则（`origin = 'rule'`）：标题命中直接算数，正文要出现 3 次以上，每篇最多 3 个；
 5. 人工干预写 `origin = 'manual'`，自动流程只删非 manual 的标签关联。
 
-`/tags` 的分组（人工智能、数据与检索、架构与稳定性……）是**展示层映射**，写在 `src/lib/domain/tag-group.ts`，不新增数据库列；未知标签落到「其他」，不会因为新增一个标签而消失。
+`/tags` 的分组（人工智能、数据与检索、架构与稳定性……）是**展示层映射**，写在 `packages/domain` 的标签分组规则，不新增数据库列；未知标签落到「其他」，不会因为新增一个标签而消失。
 
 ### 失败与可观测
 
@@ -295,7 +295,7 @@ interface SourceAdapter {
 既过不了唯一 `title` / `description` 那条，也是典型的重复内容。一期刊得多就分页
 （`/edition/[n]/page/[page]`），与首页续版同构。
 
-实现：纯计算在 `src/lib/domain/edition.ts`（`editionNumber` / `editionDay` / `editionRange` /
+实现：纯计算在 `packages/domain`（`editionNumber` / `editionDay` / `editionRange` /
 `editionNumberAt`），查询在 `queries/posts.ts` 的 `postsByEdition`（复用
 `ListFilters.firstSeenFrom/To`）与 `editionSummaries`。期界必须用
 `startOfDayInTimeZone(day, "Asia/Shanghai")`，**不要用 UTC 零点**——不然北京时间每天 20:00
@@ -305,11 +305,11 @@ interface SourceAdapter {
 但 `/edition/[n]` 照样存在——期号的连续性由路由自己保证，目录是给人翻的，不是日历。
 
 - 每日抓取完成后触发一次重建；列表页最多滞后一天，可接受。
-- 搜索是唯一必须动态渲染的页面，因此站点需要 Node 适配器（而非纯静态托管）。
+- 搜索是唯一必须动态渲染的页面，因此站点需要 Bun adapter 与按需 SSR。
 - 报纸与目录页用 `BaseLayout` 的 `chrome="bare"`：隐藏侧栏与移动栏，但 `<head>`、canonical、hreflang 仍由 layout 统一维护；页面自己提供顶部导航。不要为它复制一份 head。
 - **筛选只能走 SSR**：静态页读不到 `?company=&tag=&year=`。所以「筛选组合页」与搜索一样是 SSR + `noindex`，不要把筛选做成静态路径组合（数量爆炸且都是薄页面）。
 - 筛选状态全部在 URL 查询参数里（硬性规则 5），不引入客户端状态。
-- **页面只有一个数据库入口**：`src/lib/db/queries`。页面与 endpoint 不许直接 `openReadonlyDatabase`（`guard.test.ts` 守），查找与过滤规则也就不会各写一份。
+- **页面只有一个数据库入口**：`@boguan/database/web-read`。页面与 endpoint 不许直接开连接（根目录的 `architecture.test.ts` 守这条边界），查找与过滤规则也就不会各写一份。
 - **CI 构建用固定数据集**：`vpr db:fixture` 生成 `data/fixture.db`（4 条覆盖「有/无发布时间、两家公司」），
   `BOGUAN_DB=data/fixture.db vpr build`。构建不依赖网络与源站可用性；本地开发则用真实抓取库。
 
@@ -321,7 +321,7 @@ interface SourceAdapter {
 
 中文分词是这里唯一的难点：SQLite FTS5 默认的 `unicode61` 分词器不切中文，整段中文会被当成单个 token。
 
-**方案**：入库前切词、以空格连接写入 FTS5；查询时对关键词做同样切分。分词器是 `@node-rs/jieba`（napi-rs 预编译，Bun 与 Node 都能用；`nodejieba` 是 node-gyp 原生模块，在 Bun 上不可靠），代码在 `src/lib/search/tokenize.ts`，crawler 与 SSR 搜索共用。索引与查询必须走同一个函数，否则 token 对不上。
+**方案**：入库前切词、以空格连接写入 FTS5；查询时对关键词做同样切分。分词器是 `@node-rs/jieba`（napi-rs 预编译，适用于 Bun 运行时），代码由 `@boguan/search` 包提供，crawler 与 SSR 搜索共用。索引与查询必须走同一个函数，否则 token 对不上。
 
 ```ts
 segment("多级缓存架构实践"); // "多级 缓存 架构 实践"
@@ -372,12 +372,12 @@ select rowid from posts_fts where posts_fts match 'title_tokens : ("缓存")'
 7. **薄标签页 `noindex, follow`**：文章数 < 3 的标签页照样生成（老外链不断），但不进 sitemap、
    也不从 `/tags` 与页脚导航链过去。556 篇语料里 420 个标签有 299 个只有 1 篇，占 sitemap 七成，
    而只出现在薄标签里、没有别的标签兜底的文章只有 3 篇——门槛几乎不损失可达性。
-   门槛常量在 `src/lib/tags.ts`，页面与 sitemap 用的是同一个。
+   门槛常量在 `@boguan/domain` 的薄标签门槛，页面与 sitemap 用的是同一个。
 8. 多语言页面互相声明：每页输出各语言的 `hreflang` 与 `x-default`，canonical 指自己。见 §9。
 9. 站内 feed（`/rss.xml`、`/en/rss.xml`）只放**标题 + 摘要 + 原文链接**，与页面同一套内容边界（硬性规则 1）；`BaseLayout` 输出 `<link rel="alternate" type="application/rss+xml">` 便于订阅发现。共享页脚（`PaperFooter.astro`）**不放可见的订阅链接**：feed 是免费的纯技术输出，不构成经营性或收费服务，界面上的「订阅」措辞在备案期容易被误读，发现路径只留 head 的 alternate link，读者与抓取器照样能取到。
 10. **薄期页 `noindex, follow`**：一期新增 < 3 篇的期页照样生成（期号不能断），但不进 sitemap。
     日报必然有「今天只来了一篇」的薄日子，这类页面不该占索引位；可索引的是较厚的期与 `/editions`
-    目录。门槛常量在 `src/lib/domain/edition.ts` 的 `EDITION_MIN_POSTS`，页面与 sitemap 共用。
+    目录。门槛常量在 `packages/domain` 的 `EDITION_MIN_POSTS`，页面与 sitemap 共用。
 
 ---
 
@@ -387,7 +387,7 @@ select rowid from posts_fts where posts_fts match 'title_tokens : ("缓存")'
 
 ### 语言与 URL
 
-- 语言清单是唯一事实源：`src/lib/i18n/config.ts` 与 `astro.config.mjs` 的 `i18n.locales` 必须一致（加语言时两处一起改）。
+- 语言清单的唯一事实源是 `apps/web/src/lib/i18n/config.ts`：`astro.config.mjs` 的 i18n 与 sitemap 配置都从它取值，加语言只改这一处（文案另加一份 messages）。
 - 默认语言不带前缀，其它语言带前缀，**同一份内容共享 slug**：
 
 | URL                           | 语言  |
@@ -395,25 +395,25 @@ select rowid from posts_fts where posts_fts match 'title_tokens : ("缓存")'
 | `/`、`/company/meituan`       | zh-CN |
 | `/en/`、`/en/company/meituan` | en    |
 
-- **一份页面 × 所有语言**：所有页面都写在 `src/pages/[...lang]/` 下，用 `localeRoutes()` 生成 `getStaticPaths`，语言只当参数：
+- **一份页面 × 所有语言**：所有页面都写在 `apps/web/src/pages/[...lang]/` 下，用 `localeRoutes()` 生成 `getStaticPaths`，语言只当参数：
 
-  | 文件                                       | 生成的 URL                                |
-  | :----------------------------------------- | :---------------------------------------- |
-  | `src/pages/[...lang]/index.astro`          | `/`、`/en/`                               |
-  | `src/pages/[...lang]/company/[slug].astro` | `/company/meituan`、`/en/company/meituan` |
+  | 文件                                                | 生成的 URL                                |
+  | :-------------------------------------------------- | :---------------------------------------- |
+  | `apps/web/src/pages/[...lang]/index.astro`          | `/`、`/en/`                               |
+  | `apps/web/src/pages/[...lang]/company/[slug].astro` | `/company/meituan`、`/en/company/meituan` |
 
   默认语言用 `lang: undefined` 生成无前缀路径，其它语言用 `lang: '<prefix>'`，与 `prefixDefaultLocale: false` 对齐。
 
-- **不为某种语言复制页面文件**。Astro 文档也给了 `src/pages/en/*.astro` 的复制方案，但那样每个页面都得复制数据查询与 `getStaticPaths`，语言越多越容易漂移；而 hreflang 是按路径前缀推的，一漏就是指向 404 的死链。
+- **不为某种语言复制页面文件**。Astro 文档也给了 `apps/web/src/pages/en/*.astro` 的复制方案，但那样每个页面都得复制数据查询与 `getStaticPaths`，语言越多越容易漂移；而 hreflang 是按路径前缀推的，一漏就是指向 404 的死链。
 - hreflang 只声明本页真正生成过的语言（`BaseLayout` 的 `alternateLocales`）。「所有页面都在 `[...lang]/` 下」由 `i18n.test.ts` 的目录约定测试守护。
 - 语言切换是普通 `<a>` 链接，路径由 `localizePath()` / `alternateLinks()` 算出，不引入客户端状态。
 
 ### 取词
 
-- 唯一的取词入口是 `useTranslations(locale)` 返回的 `t('key')`；文案在 `src/lib/i18n/messages/{locale}.json`，key 用扁平 `area.name` 写法。
+- 唯一的取词入口是 `useTranslations(locale)` 返回的 `t('key')`；文案在 `apps/web/src/lib/i18n/messages/{locale}.json`，key 用扁平 `area.name` 写法。
 - **页面、组件里不写裸字符串**：硬编码的界面文案 CI 管不了，但会在加语言时全部漏掉。
 - 缺词不静默：默认语言也没有该 key 时 `t()` 直接抛错让构建失败；其它语言缺 key 回退到 zh-CN（同步由 `i18n:check` 拦截）。
-- 品牌名「博观」是常量（`src/lib/site.ts`），不进 messages。
+- 品牌名「博观」是常量（`apps/web/src/lib/site.ts`），不进 messages。
 
 ### 内容语言
 
@@ -424,7 +424,7 @@ select rowid from posts_fts where posts_fts match 'title_tokens : ("缓存")'
 ### 工具
 
 - `x18n`（devDependency，只做校验，不进运行时）：`vp run i18n:check` 检查缺 key、漏翻、未使用 key，CI 必跑；`vp run i18n:ui` 起浏览器界面批量改文案。
-- 语言相关的单元测试在 `src/lib/i18n/i18n.test.ts`（key 对齐、占位符一致、路径前缀互转）。
+- 语言相关的单元测试在 Web 包的 i18n 契约测试（key 对齐、占位符一致、路径前缀互转）。
 
 > **为什么默认语言不带前缀**：中文站的主场是 `/`，也是所有外链与分享的入口。代价是将来更换默认语言需要处理 301，可以接受。
 
@@ -443,11 +443,11 @@ select rowid from posts_fts where posts_fts match 'title_tokens : ("缓存")'
 
 ### 三层，各管各的
 
-| 层   | 位置                                                  | 谁用                     |
-| :--- | :---------------------------------------------------- | :----------------------- |
-| 原语 | `src/styles/tokens.css` 的 `--neutral-*`/`--accent-*` | 只有令牌层，组件不直接用 |
-| 语义 | 同文件的 `--color-*`                                  | 组件只引用这一层         |
-| 组件 | `.astro` 里的 `<style>`                               | 单个组件内部，作用域隔离 |
+| 层   | 位置                                                           | 谁用                     |
+| :--- | :------------------------------------------------------------- | :----------------------- |
+| 原语 | `apps/web/src/styles/tokens.css` 的 `--neutral-*`/`--accent-*` | 只有令牌层，组件不直接用 |
+| 语义 | 同文件的 `--color-*`                                           | 组件只引用这一层         |
+| 组件 | `.astro` 里的 `<style>`                                        | 单个组件内部，作用域隔离 |
 
 ### 亮/暗只有一套机制
 
@@ -460,7 +460,7 @@ select rowid from posts_fts where posts_fts match 'title_tokens : ("缓存")'
 ### 颜色与对比度
 
 - 色值用 `oklch()`，中性色相固定 265、强调色相固定 252，两套主题不换色相。
-- 每个角色都有亮/暗两个值，对比度由 `src/styles/tokens.test.ts` 实测（正文 ≥ 4.5:1，边框/分隔 ≥ 1.4:1）。改色后不达标会让测试直接失败，不靠自觉。
+- 每个角色都有亮/暗两个值，对比度由 Web 包的令牌守卫测试 实测（正文 ≥ 4.5:1，边框/分隔 ≥ 1.4:1）。改色后不达标会让测试直接失败，不靠自觉。
 - 强调色只承担「可交互」一个含义，不拿来做静态装饰；一个视图只强调一个主动作。
 
 ### 排版
@@ -471,11 +471,11 @@ select rowid from posts_fts where posts_fts match 'title_tokens : ("缓存")'
 
 ### 报纸纸面：首页、索引页与目录页
 
-首页是一张全宽的「技术晨报」，由 `src/components/HomeNewspaper.astro` 与 `src/styles/home.css` 实现。纸面底层抽在 `src/styles/paper.css`：页面级 `--home-*` 语义色、纸纹、检索框、主题/语言控件与共享页脚 `PaperFooter.astro`。报纸纸面通过 `light-dark()` 跟随全站亮/暗主题：亮色是暖纸 + 墨色 + 朱砂，暗色是暖炭黑 + 奶油 + 琥珀红；不另做一套布局。共享页脚底部固定展示 ICP 备案号（法规要求，见 `src/lib/site.ts` 的 `icp`）。
+首页是一张全宽的「技术晨报」，由 `apps/web/src/components/HomeNewspaper.astro` 与 `apps/web/src/styles/home.css` 实现。纸面底层抽在 `apps/web/src/styles/paper.css`：页面级 `--home-*` 语义色、纸纹、检索框、主题/语言控件与共享页脚 `PaperFooter.astro`。报纸纸面通过 `light-dark()` 跟随全站亮/暗主题：亮色是暖纸 + 墨色 + 朱砂，暗色是暖炭黑 + 奶油 + 琥珀红；不另做一套布局。共享页脚底部固定展示 ICP 备案号（法规要求，见 `apps/web/src/lib/site.ts` 的 `icp`）。
 
-标签、公司、年份、搜索与首页分页共用 `src/components/IndexSheet.astro` 与 `src/styles/index-sheet.css`：报眉（桌面吸顶）、版头（kicker + 衬线标题 + 真实统计）、筛选条（链接驱动，无 JS）、两栏目录、右栏相关切片与分页。报眉与版头抽成 `PaperRunningHead.astro` / `PaperSectionHead.astro`，目录页复用。版头换、目录不换；静态切片页保留唯一 canonical，任何带筛选的组合与搜索页都是 `noindex`。索引页每页 20 条；`/page/[n]` 是首页续版，保持 10 条；搜索无查询时展示最近 8 条作为检索着陆页。首页与索引页都用 `chrome="bare"`，由报眉承担导航、检索、主题与语言切换。
+标签、公司、年份、搜索与首页分页共用 `apps/web/src/components/IndexSheet.astro` 与 `apps/web/src/styles/index-sheet.css`：报眉（桌面吸顶）、版头（kicker + 衬线标题 + 真实统计）、筛选条（链接驱动，无 JS）、两栏目录、右栏相关切片与分页。报眉与版头抽成 `PaperRunningHead.astro` / `PaperSectionHead.astro`，目录页复用。版头换、目录不换；静态切片页保留唯一 canonical，任何带筛选的组合与搜索页都是 `noindex`。索引页每页 20 条；`/page/[n]` 是首页续版，保持 10 条；搜索无查询时展示最近 8 条作为检索着陆页。首页与索引页都用 `chrome="bare"`，由报眉承担导航、检索、主题与语言切换。
 
-`/tags`、`/companies` 用 `DirectorySheet.astro` 与 `src/styles/directory.css` 做分组目录，共享同一套报眉、版头与页脚：公司按收录数排成索引，标签按主题分组并在顶部提供分组跳转；标签目录只列可索引标签。
+`/tags`、`/companies` 用 `DirectorySheet.astro` 与 `apps/web/src/styles/directory.css` 做分组目录，共享同一套报眉、版头与页脚：公司按收录数排成索引，标签按主题分组并在顶部提供分组跳转；标签目录只列可索引标签。
 
 > 基线：`light-dark()` 与 `oklch()` 需要 2024 年后的浏览器（Chrome 123 / Safari 17.5 / Firefox 120）。本站面向开发者，不再为更老的浏览器降级。
 
@@ -486,7 +486,7 @@ select rowid from posts_fts where posts_fts match 'title_tokens : ("缓存")'
 ```
 阿里云 ECS（Ubuntu 24.04，华北2，2C2G）
 ├── Caddy            自动 HTTPS，反代
-├── web (Node)       独立低权限账号，静态产物 + 搜索 SSR
+├── web (Bun)       独立低权限账号，静态产物 + 搜索 SSR
 └── systemd timers  每日抓取、校验、备份、构建与发布；定期探活
 ```
 

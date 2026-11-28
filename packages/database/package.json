@@ -1,0 +1,21 @@
+{
+  "name": "@boguan/database",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./web-read": "./src/web-read.ts",
+    "./crawler": "./src/crawler.ts",
+    "./ops": "./src/ops.ts"
+  },
+  "dependencies": {
+    "@boguan/domain": "workspace:*",
+    "@boguan/search": "workspace:*",
+    "better-sqlite3": "^13.0.3",
+    "drizzle-orm": "^0.45.4"
+  },
+  "devDependencies": {
+    "@boguan/body-store": "workspace:*",
+    "@types/better-sqlite3": "^9.6.0"
+  }
+}

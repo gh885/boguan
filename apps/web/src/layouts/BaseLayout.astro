@@ -1,0 +1,154 @@
+---
+import { alternateLinks, localizePath, resolveLocale, useTranslations } from "../lib/i18n";
+import { defaultLocale, locales, ogLocales, type Locale } from "../lib/i18n/config";
+import { site } from "../lib/site";
+import "../styles/tokens.css";
+import "../styles/base.css";
+
+interface Props {
+	title: string;
+	description: string;
+	noindex?: boolean;
+	locale?: Locale;
+	alternateLocales?: readonly Locale[];
+	prevHref?: string;
+	nextHref?: string;
+	jsonLd?: Record<string, unknown>;
+}
+
+const {
+	title,
+	description,
+	noindex = false,
+	locale = resolveLocale(Astro.currentLocale),
+	alternateLocales = locales,
+	prevHref,
+	nextHref,
+	jsonLd,
+} = Astro.props;
+
+const t = useTranslations(locale);
+const pageTitle = title.endsWith(site.name) ? title : `${title} · ${site.name}`;
+const pathname = Astro.url.pathname;
+const canonical = new URL(pathname, site.url).href;
+const alternates = alternateLinks(pathname, alternateLocales);
+const xDefault = alternates.find((alternate) => alternate.locale === defaultLocale);
+const robots = noindex ? "noindex, follow" : "index, follow";
+---
+
+<!doctype html>
+<html lang={locale}>
+	<head>
+		<meta charset="utf-8" />
+		<script is:inline>
+			(() => {
+				const root = document.documentElement;
+				root.dataset.js = "true";
+				try {
+					const stored = localStorage.getItem("boguan:theme");
+					if (stored === "light" || stored === "dark") root.dataset.theme = stored;
+				} catch {
+				}
+			})();
+		</script>
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="color-scheme" content="light dark" />
+		<title>{pageTitle}</title>
+		<meta name="description" content={description} />
+		<link rel="canonical" href={canonical} />
+		{
+			alternates.map((alternate) => (
+				<link
+					rel="alternate"
+					hreflang={alternate.hreflang}
+					href={new URL(alternate.href, site.url).href}
+				/>
+			))
+		}
+		{xDefault && (
+			<link rel="alternate" hreflang="x-default" href={new URL(xDefault.href, site.url).href} />
+		)}
+		<link
+			rel="alternate"
+			type="application/rss+xml"
+			title={t("feed.title")}
+			href={new URL(localizePath("/rss.xml", locale), site.url).href}
+		/>
+		{prevHref && <link rel="prev" href={new URL(prevHref, site.url).href} />}
+		{nextHref && <link rel="next" href={new URL(nextHref, site.url).href} />}
+		<meta name="robots" content={robots} />
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content={site.name} />
+		<meta property="og:title" content={pageTitle} />
+		<meta property="og:description" content={description} />
+		<meta property="og:url" content={canonical} />
+		<meta property="og:image" content={`${site.url}/og.png`} />
+		<meta property="og:image:type" content="image/png" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta property="og:image:alt" content={t("meta.ogAlt")} />
+		<meta property="og:locale" content={ogLocales[locale]} />
+		{
+			alternates
+				.filter((alternate) => alternate.locale !== locale)
+				.map((alternate) => (
+					<meta property="og:locale:alternate" content={ogLocales[alternate.locale]} />
+				))
+		}
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content={pageTitle} />
+		<meta name="twitter:description" content={description} />
+		<meta name="twitter:image" content={`${site.url}/og.png`} />
+		<meta name="twitter:image:alt" content={t("meta.ogAlt")} />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" href="/favicon.ico" />
+		<meta name="generator" content={Astro.generator} />
+		{jsonLd && (
+			<script
+				type="application/ld+json"
+				set:html={JSON.stringify(jsonLd).replace(/</g, "\\u003c")}
+			/>
+		)}
+	</head>
+
+	<body>
+		<a class="skip-link" href="#main">{t("nav.skipToContent")}</a>
+
+		<main id="main" class="main">
+			<div class="main-inner">
+				<slot />
+			</div>
+		</main>
+		<script>
+			import { createRumConfig } from "../lib/rum";
+			import { siteHostnames } from "../lib/site";
+
+			if (
+				import.meta.env.PROD &&
+				location.protocol === "https:" &&
+				siteHostnames.some((hostname) => hostname === location.hostname) &&
+				navigator.doNotTrack !== "1"
+			) {
+				Object.assign(window, { __rum: createRumConfig() });
+				const sdk = document.createElement("script");
+				sdk.src = "https://sdk.rum.aliyuncs.com/v2/browser-sdk.js";
+				sdk.async = true;
+				sdk.crossOrigin = "anonymous";
+				sdk.referrerPolicy = "no-referrer";
+				document.body.append(sdk);
+			}
+		</script>
+	</body>
+</html>
+
+<style>
+
+	.main {
+		min-height: 100dvh;
+		width: 100%;
+	}
+
+	.main-inner {
+		width: 100%;
+	}
+</style>

@@ -1,0 +1,55 @@
+import { site } from "./site";
+
+export const rumEndpoint =
+  "https://proj-xtrace-f668d8d49a60567a472c54a97f4342ca-cn-hangzhou.cn-hangzhou.log.aliyuncs.com/rum/web/v2?workspace=default-cms-1236451801020363-cn-hangzhou&service_id=c6aa46364r@b7994f83a305c3105f5d1";
+
+export function rumUrl(value: string): string {
+  return value.split(/[?#]/, 1)[0] ?? "";
+}
+
+export function sanitizeRumPayload(value: unknown): unknown {
+  if (typeof value === "string") {
+    return value.replace(/(?:https?:)?\/\/[^\s<>"']+/gi, (url) => rumUrl(url));
+  }
+  if (Array.isArray(value)) return value.map(sanitizeRumPayload);
+  if (value === null || typeof value !== "object") return value;
+
+  const result: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (/title|snapshot|body|header|cookie|authorization|password|token|params|query/i.test(key)) {
+      continue;
+    }
+    if (typeof entry === "string" && /url|referrer|href|^(name|file)$/.test(key)) {
+      result[key] = rumUrl(entry);
+    } else {
+      result[key] = sanitizeRumPayload(entry);
+    }
+  }
+  return result;
+}
+
+export function createRumConfig() {
+  return {
+    endpoint: rumEndpoint,
+    env: "prod",
+    spaMode: false,
+    sessionConfig: { sampleRate: 1, sampling: 100, storage: "localStorage" },
+    remoteConfig: { enable: false },
+    collectors: {
+      perf: true,
+      webVitals: true,
+      api: false,
+      staticResource: true,
+      jsError: true,
+      consoleError: false,
+      action: false,
+      click: false,
+    },
+    tracing: false,
+    replay: false,
+    profiling: false,
+    parseViewName: (url: string) => new URL(url, site.url).pathname,
+    parseResourceName: rumUrl,
+    beforeReport: sanitizeRumPayload,
+  };
+}

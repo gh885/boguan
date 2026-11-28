@@ -1,6 +1,6 @@
 # 数据源实测记录
 
-每接入一个源都在这里留一行结论。**没跑通 `vpr crawl --dry-run` 的源不要进 `SEED_SOURCES`**：
+每接入一个源都在这里留一行结论。**没跑通 `vpr crawl --dry-run` 的源不要进 `@boguan/catalog` 的 `SOURCES`**：
 `enabled = true` 意味着每天都会被请求，猜错一次就是每天骚扰人家一次。
 
 抓取规则见 [`ARCHITECTURE.md`](ARCHITECTURE.md) §5；合规底线见 `AGENTS.md` 硬性规则 2。
@@ -12,7 +12,7 @@
 | 公司 | 源                                                      | 形态                      | robots                                                                       | 时间来源                                                               | 正文来源                                                     | 标签                                                        | 每次请求                        |
 | :--- | :------------------------------------------------------ | :------------------------ | :--------------------------------------------------------------------------- | :--------------------------------------------------------------------- | :----------------------------------------------------------- | :---------------------------------------------------------- | :------------------------------ |
 | 美团 | `https://tech.meituan.com/rss.xml`（`meituan-rss`）     | RSS 2.0                   | `/robots.txt` 返回 SPA 兜底 HTML → 视为无规则（`allow-all (html-fallback)`） | **item 里没有 pubDate**，从 URL 路径 `/YYYY/MM/DD/` 取                 | `content:encoded` 带全文，**不进详情页**（`detail: 'none'`） | 无 → 关键词规则                                             | 1                               |
-| 得物 | `https://tech.dewu.com/`（`dewu`，`?page=N`）           | Nuxt SSR                  | 无 `robots.txt`（404）→ `allow-all`                                          | 列表/详情都带 `2026-07-13 17:07:05`（无时区）→ 按 `Asia/Shanghai` 解释 | 详情页 `#articleCont`（markdown 渲染）                       | 8 个中文分类 → `SEED_TAG_ALIASES` 映射到已有标签            | 1 页 + 每篇 1 次详情            |
+| 得物 | `https://tech.dewu.com/`（`dewu`，`?page=N`）           | Nuxt SSR                  | 无 `robots.txt`（404）→ `allow-all`                                          | 列表/详情都带 `2026-07-13 17:07:05`（无时区）→ 按 `Asia/Shanghai` 解释 | 详情页 `#articleCont`（markdown 渲染）                       | 8 个中文分类 → `TAG_ALIASES` 映射到已有标签                 | 1 页 + 每篇 1 次详情            |
 | 有赞 | `https://tech.youzan.com/sitemap-posts.xml`（`youzan`） | Ghost sitemap + HTML 详情 | 解析成功：`Disallow: /ghost/`、有 sitemap                                    | 详情页 `28 Oct 2022`（英文、无时区）→ 按 `Asia/Shanghai` 解释          | 详情页 `.post-content`（约 6 千字/篇）                       | `<article class="post tag-…">` 里的 slug + 侧栏导航的中文名 | 1（sitemap）+ 新文章各 1 次详情 |
 
 ### 列表入口为什么从翻页换成 sitemap（有赞）
@@ -61,7 +61,7 @@ batch #13 backfill --max-pages=0   dewu   197 条（197 新增 / 0 失败），2
 | 得物的越界页返回 200 + 空列表                          | 不是 404，直接 `items.length === 0 → break` 会让选择器失效被静默吞掉。约定：**第 1 页空就抛错，后面的空页当作到底**（`dewu.ts`）       |
 | 有赞回填 351 篇要 342 次请求还是 700 次                | 拿 canonical URL（去掉结尾斜杠）去抓详情页会 301 回来，等于每篇多一次请求。抓取用列表给的原始 URL，canonical 只做身份（`pipeline.ts`） |
 | sitemap 里混着活动页、招聘页                           | `技术活动 \| …（已结束）`、`团队介绍` 这类页面也在 sitemap 里，正文只有几十字。当前按失败跳过（2 条），是否整类排除见 ARCHITECTURE §13 |
-| 有赞标签出现 `bigdata` / `da-shu-ju` / `big-data` 三个 | 源站标签云里英语与拼音写法并存。按中文名归并（`da-shu-ju`→大数据），英语写法进 `SEED_TAG_ALIASES` 人工补                               |
+| 有赞标签出现 `bigdata` / `da-shu-ju` / `big-data` 三个 | 源站标签云里英语与拼音写法并存。按中文名归并（`da-shu-ju`→大数据），英语写法进 `TAG_ALIASES` 人工补                                    |
 | 美团时间全是「前一天 16:00Z」                          | 正常：URL 里只有日期、没有时刻，按 `Asia/Shanghai` 当 00:00 解释 → UTC 前一天 16:00                                                    |
 | 增量模式第一天就往前翻了几页历史                       | 阈值「连续 10 条」大于每页条数（5），永远达不到。改成「**整页都早于水位**就停」，与页大小无关                                          |
 
@@ -98,9 +98,9 @@ batch #13 backfill --max-pages=0   dewu   197 条（197 新增 / 0 失败），2
 ## 接入一个新源的清单
 
 1. `curl` 一下 `/robots.txt`，确认目标路径没被 `Disallow`；
-2. 写适配器（`scripts/crawler/adapters/*.ts`），声明 `capabilities`；
+2. 写适配器（`apps/crawler/src/adapters/*.ts`），声明 `capabilities`；
 3. `vpr crawl --dry-run --source=<slug>`：看标题、时间（含源串）、摘要字数、标签、详情页正文长度；
-4. 在 `SEED_SOURCES` 加一条，`vpr db:seed`；
+4. 在 `@boguan/catalog` 的 `SOURCES` 加一条，`vpr db:seed`；
 5. `vpr crawl --mode=backfill --max-pages=1`：确认入库 → 再跑一次确认幂等（`inserted/updated` 为 0）；
 6. `vpr db:check` 全绿后，再考虑 `--max-pages=0` 全量回填；
 7. 把结论补进上面的表。

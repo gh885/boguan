@@ -56,11 +56,11 @@ https://boguan.org.cn
 | 框架            | Astro 7（静态优先，按需 SSR）     | ✅ 已就绪     |
 | 语言            | TypeScript（strict）              | ✅ 已就绪     |
 | 运行时 / 包管理 | Bun 1.4                           | ✅ 已就绪     |
-| 工具链          | Vite+（`vp` / `vpr` / `vpx`）     | ✅ 已就绪     |
+| 工具链          | Vite+（`vp` / `vpr`）             | ✅ 已就绪     |
 | 数据库          | SQLite                            | ✅ 已就绪     |
 | ORM             | Drizzle                           | ✅ 已就绪     |
 | 全文检索        | SQLite FTS5 + 中文分词（jieba）   | ✅ 查询可用   |
-| 多语言          | `src/lib/i18n` + `x18n` 文案校验  | ✅ 已就绪     |
+| 多语言          | `x18n` 文案校验（zh-CN + en）     | ✅ 已就绪     |
 | 样式            | 原生 CSS + 设计令牌，亮/暗主题    | ✅ 已就绪     |
 | 抓取管道        | 独立 TS 进程（不跑在 Web 进程里） | ✅ 两家源跑通 |
 | 部署            | 单台 ECS + systemd + Caddy        | ✅ 已上线     |
@@ -75,27 +75,25 @@ https://boguan.org.cn
 
 ```text
 boguan/
-├── public/                 # 静态资源（favicon 等）
-├── scripts/
+├── apps/
 │   ├── crawler/            # 抓取管道：fetch/robots → adapters → normalize → pipeline
-│   └── db/                 # init / seed / check / metrics
-├── drizzle/                # SQL 迁移（FTS5 为手写迁移）
+│   ├── ops/                # init / seed / check / curate / metrics / fixture
+│   └── web/                # Astro 站点：pages / components / layouts / lib / styles / public
+├── packages/
+│   ├── body-store/         # crawler 私有正文文件
+│   ├── catalog/            # 采集配置
+│   ├── database/           # schema、迁移（drizzle/）与按能力分入口的查询
+│   ├── domain/             # 纯业务规则
+│   └── search/             # 分词与 FTS 查询表达式
 ├── data/                   # 本地 SQLite 与正文文件（不进仓库）
-├── src/
-│   ├── assets/             # 需要被构建处理的资源
-│   ├── components/         # 可复用组件（.astro 或岛屿）
-│   ├── layouts/            # 页面骨架、全局 head
-│   ├── pages/              # 路由：文件即路由
-│   └── env.d.ts
 ├── docs/                   # 架构与决策文档
-├── scripts/                # 独立脚本：抓取、导入、维护（规划中）
-├── astro.config.mjs
+├── architecture.test.ts    # 边界规则：谁可以 import 谁、源码零注释
+├── drizzle.config.ts       # 迁移生成配置
 ├── vite.config.ts          # Vite+ 配置：fmt / lint
-├── package.json
-└── AGENTS.md               # 给 AI 助手与协作者的工程约定
+└── package.json            # 只做编排，不含运行时依赖
 ```
 
-目录会随实现推进扩展，规划中的布局见 `docs/ARCHITECTURE.md`。
+各包的技术栈、公开接口与依赖约束见包内 README；仓库根不承载业务代码。
 
 ---
 
@@ -114,9 +112,10 @@ vpr preview        # 本地预览构建产物
 
 ```bash
 vp check           # 格式化 + 校验 + 类型检查
-vp test            # 运行测试
-vpx scripts/foo.ts # 直接运行 TS 脚本（替代 tsx）
+vpr test           # 运行测试（bun test）
 ```
+
+脚本与数据库都在 Bun 上，入口一律 `bun <file>`（`vpx` 走 Node，本项目不用）；`vpr <script>` 只是根 `package.json` 的触发器。
 
 抓取管道（独立进程，与 Web 无关）：
 

@@ -1,0 +1,84 @@
+---
+import { companiesByTag, openWebDatabase, postYearsByFilters, postsByTag, type TagCard, tagIndex } from "@boguan/database/web-read";
+import { tagGroupOf, isIndexableCollection } from "@boguan/domain";
+import type { GetStaticPaths } from "astro";
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import TagView from "../../../components/TagView.astro";
+import { localizePath, localeRoutes, useTranslations } from "../../../lib/i18n";
+import type { Locale } from "../../../lib/i18n/config";
+import { INDEX_PAGE_SIZE, pageCount, pagePath } from "../../../lib/sheet";
+import { collectionJsonLd } from "../../../lib/structured-data";
+import { site } from "../../../lib/site";
+
+interface Props {
+	locale: Locale;
+	tag: TagCard;
+	relatedTags: TagCard[];
+}
+
+export const getStaticPaths = (() => {
+	const db = openWebDatabase();
+	const tags = tagIndex(db);
+	return tags
+		.filter((tag) => tag.count > 0)
+		.flatMap((tag) =>
+			localeRoutes({ slug: tag.slug }).map((route) => ({
+				...route,
+				props: {
+					...route.props,
+					tag,
+					relatedTags: tags
+						.filter((candidate) => candidate.slug !== tag.slug)
+						.filter((candidate) => tagGroupOf(candidate.slug) === tagGroupOf(tag.slug))
+						.slice(0, 6),
+				},
+			})),
+		);
+}) satisfies GetStaticPaths;
+
+const { locale, tag, relatedTags } = Astro.props;
+const t = useTranslations(locale);
+const db = openWebDatabase();
+const slug = String(Astro.params.slug);
+
+if (tag.count === 0) throw new Error(`标签不存在：${slug}`);
+
+const companies = companiesByTag(db, slug, 6);
+const years = postYearsByFilters(db, { tagSlug: slug });
+const { items, total } = postsByTag(db, slug, { limit: INDEX_PAGE_SIZE });
+const totalPages = pageCount(total, INDEX_PAGE_SIZE);
+const navYearsHref = years[0]
+	? localizePath(`/year/${years[0].year}`, locale)
+	: localizePath("/tags", locale);
+const title = t("meta.tag.title", { name: tag.name });
+const description = t("meta.tag.description", { name: tag.name });
+---
+
+<BaseLayout
+	locale={locale}
+	title={title}
+	description={description}
+	chrome="bare"
+	noindex={!isIndexableCollection(tag.count)}
+	nextHref={totalPages > 1 ? localizePath(pagePath(`/tag/${slug}`, 2), locale) : undefined}
+	jsonLd={collectionJsonLd({
+		name: title,
+		description,
+		url: new URL(localizePath(`/tag/${slug}`, locale), site.url).href,
+		items,
+	})}
+>
+	<TagView
+		locale={locale}
+		tag={tag}
+		companies={companies}
+		relatedTags={relatedTags}
+		years={years}
+		posts={items}
+		total={total}
+		page={1}
+		totalPages={totalPages}
+		nextHref={totalPages > 1 ? localizePath(pagePath(`/tag/${slug}`, 2), locale) : undefined}
+		navYearsHref={navYearsHref}
+	/>
+</BaseLayout>

@@ -1,0 +1,113 @@
+---
+import { CompanyCard, PostCard as PostCardData, TagCard } from "@boguan/database/web-read";
+import { formatCount, localizePath, useTranslations } from "../lib/i18n";
+import { companyDisplayName } from "../lib/i18n/company";
+import type { Locale } from "../lib/i18n/config";
+import { INDEX_PAGE_SIZE, searchHref, type IndexFacetGroup, type IndexRailModule } from "../lib/sheet";
+import IndexSheet from "./IndexSheet.astro";
+
+interface Props {
+  locale: Locale;
+  tag: TagCard;
+  companies: CompanyCard[];
+  relatedTags: TagCard[];
+  years: { year: number; count: number }[];
+  posts: PostCardData[];
+  total: number;
+  page: number;
+  totalPages: number;
+  prevHref?: string;
+  nextHref?: string;
+  navYearsHref?: string;
+}
+
+const {
+  locale,
+  tag,
+  companies,
+  relatedTags,
+  years,
+  posts,
+  total,
+  page,
+  totalPages,
+  prevHref,
+  nextHref,
+  navYearsHref,
+} = Astro.props;
+const t = useTranslations(locale);
+
+const facets: IndexFacetGroup[] = [
+  {
+    label: t("filter.label"),
+    items: [
+      {
+        label: t("filter.hasCode"),
+        href: searchHref(locale, { tag: tag.slug, has_code: true }),
+      },
+    ],
+  },
+];
+
+if (years.length > 1) {
+  facets.push({
+    label: t("nav.years"),
+    items: years.map((entry) => ({
+      label: String(entry.year),
+      count: entry.count,
+      href: searchHref(locale, { tag: tag.slug, year: entry.year }),
+    })),
+  });
+}
+
+const rail: IndexRailModule[] = [];
+
+if (companies.length > 0) {
+  rail.push({
+    title: t("tag.companies"),
+    links: companies.map((company) => ({
+      label: companyDisplayName(company, locale),
+      href: localizePath(`/company/${company.slug}`, locale),
+      count: company.count,
+      lang: locale === "en" && !company.nameEn ? "zh-CN" : undefined,
+    })),
+  });
+}
+
+if (relatedTags.length > 0) {
+  rail.push({
+    title: t("index.relatedTags"),
+    links: relatedTags.map((related) => ({
+      label: related.name,
+      href: localizePath(`/tag/${related.slug}`, locale),
+      count: related.count,
+      lang: locale === "en" ? "zh-CN" : undefined,
+    })),
+    allHref: localizePath("/tags", locale),
+    allLabel: t("nav.viewAllTags"),
+  });
+}
+
+const facts = [formatCount(locale, "articles", total)];
+---
+
+<IndexSheet
+	locale={locale}
+	kicker={t("index.kicker.tag")}
+	current="tags"
+	title={tag.name}
+	titleLang={locale === "en" ? "zh-CN" : undefined}
+	facts={facts}
+	posts={posts}
+	total={total}
+	page={page}
+	totalPages={totalPages}
+	prevHref={prevHref}
+	nextHref={nextHref}
+	pageSize={INDEX_PAGE_SIZE}
+	facets={facets}
+	rail={rail}
+	emptyTitle={t("list.empty")}
+	emptyBody={t("search.noQuery.body")}
+	navYearsHref={navYearsHref}
+/>

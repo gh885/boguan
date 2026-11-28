@@ -20,7 +20,7 @@ vpr i18n:check     # 文案检查（缺 key / 漏翻 / 未使用）
 vpr build
 ```
 
-改动界面文案时，请同时更新 `src/lib/i18n/messages/zh-CN.json`（源语言）与 `en.json`，取词一律用 `useTranslations(locale)`，不要在页面里硬编码字符串。
+改动界面文案时，请同时更新 `apps/web/src/lib/i18n/messages/zh-CN.json`（源语言）与 `apps/web/src/lib/i18n/messages/en.json`，取词一律用 `useTranslations(locale)`，不要在页面里硬编码字符串。
 
 ## 提交 PR
 
@@ -32,7 +32,7 @@ vpr build
 ## 新增数据源
 
 1. 先提 [数据源 Issue](https://github.com/gh885/boguan/issues/new?template=source-request.yml)，确认可抓性与合规性
-2. 在 `scripts/crawler/adapters/` 下新增适配器，实现统一接口
+2. 在 `apps/crawler/src/adapters/` 下新增适配器，实现统一接口
 3. 在 `sources` 中登记来源，本地跑通增量抓取
 4. PR 中附上抓取样本（标题、时间、摘要各若干条），便于 review
 

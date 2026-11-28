@@ -41,7 +41,7 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 log "build -> $OUT"
-./node_modules/.bin/astro build --outDir "$OUT"
+BOGUAN_OUT_DIR="$OUT" bun run --cwd apps/web build
 [[ -s $OUT/server/entry.mjs && -s $OUT/client/index.html ]] || { log '构建产物不完整'; exit 1; }
 printf '%s\n' "$(git rev-parse HEAD)" > "$OUT/REVISION"
 

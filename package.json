@@ -1,42 +1,37 @@
 {
   "name": "boguan",
   "version": "0.0.1",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "type": "module",
   "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview",
-    "astro": "astro",
+    "dev": "bun run --cwd apps/web dev",
+    "build": "bun run --cwd apps/web build",
+    "preview": "bun run --cwd apps/web preview",
+    "astro": "bun run --cwd apps/web astro",
     "i18n:check": "x18n check",
     "i18n:ui": "x18n ui",
     "prepare": "vp config",
+    "test": "bun test",
     "db:generate": "drizzle-kit generate",
-    "db:init": "vpx scripts/db/init.ts",
-    "db:seed": "vpx scripts/db/seed.ts",
-    "db:check": "vpx scripts/db/check.ts",
-    "db:curate": "vpx scripts/db/curate.ts",
-    "db:metrics": "vpx scripts/db/metrics.ts",
-    "crawl": "vpx scripts/crawler/cli.ts",
-    "db:fixture": "vpx scripts/db/fixture.ts"
+    "db:init": "bun apps/ops/src/init.ts",
+    "db:seed": "bun apps/ops/src/seed.ts",
+    "db:check": "bun apps/ops/src/check.ts",
+    "db:curate": "bun apps/ops/src/curate.ts",
+    "db:metrics": "bun apps/ops/src/metrics.ts",
+    "db:fixture": "bun apps/ops/src/fixture.ts",
+    "crawl": "bun apps/crawler/src/cli.ts"
   },
-  "dependencies": {
-    "@astrojs/node": "11.1.9",
-    "@astrojs/rss": "^4.0.19",
-    "@astrojs/sitemap": "^3.7.4",
-    "@node-rs/jieba": "^2.0.4",
-    "astro": "^7.4.4",
-    "better-sqlite3": "^13.0.3",
-    "cheerio": "^1.2.0",
-    "drizzle-orm": "^0.45.4",
-    "entities": "^4.5.0",
-    "robots-parser": "^3.0.1",
-    "rss-parser": "^3.13.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
+    "@types/bun": "^1.4.5",
     "@types/node": "^26.6.6",
     "@x18n/cli": "^0.1.4",
     "@x18n/core": "^0.1.4",
+    "better-sqlite3": "^13.0.3",
     "drizzle-kit": "^0.31.11",
     "vite": "npm:@voidzero-dev/vite-plus-core@1.4.0",
     "vite-plus": "1.4.0"
@@ -52,7 +47,7 @@
     }
   },
   "engines": {
-    "node": ">=24"
+    "bun": ">=1.4.4"
   },
   "trustedDependencies": [
     "esbuild"

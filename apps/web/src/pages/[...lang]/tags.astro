@@ -1,0 +1,119 @@
+---
+import { openWebDatabase, postYears, tagIndex } from "@boguan/database/web-read";
+import { groupTags, type TagGroupId, isIndexableCollection } from "@boguan/domain";
+import type { GetStaticPaths } from "astro";
+import DirectorySheet from "../../components/DirectorySheet.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { formatCount, localizePath, localeRoutes, useTranslations } from "../../lib/i18n";
+import type { Locale } from "../../lib/i18n/config";
+import { collectionJsonLd } from "../../lib/structured-data";
+import { site } from "../../lib/site";
+
+export const getStaticPaths = (() => localeRoutes()) satisfies GetStaticPaths;
+
+interface Props {
+	locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = useTranslations(locale);
+const db = openWebDatabase();
+const tags = tagIndex(db).filter((tag) => isIndexableCollection(tag.count));
+const groups = groupTags(tags);
+const years = postYears(db);
+const navYearsHref = years[0]
+	? localizePath(`/year/${years[0].year}`, locale)
+	: localizePath("/tags", locale);
+const url = new URL(localizePath("/tags", locale), site.url).href;
+const description = t("meta.tags.description");
+
+const groupLabels: Record<TagGroupId, string> = {
+	ai: t("tags.group.ai"),
+	data: t("tags.group.data"),
+	architecture: t("tags.group.architecture"),
+	engineering: t("tags.group.engineering"),
+	frontend: t("tags.group.frontend"),
+	security: t("tags.group.security"),
+	other: t("tags.group.other"),
+};
+---
+
+<BaseLayout
+	locale={locale}
+	title={t("meta.tags.title")}
+	description={description}
+	chrome="bare"
+	jsonLd={collectionJsonLd({
+		name: t("tags.title"),
+		description,
+		url,
+		items: tags.map((tag) => ({
+			title: tag.name,
+			url: new URL(localizePath(`/tag/${tag.slug}`, locale), site.url).href,
+		})),
+	})}
+>
+	<DirectorySheet
+		locale={locale}
+		current="tags"
+		kicker={t("directory.kicker.tags")}
+		title={t("tags.title")}
+		facts={[formatCount(locale, "tags", tags.length)]}
+		description={t("directory.tagsNote")}
+		navYearsHref={navYearsHref}
+	>
+		{
+			groups.length === 0 ? (
+				<div class="directory-empty">
+					<h2>{t("tags.empty")}</h2>
+					<p>{t("list.empty")}</p>
+				</div>
+			) : (
+				<>
+					<nav class="directory-jump" aria-label={t("directory.groupNav")}>
+						{groups.map((group) => (
+							<a href={`#tag-group-${group.id}`}>
+								<span>{groupLabels[group.id]}</span>
+								<span class="directory-jump-count" aria-hidden="true">
+									{group.count}
+								</span>
+								<span class="visually-hidden">{formatCount(locale, "tags", group.count)}</span>
+							</a>
+						))}
+					</nav>
+
+					<div class="directory-groups">
+						{groups.map((group) => (
+							<section class="directory-group" id={`tag-group-${group.id}`}>
+								<div class="directory-group-head">
+									<h2>{groupLabels[group.id]}</h2>
+									<span>{formatCount(locale, "tags", group.count)}</span>
+								</div>
+								<ul class="directory-tags">
+									{group.tags.map((tag) => (
+										<li>
+											<a href={localizePath(`/tag/${tag.slug}`, locale)}>
+												<span
+													class="directory-tag-name"
+													lang={locale === "en" ? "zh-CN" : undefined}
+												>
+													{tag.name}
+												</span>
+												<span class="directory-count" aria-hidden="true">
+													{tag.count}
+												</span>
+												<span class="visually-hidden">
+													{formatCount(locale, "articles", tag.count)}
+												</span>
+											</a>
+										</li>
+									))}
+								</ul>
+							</section>
+						))}
+					</div>
+				</>
+			)
+		}
+	</DirectorySheet>
+</BaseLayout>

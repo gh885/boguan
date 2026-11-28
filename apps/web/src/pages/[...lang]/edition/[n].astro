@@ -1,0 +1,138 @@
+---
+import { countPosts, editionSummaries, openWebDatabase, postsByEdition, postYears } from "@boguan/database/web-read";
+import { editionDay, editionNumberAt, editionRange, isIndexableCollection } from "@boguan/domain";
+import type { GetStaticPaths } from "astro";
+import IndexSheet from "../../../components/IndexSheet.astro";
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import {
+	formatDate,
+	formatLongDate,
+	formatNumber,
+	localizePath,
+	localeRoutes,
+	useTranslations,
+} from "../../../lib/i18n";
+import type { Locale } from "../../../lib/i18n/config";
+import { INDEX_PAGE_SIZE, pageCount, pagePath, type IndexRailModule } from "../../../lib/sheet";
+import { collectionJsonLd } from "../../../lib/structured-data";
+import { site } from "../../../lib/site";
+
+export const getStaticPaths = (() => {
+	const latest = Math.max(1, editionNumberAt(new Date()) ?? 1);
+	return Array.from({ length: latest }, (_, index) => index + 1).flatMap((number) =>
+		localeRoutes({ n: String(number) }),
+	);
+}) satisfies GetStaticPaths;
+
+interface Props {
+	locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = useTranslations(locale);
+const db = openWebDatabase();
+
+const number = Number(Astro.params.n);
+const day = editionDay(number);
+const range = editionRange(number);
+
+if (day === null || range === null) throw new Error(`期号不存在：${String(Astro.params.n)}`);
+
+const today = editionNumberAt(new Date()) ?? number;
+const summaries = editionSummaries(db);
+const countOf = (value: number) => summaries.find((row) => row.number === value)?.count ?? 0;
+
+const { items, total } = postsByEdition(db, range, { limit: INDEX_PAGE_SIZE });
+const cumulative = countPosts(db, { firstSeenTo: range.endIso });
+const totalPages = pageCount(total, INDEX_PAGE_SIZE);
+const years = postYears(db);
+const navYearsHref = years[0]
+	? localizePath(`/year/${years[0].year}`, locale)
+	: localizePath("/tags", locale);
+
+const isoLongDate = formatLongDate(day, locale);
+const shortDate = formatDate(day, locale);
+const dateNumber = formatNumber(locale, number);
+const title = t("meta.edition.title", { number: dateNumber, date: shortDate });
+const description =
+	total > 0
+		? t("meta.edition.description", {
+				number: dateNumber,
+				date: shortDate,
+				count: formatNumber(locale, total),
+			})
+		: t("meta.edition.descriptionEmpty", { number: dateNumber, date: shortDate });
+
+const prevHref =
+	totalPages > 1 ? localizePath(pagePath(`/edition/${number}`, 2), locale) : undefined;
+
+const rail: IndexRailModule[] = [
+	{
+		title: t("edition.rail"),
+		links: [
+			...(number > 1
+				? [
+						{
+							label: t("edition.previous"),
+							href: localizePath(`/edition/${number - 1}`, locale),
+							count: countOf(number - 1) || undefined,
+						},
+					]
+				: []),
+			...(number < today
+				? [
+						{
+							label: t("edition.next"),
+							href: localizePath(`/edition/${number + 1}`, locale),
+							count: countOf(number + 1) || undefined,
+						},
+					]
+				: []),
+		],
+		allHref: localizePath("/editions", locale),
+		allLabel: t("edition.all"),
+	},
+];
+
+const emptyActionHref =
+	number > 1 ? localizePath(`/edition/${number - 1}`, locale) : localizePath("/editions", locale);
+const emptyActionLabel = number > 1 ? t("edition.previous") : t("edition.all");
+---
+
+<BaseLayout
+	locale={locale}
+	title={title}
+	description={description}
+	chrome="bare"
+	noindex={!isIndexableCollection(total)}
+	nextHref={prevHref}
+	jsonLd={collectionJsonLd({
+		name: title,
+		description,
+		url: new URL(localizePath(`/edition/${number}`, locale), site.url).href,
+		items,
+	})}
+>
+	<IndexSheet
+		locale={locale}
+		current="editions"
+		kicker={t("edition.kicker.issue", { number: dateNumber })}
+		title={isoLongDate}
+		facts={[
+			t("edition.facts.new", { count: formatNumber(locale, total) }),
+			t("edition.facts.cumulative", { count: formatNumber(locale, cumulative) }),
+		]}
+		posts={items}
+		total={total}
+		page={1}
+		totalPages={totalPages}
+		pageSize={INDEX_PAGE_SIZE}
+		nextHref={prevHref}
+		rail={rail}
+		emptyTitle={t("edition.empty.title")}
+		emptyBody={t("edition.empty.body")}
+		emptyAction={{ href: emptyActionHref, label: emptyActionLabel }}
+		footerNote={t("edition.issue", { number: dateNumber })}
+		navYearsHref={navYearsHref}
+	/>
+</BaseLayout>

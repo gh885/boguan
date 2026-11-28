@@ -1,0 +1,131 @@
+---
+import { editionSummaries, openWebDatabase, postYears } from "@boguan/database/web-read";
+import { editionDay } from "@boguan/domain";
+import type { GetStaticPaths } from "astro";
+import DirectorySheet from "../../components/DirectorySheet.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import {
+	formatCount,
+	formatDate,
+	formatMonth,
+	formatNumber,
+	localizePath,
+	localeRoutes,
+	useTranslations,
+} from "../../lib/i18n";
+import type { Locale } from "../../lib/i18n/config";
+import { site } from "../../lib/site";
+
+export const getStaticPaths = (() => localeRoutes()) satisfies GetStaticPaths;
+
+interface Props {
+	locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = useTranslations(locale);
+const db = openWebDatabase();
+
+const summaries = editionSummaries(db);
+const years = postYears(db);
+const navYearsHref = years[0]
+	? localizePath(`/year/${years[0].year}`, locale)
+	: localizePath("/tags", locale);
+
+const totalPosts = summaries.reduce((sum, row) => sum + row.count, 0);
+
+interface MonthGroup {
+	key: string;
+	label: string;
+	count: number;
+	editions: { number: number; day: string; count: number }[];
+}
+
+const groups: MonthGroup[] = [];
+for (const row of summaries) {
+	const key = row.day.slice(0, 7);
+	const last = groups[groups.length - 1];
+	const entry = { number: row.number, day: row.day, count: row.count };
+	if (last && last.key === key) {
+		last.editions.push(entry);
+		last.count += row.count;
+	} else {
+		groups.push({ key, label: formatMonth(row.day, locale), count: row.count, editions: [entry] });
+	}
+}
+
+const title = t("meta.editions.title");
+const description = t("meta.editions.description");
+---
+
+<BaseLayout
+	locale={locale}
+	title={title}
+	description={description}
+	chrome="bare"
+	jsonLd={{
+		"@context": "https://schema.org",
+		"@type": "CollectionPage",
+		name: title,
+		description,
+		url: new URL(localizePath("/editions", locale), site.url).href,
+		isPartOf: { "@type": "WebSite", name: site.name, url: site.url },
+		materialType: "PublicationIssue",
+		numberOfItems: summaries.length,
+	}}
+>
+	<DirectorySheet
+		locale={locale}
+		current="editions"
+		kicker={t("edition.kicker.all")}
+		title={title}
+		facts={[
+			t("edition.facts.issues", { count: formatNumber(locale, summaries.length) }),
+			formatCount(locale, "articles", totalPosts),
+		]}
+		description={t("edition.allDescription")}
+		navYearsHref={navYearsHref}
+	>
+		{groups.length > 0 ? (
+			<>
+				<nav class="directory-jump" aria-label={t("directory.groupNav")}>
+					{groups.map((group) => (
+						<a href={`#${group.key}`}>
+							<span>{group.label}</span>
+						</a>
+					))}
+				</nav>
+				<div class="directory-groups">
+					{groups.map((group) => (
+						<section class="directory-group" id={group.key}>
+							<div class="directory-group-head">
+								<h2>{group.label}</h2>
+								<span>{formatCount(locale, "articles", group.count)}</span>
+							</div>
+							<ul class="directory-tags directory-editions">
+								{group.editions.map((entry) => {
+									const day = editionDay(entry.number) ?? entry.day;
+									return (
+										<li>
+											<a href={localizePath(`/edition/${entry.number}`, locale)}>
+												<span class="directory-tag-name">
+													{t("edition.issue", { number: formatNumber(locale, entry.number) })} ·{" "}
+													{formatDate(day, locale)}
+												</span>
+											</a>
+										</li>
+									);
+								})}
+							</ul>
+						</section>
+					))}
+				</div>
+			</>
+		) : (
+			<div class="directory-empty">
+				<h2>{t("list.empty")}</h2>
+				<p>{t("edition.allDescription")}</p>
+			</div>
+		)}
+	</DirectorySheet>
+</BaseLayout>

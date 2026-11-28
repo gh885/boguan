@@ -1,0 +1,92 @@
+---
+import { companyCards, openWebDatabase, postYears } from "@boguan/database/web-read";
+import type { GetStaticPaths } from "astro";
+import DirectorySheet from "../../components/DirectorySheet.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { formatCount, localizePath, localeRoutes, useTranslations } from "../../lib/i18n";
+import { companyDisplayName } from "../../lib/i18n/company";
+import type { Locale } from "../../lib/i18n/config";
+import { collectionJsonLd } from "../../lib/structured-data";
+import { site } from "../../lib/site";
+
+export const getStaticPaths = (() => localeRoutes()) satisfies GetStaticPaths;
+
+interface Props {
+	locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = useTranslations(locale);
+const db = openWebDatabase();
+const companies = companyCards(db);
+const totalPosts = companies.reduce((sum, company) => sum + company.count, 0);
+const years = postYears(db);
+const navYearsHref = years[0]
+	? localizePath(`/year/${years[0].year}`, locale)
+	: localizePath("/tags", locale);
+const url = new URL(localizePath("/companies", locale), site.url).href;
+const description = t("meta.companies.description");
+---
+
+<BaseLayout
+	locale={locale}
+	title={t("meta.companies.title")}
+	description={description}
+	chrome="bare"
+	jsonLd={collectionJsonLd({
+		name: t("companies.title"),
+		description,
+		url,
+		items: companies.map((company) => ({
+			title: companyDisplayName(company, locale),
+			url: new URL(localizePath(`/company/${company.slug}`, locale), site.url).href,
+		})),
+	})}
+>
+	<DirectorySheet
+		locale={locale}
+		current="companies"
+		kicker={t("directory.kicker.companies")}
+		title={t("companies.title")}
+		facts={[
+			formatCount(locale, "companies", companies.length),
+			formatCount(locale, "articles", totalPosts),
+		]}
+		description={t("directory.companiesNote")}
+		navYearsHref={navYearsHref}
+	>
+		{
+			companies.length === 0 ? (
+				<div class="directory-empty">
+					<h2>{t("companies.empty")}</h2>
+					<p>{t("list.empty")}</p>
+				</div>
+			) : (
+				<ol class="directory-companies" role="list">
+					{companies.map((company, index) => {
+						const name = companyDisplayName(company, locale);
+						return (
+							<li>
+								<a href={localizePath(`/company/${company.slug}`, locale)}>
+									<span class="directory-num" aria-hidden="true">
+										{String(index + 1).padStart(2, "0")}
+									</span>
+									<span
+										class="directory-name"
+										lang={locale === "en" && !company.nameEn ? "zh-CN" : undefined}
+									>
+										{name}
+									</span>
+									<span class="directory-count" aria-hidden="true">{company.count}</span>
+									<span class="visually-hidden">
+										{formatCount(locale, "articles", company.count)}
+									</span>
+								</a>
+							</li>
+						);
+					})}
+				</ol>
+			)
+		}
+	</DirectorySheet>
+</BaseLayout>
