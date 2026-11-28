@@ -52,18 +52,20 @@ GitHub Actions 使用下文的专用受限部署密钥，只允许 `deploy <完�
 
 ## 目录与权限
 
-| 路径                          | 用途                                            |
-| :---------------------------- | :---------------------------------------------- |
-| `/home/xun/boguan`            | 仓库、依赖、数据库；管理员/抓取账号维护         |
-| `releases/<时间戳>-<随机值>/` | 独立构建产物及 `REVISION`，保留三个版本         |
-| `dist`                        | 指向当前 release 的软链                         |
-| `.ops`                        | 发布锁、通知节流与异地备份成功时间；0700        |
-| `/home/xun/backups`           | SQLite 压缩快照及 SHA256，保留 14 份；文件 0600 |
-| `/home/xun/ops`               | 从当前仓库安装的运维脚本                        |
-| `/etc/boguan/ops.env`         | 私有配置，root:xun 0640，不进 Git               |
-| `/etc/boguan/ossutilconfig`   | OSS 实例角色配置，无长期密钥，root:xun 0640     |
-| `/home/xun/ops-python`        | 云监控官方 Python SDK 的独立虚拟环境            |
-| `/srv/boguan`                 | systemd 给 Web 的只读 bind 视图，不是第二份代码 |
+| 路径                          | 用途                                                                   |
+| :---------------------------- | :--------------------------------------------------------------------- |
+| `/home/xun/boguan`            | 仓库、依赖、数据库；管理员/抓取账号维护                                |
+| `releases/<时间戳>-<随机值>/` | 独立构建产物及 `REVISION`，保留三个版本                                |
+| `dist`                        | 指向当前 release 的**相对**软链（绝对路径进不了 systemd 的 bind 沙箱） |
+| `.ops`                        | 发布锁、通知节流与异地备份成功时间；0700                               |
+| `/home/xun/backups`           | SQLite 压缩快照及 SHA256，保留 14 份；文件 0600                        |
+| `/home/xun/ops`               | 从当前仓库安装的运维脚本                                               |
+| `/etc/boguan/ops.env`         | 私有配置，root:xun 0640，不进 Git                                      |
+| `/etc/boguan/ossutilconfig`   | OSS 实例角色配置，无长期密钥，root:xun 0640                            |
+| `/home/xun/ops-python`        | 云监控官方 Python SDK 的独立虚拟环境                                   |
+| `/srv/boguan`                 | systemd 给 Web 的只读 bind 视图，不是第二份代码                        |
+
+发布产物运行在 `$APP/releases/` 下，依赖从仓库根的 `node_modules` 解析（`bunfig.toml` 用 `hoisted` linker，否则原生模块 `@node-rs/jieba` 只落在 `apps/web/node_modules`，release 目录解析不到）。构建输出目录必须传绝对路径：`bun run --cwd apps/web build` 的工作目录是 `apps/web`，相对的 `BOGUAN_OUT_DIR` 会落到 `apps/web/releases`。
 
 Web 使用无登录账号 `boguan-web`，`ProtectHome=true`，只能通过 `/srv/boguan` 只读访问应用。
 正文、`.git`、`.ops`、备份、运维配置不可访问，服务不具有 sudo 权限。SQLite 连接自身也只读。

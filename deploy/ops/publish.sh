@@ -15,8 +15,10 @@ fi
 [[ -L dist && -d dist/server && -d dist/client ]] || { log 'dist 必须指向完整 release'; exit 1; }
 PREVIOUS=$(readlink dist)
 verify_database "${BOGUAN_DB:-$APP/data/boguan.db}"
-mkdir -p releases
-OUT=$(mktemp -d releases/"$(date +%Y%m%d-%H%M%S)"-XXXXXX)
+mkdir -p "$APP/releases"
+OUT=$(mktemp -d "$APP/releases/$(date +%Y%m%d-%H%M%S)-XXXXXX")
+# 软链必须相对 $APP：systemd 把 $APP 只读 bind 到 /srv/boguan，绝对路径指不进沙箱。
+REL=${OUT#"$APP/"}
 # mktemp 默认 0700；产物须允许独立 Web 账号读取、穿越。
 chmod 755 "$OUT"
 SWITCHED=0
@@ -47,7 +49,7 @@ printf '%s\n' "$(git rev-parse HEAD)" > "$OUT/REVISION"
 
 # 先标记，确保中断恰好发生在切换前后时也能恢复旧软链。
 SWITCHED=1
-ln -sfn "$OUT" dist.new
+ln -sfn "$REL" dist.new
 mv -Tf dist.new dist
 restart_web
 wait_ready
