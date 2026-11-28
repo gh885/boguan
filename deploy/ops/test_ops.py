@@ -36,7 +36,19 @@ sudo() {
 }
 sleep() { :; }
 git() { printf 'test-revision\n'; }
-export -f curl sudo sleep git
+bun() {
+  if [[ $* == *"apps/web"* && $* == *"build"* ]]; then
+    [[ ${SCENARIO:-} != build-fails ]] || return 1
+    mkdir -p "$BOGUAN_OUT_DIR/server" "$BOGUAN_OUT_DIR/client"
+    echo server > "$BOGUAN_OUT_DIR/server/entry.mjs"
+    echo html > "$BOGUAN_OUT_DIR/client/index.html"
+    return 0
+  fi
+  if [[ ${SCENARIO:-} == crawl-fails && $* == *crawler* ]]; then return 1; fi
+  if [[ ${SCENARIO:-} == check-fails && $* == *check.ts* ]]; then return 1; fi
+  return 0
+}
+export -f curl sudo sleep git bun
 '''
 
 
@@ -63,22 +75,6 @@ class OpsTests(unittest.TestCase):
                 CREATE TABLE crawl_jobs(id INTEGER PRIMARY KEY, status TEXT);
                 INSERT INTO crawl_jobs VALUES(1,'ok');
             """)
-        builder = self.app / "node_modules/.bin/astro"
-        builder.write_text('''#!/usr/bin/env bash
-set -eu
-[[ ${SCENARIO:-} != build-fails ]] || exit 1
-mkdir -p "$3/server" "$3/client"
-echo server > "$3/server/entry.mjs"
-echo html > "$3/client/index.html"
-''')
-        builder.chmod(0o755)
-        crawler = self.app / "node_modules/.bin/bun"
-        crawler.write_text('''#!/usr/bin/env bash
-set -eu
-if [[ ${SCENARIO:-} == crawl-fails && $1 == *crawler* ]]; then exit 1; fi
-if [[ ${SCENARIO:-} == check-fails && $1 == *check.ts ]]; then exit 1; fi
-''')
-        crawler.chmod(0o755)
 
     def tearDown(self):
         self.temp.cleanup()

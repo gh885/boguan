@@ -1,12 +1,26 @@
 import { existsSync, mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import Database from "better-sqlite3";
 import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
 
 export type Db = BetterSQLite3Database<typeof schema> & { $client: Database.Database };
 
-export const defaultDatabasePath = process.env.BOGUAN_DB ?? "data/boguan.db";
+function workspaceRoot(): string {
+  let dir = process.cwd();
+  for (;;) {
+    if (existsSync(join(dir, "bun.lock"))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) return process.cwd();
+    dir = parent;
+  }
+}
+
+function anchor(path: string): string {
+  return isAbsolute(path) ? path : join(workspaceRoot(), path);
+}
+
+export const defaultDatabasePath = anchor(process.env.BOGUAN_DB ?? "data/boguan.db");
 
 function applyPragmas(raw: Database.Database): void {
   raw.pragma("journal_mode = WAL");

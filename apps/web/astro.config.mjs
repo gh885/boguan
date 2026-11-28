@@ -26,6 +26,7 @@ const indexableEditions = new Set(
 // 同一批 CSS，外链可跨页缓存；内联会让每页 HTML 各带一份，搜索引擎爬取白白变大。
 export default defineConfig({
   site: "https://boguan.org.cn",
+  outDir: process.env.BOGUAN_OUT_DIR ?? "./dist",
   // URL 语言策略：默认语言（中文）不带前缀，其它语言带前缀。
   //   /            /company/meituan        → zh-CN
   //   /en/         /en/company/meituan     → en
@@ -39,6 +40,13 @@ export default defineConfig({
   },
   // 搜索是唯一的 SSR 页面（静态列表页仍然在构建时生成），见 ARCHITECTURE §6。
   adapter: node({ mode: "standalone" }),
+  vite: {
+    build: {
+      rollupOptions: {
+        external: [/@node-rs\/jieba/],
+      },
+    },
+  },
   integrations: [
     sitemap({
       // 键是 URL 里的语言段，值是 hreflang；默认语言没有前缀，但也要出现在映射里，

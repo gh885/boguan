@@ -16,6 +16,11 @@
     "@boguan/catalog": "workspace:*",
     "@boguan/database": "workspace:*",
     "@boguan/domain": "workspace:*",
-    "drizzle-kit": "^0.31.11"
+    "better-sqlite3": "^13.0.3",
+    "drizzle-kit": "^0.31.11",
+    "drizzle-orm": "^0.45.4"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0"
   }
 }

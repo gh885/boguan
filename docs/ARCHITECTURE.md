@@ -387,7 +387,7 @@ select rowid from posts_fts where posts_fts match 'title_tokens : ("缓存")'
 
 ### 语言与 URL
 
-- 语言清单是唯一事实源：`apps/web/src/i18n/config.ts` 与 `astro.config.mjs` 的 `i18n.locales` 必须一致（加语言时两处一起改）。
+- 语言清单是唯一事实源：`apps/web/src/lib/i18n/config.ts` 与 `astro.config.mjs` 的 `i18n.locales` 必须一致（加语言时两处一起改）。
 - 默认语言不带前缀，其它语言带前缀，**同一份内容共享 slug**：
 
 | URL                           | 语言  |
@@ -395,25 +395,25 @@ select rowid from posts_fts where posts_fts match 'title_tokens : ("缓存")'
 | `/`、`/company/meituan`       | zh-CN |
 | `/en/`、`/en/company/meituan` | en    |
 
-- **一份页面 × 所有语言**：所有页面都写在 `apps/web/apps/web/src/pages/[...lang]/` 下，用 `localeRoutes()` 生成 `getStaticPaths`，语言只当参数：
+- **一份页面 × 所有语言**：所有页面都写在 `apps/web/src/pages/[...lang]/` 下，用 `localeRoutes()` 生成 `getStaticPaths`，语言只当参数：
 
-  | 文件                                                                  | 生成的 URL                                |
-  | :-------------------------------------------------------------------- | :---------------------------------------- |
-  | `apps/web/apps/web/apps/web/src/pages/[...lang]/index.astro`          | `/`、`/en/`                               |
-  | `apps/web/apps/web/apps/web/src/pages/[...lang]/company/[slug].astro` | `/company/meituan`、`/en/company/meituan` |
+  | 文件                                                | 生成的 URL                                |
+  | :-------------------------------------------------- | :---------------------------------------- |
+  | `apps/web/src/pages/[...lang]/index.astro`          | `/`、`/en/`                               |
+  | `apps/web/src/pages/[...lang]/company/[slug].astro` | `/company/meituan`、`/en/company/meituan` |
 
   默认语言用 `lang: undefined` 生成无前缀路径，其它语言用 `lang: '<prefix>'`，与 `prefixDefaultLocale: false` 对齐。
 
-- **不为某种语言复制页面文件**。Astro 文档也给了 `apps/web/apps/web/src/pages/en/*.astro` 的复制方案，但那样每个页面都得复制数据查询与 `getStaticPaths`，语言越多越容易漂移；而 hreflang 是按路径前缀推的，一漏就是指向 404 的死链。
+- **不为某种语言复制页面文件**。Astro 文档也给了 `apps/web/src/pages/en/*.astro` 的复制方案，但那样每个页面都得复制数据查询与 `getStaticPaths`，语言越多越容易漂移；而 hreflang 是按路径前缀推的，一漏就是指向 404 的死链。
 - hreflang 只声明本页真正生成过的语言（`BaseLayout` 的 `alternateLocales`）。「所有页面都在 `[...lang]/` 下」由 `i18n.test.ts` 的目录约定测试守护。
 - 语言切换是普通 `<a>` 链接，路径由 `localizePath()` / `alternateLinks()` 算出，不引入客户端状态。
 
 ### 取词
 
-- 唯一的取词入口是 `useTranslations(locale)` 返回的 `t('key')`；文案在 `apps/web/src/i18n/messages/{locale}.json`，key 用扁平 `area.name` 写法。
+- 唯一的取词入口是 `useTranslations(locale)` 返回的 `t('key')`；文案在 `apps/web/src/lib/i18n/messages/{locale}.json`，key 用扁平 `area.name` 写法。
 - **页面、组件里不写裸字符串**：硬编码的界面文案 CI 管不了，但会在加语言时全部漏掉。
 - 缺词不静默：默认语言也没有该 key 时 `t()` 直接抛错让构建失败；其它语言缺 key 回退到 zh-CN（同步由 `i18n:check` 拦截）。
-- 品牌名「博观」是常量（`apps/web/apps/web/src/lib/site.ts`），不进 messages。
+- 品牌名「博观」是常量（`apps/web/src/lib/site.ts`），不进 messages。
 
 ### 内容语言
 
@@ -443,11 +443,11 @@ select rowid from posts_fts where posts_fts match 'title_tokens : ("缓存")'
 
 ### 三层，各管各的
 
-| 层   | 位置                                                                    | 谁用                     |
-| :--- | :---------------------------------------------------------------------- | :----------------------- |
-| 原语 | `apps/web/apps/web/src/styles/tokens.css` 的 `--neutral-*`/`--accent-*` | 只有令牌层，组件不直接用 |
-| 语义 | 同文件的 `--color-*`                                                    | 组件只引用这一层         |
-| 组件 | `.astro` 里的 `<style>`                                                 | 单个组件内部，作用域隔离 |
+| 层   | 位置                                                           | 谁用                     |
+| :--- | :------------------------------------------------------------- | :----------------------- |
+| 原语 | `apps/web/src/styles/tokens.css` 的 `--neutral-*`/`--accent-*` | 只有令牌层，组件不直接用 |
+| 语义 | 同文件的 `--color-*`                                           | 组件只引用这一层         |
+| 组件 | `.astro` 里的 `<style>`                                        | 单个组件内部，作用域隔离 |
 
 ### 亮/暗只有一套机制
 
@@ -471,11 +471,11 @@ select rowid from posts_fts where posts_fts match 'title_tokens : ("缓存")'
 
 ### 报纸纸面：首页、索引页与目录页
 
-首页是一张全宽的「技术晨报」，由 `apps/web/apps/web/src/components/HomeNewspaper.astro` 与 `apps/web/apps/web/src/styles/home.css` 实现。纸面底层抽在 `apps/web/apps/web/src/styles/paper.css`：页面级 `--home-*` 语义色、纸纹、检索框、主题/语言控件与共享页脚 `PaperFooter.astro`。报纸纸面通过 `light-dark()` 跟随全站亮/暗主题：亮色是暖纸 + 墨色 + 朱砂，暗色是暖炭黑 + 奶油 + 琥珀红；不另做一套布局。共享页脚底部固定展示 ICP 备案号（法规要求，见 `apps/web/apps/web/src/lib/site.ts` 的 `icp`）。
+首页是一张全宽的「技术晨报」，由 `apps/web/src/components/HomeNewspaper.astro` 与 `apps/web/src/styles/home.css` 实现。纸面底层抽在 `apps/web/src/styles/paper.css`：页面级 `--home-*` 语义色、纸纹、检索框、主题/语言控件与共享页脚 `PaperFooter.astro`。报纸纸面通过 `light-dark()` 跟随全站亮/暗主题：亮色是暖纸 + 墨色 + 朱砂，暗色是暖炭黑 + 奶油 + 琥珀红；不另做一套布局。共享页脚底部固定展示 ICP 备案号（法规要求，见 `apps/web/src/lib/site.ts` 的 `icp`）。
 
-标签、公司、年份、搜索与首页分页共用 `apps/web/apps/web/src/components/IndexSheet.astro` 与 `apps/web/apps/web/src/styles/index-sheet.css`：报眉（桌面吸顶）、版头（kicker + 衬线标题 + 真实统计）、筛选条（链接驱动，无 JS）、两栏目录、右栏相关切片与分页。报眉与版头抽成 `PaperRunningHead.astro` / `PaperSectionHead.astro`，目录页复用。版头换、目录不换；静态切片页保留唯一 canonical，任何带筛选的组合与搜索页都是 `noindex`。索引页每页 20 条；`/page/[n]` 是首页续版，保持 10 条；搜索无查询时展示最近 8 条作为检索着陆页。首页与索引页都用 `chrome="bare"`，由报眉承担导航、检索、主题与语言切换。
+标签、公司、年份、搜索与首页分页共用 `apps/web/src/components/IndexSheet.astro` 与 `apps/web/src/styles/index-sheet.css`：报眉（桌面吸顶）、版头（kicker + 衬线标题 + 真实统计）、筛选条（链接驱动，无 JS）、两栏目录、右栏相关切片与分页。报眉与版头抽成 `PaperRunningHead.astro` / `PaperSectionHead.astro`，目录页复用。版头换、目录不换；静态切片页保留唯一 canonical，任何带筛选的组合与搜索页都是 `noindex`。索引页每页 20 条；`/page/[n]` 是首页续版，保持 10 条；搜索无查询时展示最近 8 条作为检索着陆页。首页与索引页都用 `chrome="bare"`，由报眉承担导航、检索、主题与语言切换。
 
-`/tags`、`/companies` 用 `DirectorySheet.astro` 与 `apps/web/apps/web/src/styles/directory.css` 做分组目录，共享同一套报眉、版头与页脚：公司按收录数排成索引，标签按主题分组并在顶部提供分组跳转；标签目录只列可索引标签。
+`/tags`、`/companies` 用 `DirectorySheet.astro` 与 `apps/web/src/styles/directory.css` 做分组目录，共享同一套报眉、版头与页脚：公司按收录数排成索引，标签按主题分组并在顶部提供分组跳转；标签目录只列可索引标签。
 
 > 基线：`light-dark()` 与 `oklch()` 需要 2024 年后的浏览器（Chrome 123 / Safari 17.5 / Firefox 120）。本站面向开发者，不再为更老的浏览器降级。
 

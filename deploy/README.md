@@ -82,7 +82,7 @@ cd /home/xun/boguan
 bun install --frozen-lockfile
 # 空数据库：执行 db:init、db:seed，再导入备份或进行首次合规抓取。
 # 现有数据库的迁移前先备份，评估旧版本兼容性。
-./node_modules/.bin/astro build
+BOGUAN_OUT_DIR="$OUT" bun run --cwd apps/web build
 bash deploy/ops/bootstrap.sh
 
 sudo install -d -m 750 -o caddy -g caddy /var/log/caddy

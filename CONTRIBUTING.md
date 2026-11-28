@@ -20,7 +20,7 @@ vpr i18n:check     # 文案检查（缺 key / 漏翻 / 未使用）
 vpr build
 ```
 
-改动界面文案时，请同时更新 `src/lib/i18n/messages/zh-CN.json`（源语言）与 `en.json`，取词一律用 `useTranslations(locale)`，不要在页面里硬编码字符串。
+改动界面文案时，请同时更新 `apps/web/src/lib/i18n/messages/zh-CN.json`（源语言）与 `apps/web/src/lib/i18n/messages/en.json`，取词一律用 `useTranslations(locale)`，不要在页面里硬编码字符串。
 
 ## 提交 PR
 

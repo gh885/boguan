@@ -1,5 +1,5 @@
 import { Jieba } from "@node-rs/jieba";
-import { dict } from "@node-rs/jieba/dict";
+import { dict } from "@node-rs/jieba/dict.js";
 import { collapseWhitespace } from "@boguan/domain";
 
 let instance: Jieba | null = null;

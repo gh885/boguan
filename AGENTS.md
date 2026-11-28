@@ -30,17 +30,17 @@ Web 与 crawler 不互相调用，只通过 SQLite 交汇。
 
 ## 技术栈与边界
 
-| 层              | 选型                                                 |
-| :-------------- | :--------------------------------------------------- |
-| 框架            | Astro 7（默认静态输出，按需 SSR）                    |
-| 语言            | TypeScript strict                                    |
-| 运行时 / 包管理 | Bun 1.4                                              |
-| 工具链          | Vite+（`vp` / `vpr`）                                |
-| 数据库          | SQLite + better-sqlite3 + Drizzle ORM                |
-| 检索            | SQLite FTS5，中文先经 jieba 分词（`@node-rs/jieba`） |
-| 日期            | Luxon（解析与时区计算）；展示使用 `Intl`             |
-| 多语言          | `apps/web/src/i18n`（zh-CN 默认 + en），`x18n` 校验  |
-| 样式            | 原生 CSS + 设计令牌（`apps/web/src/styles/`）        |
+| 层              | 选型                                                    |
+| :-------------- | :------------------------------------------------------ |
+| 框架            | Astro 7（默认静态输出，按需 SSR）                       |
+| 语言            | TypeScript strict                                       |
+| 运行时 / 包管理 | Bun 1.4                                                 |
+| 工具链          | Vite+（`vp` / `vpr`）                                   |
+| 数据库          | SQLite + better-sqlite3 + Drizzle ORM                   |
+| 检索            | SQLite FTS5，中文先经 jieba 分词（`@node-rs/jieba`）    |
+| 日期            | Luxon（解析与时区计算）；展示使用 `Intl`                |
+| 多语言          | `apps/web/src/lib/i18n`（zh-CN 默认 + en），`x18n` 校验 |
+| 样式            | 原生 CSS + 设计令牌（`apps/web/src/styles/`）           |
 
 工作区包的职责、技术栈、公开接口与依赖约束记录于包内 README；包边界决策见 `docs/adr/`。应用仅通过公开入口依赖包能力，不跨包访问内部源码。
 

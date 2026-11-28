@@ -60,7 +60,7 @@ https://boguan.org.cn
 | 数据库          | SQLite                            | ✅ 已就绪     |
 | ORM             | Drizzle                           | ✅ 已就绪     |
 | 全文检索        | SQLite FTS5 + 中文分词（jieba）   | ✅ 查询可用   |
-| 多语言          | `src/lib/i18n` + `x18n` 文案校验  | ✅ 已就绪     |
+| 多语言          | `x18n` 文案校验（zh-CN + en）     | ✅ 已就绪     |
 | 样式            | 原生 CSS + 设计令牌，亮/暗主题    | ✅ 已就绪     |
 | 抓取管道        | 独立 TS 进程（不跑在 Web 进程里） | ✅ 两家源跑通 |
 | 部署            | 单台 ECS + systemd + Caddy        | ✅ 已上线     |
@@ -79,7 +79,7 @@ boguan/
 ├── apps/
 │   ├── crawler/            # 抓取管道：fetch/robots → adapters → normalize → pipeline
 │   ├── ops/                # init / seed / check / curate / metrics / fixture
-│   └── web/                # 站点（迁移中，当前仍在 src/）
+│   └── web/                # Astro 站点：pages / components / layouts / lib / styles
 ├── packages/
 │   ├── body-store/         # crawler 私有正文文件
 │   ├── catalog/            # 采集配置
@@ -87,12 +87,6 @@ boguan/
 │   ├── domain/             # 纯业务规则
 │   └── search/             # 分词与 FTS 查询表达式
 ├── data/                   # 本地 SQLite 与正文文件（不进仓库）
-├── src/
-│   ├── assets/             # 需要被构建处理的资源
-│   ├── components/         # 可复用组件（.astro 或岛屿）
-│   ├── layouts/            # 页面骨架、全局 head
-│   ├── pages/              # 路由：文件即路由
-│   └── env.d.ts
 ├── docs/                   # 架构与决策文档
 ├── astro.config.mjs
 ├── vite.config.ts          # Vite+ 配置：fmt / lint

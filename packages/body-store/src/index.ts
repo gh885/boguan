@@ -7,10 +7,23 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import { gunzipSync, gzipSync } from "node:zlib";
+const defaultDir = process.env.BOGUAN_BODIES ?? "data/bodies";
 
-export const defaultBodiesDir = process.env.BOGUAN_BODIES ?? "data/bodies";
+function workspaceRoot(): string {
+  let dir = process.cwd();
+  for (;;) {
+    if (existsSync(join(dir, "bun.lock"))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) return process.cwd();
+    dir = parent;
+  }
+}
+
+export const defaultBodiesDir = isAbsolute(defaultDir)
+  ? defaultDir
+  : join(workspaceRoot(), defaultDir);
 
 export interface BodyStore {
   put: (postId: number, text: string) => void;

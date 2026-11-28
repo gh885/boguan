@@ -12,7 +12,7 @@ function walk(root: string): string[] {
   const dir = join(repo, root);
   if (!existsSync(dir)) return [];
   return (readdirSync(dir, { recursive: true }) as string[])
-    .filter((name) => !name.includes("node_modules"))
+    .filter((name) => !/(^|\/)(node_modules|dist|\.astro)(\/|$)/.test(name.replaceAll("\\", "/")))
     .filter((name) => sourceFile.test(name) && !name.endsWith(".test.ts"))
     .map((name) => join(dir, name));
 }

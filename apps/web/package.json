@@ -2,13 +2,20 @@
   "name": "@boguan/web",
   "private": true,
   "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
   "dependencies": {
+    "@astrojs/node": "^11.1.9",
     "@astrojs/rss": "^4.0.19",
     "@astrojs/sitemap": "^3.7.4",
     "@boguan/database": "workspace:*",
     "@boguan/domain": "workspace:*",
     "@boguan/search": "workspace:*",
-    "@nauverse/astro-bun": "^0.1.4",
+    "@node-rs/jieba": "^2.0.4",
     "astro": "^7.4.4"
   }
 }

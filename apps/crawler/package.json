@@ -11,8 +11,14 @@
     "@boguan/database": "workspace:*",
     "@boguan/domain": "workspace:*",
     "@boguan/search": "workspace:*",
+    "better-sqlite3": "^13.0.3",
     "cheerio": "^1.2.0",
+    "domhandler": "^5.0.3",
+    "drizzle-orm": "^0.45.4",
     "robots-parser": "^3.0.1",
     "rss-parser": "^3.13.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0"
   }
 }
