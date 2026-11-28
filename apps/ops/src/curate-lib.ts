@@ -1,9 +1,13 @@
-import { rebuildAllPostFts, type Db, companies, posts } from "@boguan/database/ops";
-import { HIDDEN_NON_ARTICLE, isNonArticle, stripSiteSuffix, titleNorm } from "@boguan/domain";
+import { dedupe, posts, rebuildAllPostFts, type Db, companies } from "@boguan/database/ops";
+import {
+  contentHash,
+  HIDDEN_NON_ARTICLE,
+  isNonArticle,
+  stripSiteSuffix,
+  titleNorm,
+} from "@boguan/domain";
 import { eq } from "drizzle-orm";
 import { openBodyStore } from "@boguan/body-store";
-import { contentHash } from "../crawler/normalize";
-import { dedupe } from "../crawler/pipeline";
 
 const bodies = openBodyStore();
 

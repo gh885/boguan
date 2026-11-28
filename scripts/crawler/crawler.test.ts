@@ -1,4 +1,13 @@
-import { upsertPostFts, type Db, companies, posts, sources, tags } from "@boguan/database/crawler";
+import {
+  dedupe,
+  upsertPostFts,
+  type Db,
+  companies,
+  posts,
+  sources,
+  tags,
+} from "@boguan/database/crawler";
+import { contentHash } from "@boguan/domain";
 import Database from "better-sqlite3";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
@@ -8,9 +17,9 @@ import * as schema from "@boguan/database/ops";
 import { migrationsFolder } from "@boguan/database/ops";
 import { isPostUrl } from "./adapters/youzan";
 import { requirePageText, type FetchedPage } from "./fetch";
-import { dedupe, TagResolver } from "./pipeline";
+import { TagResolver } from "./pipeline";
 import { parseSitemapUrls } from "./sitemap";
-import { contentHash, normalizePost } from "./normalize";
+import { normalizePost } from "./normalize";
 import { ruleTags } from "@boguan/catalog";
 
 function freshDb(): Db {

@@ -1,5 +1,6 @@
 export {
   canonicalizeUrl,
+  contentHash,
   normalizeRawTag,
   normalizeRawTags,
   originOf,

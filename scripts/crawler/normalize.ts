@@ -1,5 +1,6 @@
 import {
   canonicalizeUrl,
+  contentHash,
   parsePublishedAt,
   yearInTimeZone,
   decodeEntities,
@@ -9,7 +10,6 @@ import {
   readingMinutes,
   titleNorm,
 } from "@boguan/domain";
-import { createHash } from "node:crypto";
 import type { Detail, ListItem, TagRef } from "./types";
 
 /**
@@ -69,9 +69,6 @@ function buildSummary(item: ListItem, body: string): string {
 }
 
 /** 全量指纹：标题 + 摘要 + 正文，变了才重写正文文件与 FTS */
-export function contentHash(title: string, summary: string, body: string): string {
-  return createHash("sha256").update(`${title}\n${summary}\n${body}`).digest("hex");
-}
 
 export function normalizePost(input: NormalizeInput): NormalizedPost | null {
   const { item, detail, timezone, base, brands = [] } = input;

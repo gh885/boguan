@@ -16,7 +16,7 @@ if ! bun scripts/crawler/cli.ts --mode=incremental; then
 fi
 
 log 'db check --fix --prune'
-bun scripts/db/check.ts --fix --prune
+bun apps/ops/src/check.ts --fix --prune
 verify_database "$BOGUAN_DB"
 # PARTIAL/FAILED 不能因 CLI 返回 0 而被日常任务吞掉。
 if ! python3 - "$BOGUAN_DB" <<'PY'

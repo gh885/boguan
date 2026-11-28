@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 const TRACKING_PARAMS = new Set([
   "from",
   "ref",
@@ -104,4 +106,8 @@ export function normalizeRawTags(list: readonly string[]): string[] {
     out.push(key);
   }
   return out;
+}
+
+export function contentHash(title: string, summary: string, body: string): string {
+  return createHash("sha256").update([title, summary, body].join("\n")).digest("hex");
 }

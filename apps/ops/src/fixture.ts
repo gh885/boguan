@@ -23,7 +23,7 @@ import { fileURLToPath } from "node:url";
  * 需要让构建用它：`BOGUAN_DB=data/fixture.db vpr build`（CI 就是这么做的）。
  */
 
-const fixturePath = fileURLToPath(new URL("../../data/fixture.db", import.meta.url));
+const fixturePath = fileURLToPath(new URL("../../../data/fixture.db", import.meta.url));
 
 rmSync(fixturePath, { force: true });
 rmSync(`${fixturePath}-wal`, { force: true });

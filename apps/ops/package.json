@@ -2,6 +2,15 @@
   "name": "@boguan/ops",
   "private": true,
   "type": "module",
+  "exports": {
+    "./check": "./src/check.ts",
+    "./curate": "./src/curate.ts",
+    "./curate-lib": "./src/curate-lib.ts",
+    "./fixture": "./src/fixture.ts",
+    "./init": "./src/init.ts",
+    "./metrics": "./src/metrics.ts",
+    "./seed": "./src/seed.ts"
+  },
   "dependencies": {
     "@boguan/body-store": "workspace:*",
     "@boguan/catalog": "workspace:*",

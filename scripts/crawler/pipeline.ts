@@ -1,6 +1,7 @@
 import {
   upsertPostFts,
   type Db,
+  dedupe,
   openDatabase,
   companies,
   crawlFailures,
@@ -17,6 +18,7 @@ import {
   isNonArticle,
   normalizeRawTag,
   canonicalizeUrl,
+  contentHash,
   slugify,
 } from "@boguan/domain";
 import { and, desc, eq, isNotNull, ne } from "drizzle-orm";
@@ -24,7 +26,7 @@ import { openBodyStore } from "@boguan/body-store";
 import { adapterFor } from "./adapters";
 import type { AdapterContext, SourceAdapter } from "./adapters/types";
 import { PoliteFetcher } from "./fetch";
-import { contentHash, normalizePost, type NormalizedPost } from "./normalize";
+import { normalizePost, type NormalizedPost } from "./normalize";
 import type { Detail } from "./types";
 
 const bodies = openBodyStore();
@@ -79,8 +81,6 @@ export interface CrawlReport {
 /** 水位回看窗口：列表页顺序偶尔抖动，留一点余量再停 */
 const WATERMARK_SLACK_MS = 6 * 60 * 60 * 1000;
 /** 跨源去重的时间窗口：平台转载常在 1–2 天后 */
-const DEDUPE_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
-
 type Log = (message: string) => void;
 
 export async function crawl(options: CrawlOptions): Promise<CrawlReport> {
@@ -791,64 +791,11 @@ function recordFailure(
     .run();
 }
 
-interface DedupeRow {
-  id: number;
-  companyId: number;
-  titleNorm: string;
-  publishedAt: string | null;
-  priority: number;
-}
-
 /**
  * 跨源去重：同公司 + 同归一标题 + 3 天内。
  * 官网（priority 小）胜出，输的那条打 `duplicate_of_id`、删索引与正文文件——
  * 否则搜索里会出现同一篇文章的两个入口。
  */
-export function dedupe(db: Db, log: Log): number {
-  const rows = db.$client
-    .prepare(
-      `select p.id as id, p.company_id as companyId, p.title_norm as titleNorm,
-              p.published_at as publishedAt, s.priority as priority
-       from posts p
-       join sources s on s.id = p.source_id
-       where p.duplicate_of_id is null and p.is_visible = 1
-         and exists (
-           select 1 from posts q
-           where q.company_id = p.company_id and q.title_norm = p.title_norm and q.id <> p.id
-         )
-       order by p.company_id, p.title_norm, s.priority asc, coalesce(p.published_at, '') asc, p.id asc`,
-    )
-    .all() as DedupeRow[];
-
-  let marked = 0;
-  let index = 0;
-  while (index < rows.length) {
-    const group: DedupeRow[] = [];
-    const key = `${rows[index].companyId}|${rows[index].titleNorm}`;
-    while (index < rows.length && `${rows[index].companyId}|${rows[index].titleNorm}` === key) {
-      group.push(rows[index]);
-      index += 1;
-    }
-    if (group.length < 2) continue;
-
-    const winner = group[0];
-    for (const loser of group.slice(1)) {
-      if (!withinWindow(winner.publishedAt, loser.publishedAt)) continue;
-      db.update(posts).set({ duplicateOfId: winner.id }).where(eq(posts.id, loser.id)).run();
-      // 索引与正文都留着：搜索/列表在查询时按 duplicate_of_id 过滤，
-      // 索引不参与可见性判断，也就不存在「改判后需要补索引」这一步
-      marked += 1;
-    }
-  }
-
-  if (marked > 0) log(`跨源去重：${marked} 条判为重复（保留官网/高优先级那条）`);
-  return marked;
-}
-
-function withinWindow(a: string | null, b: string | null): boolean {
-  if (!a || !b) return true; // 时间不全就不拿时间当否决条件
-  return Math.abs(Date.parse(a) - Date.parse(b)) <= DEDUPE_WINDOW_MS;
-}
 
 /**
  * 只抓一页、只打印不写库。接入新源时先跑它（`vpr crawl --dry-run --source=...`），

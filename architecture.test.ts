@@ -48,12 +48,9 @@ describe("包边界", () => {
   it("正文存储只有 crawler 与 ops 能引用", () => {
     const allowed = new Set([
       "scripts/crawler/pipeline.ts",
-      "scripts/db/check.ts",
-      "scripts/db/curate-lib.ts",
-      "scripts/db/metrics.ts",
       "apps/crawler/src/pipeline.ts",
       "apps/ops/src/check.ts",
-      "apps/ops/src/curate.ts",
+      "apps/ops/src/curate-lib.ts",
       "apps/ops/src/metrics.ts",
     ]);
 
