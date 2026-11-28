@@ -9,15 +9,6 @@ import {
 import { eq } from "drizzle-orm";
 import { openBodyStore } from "@boguan/body-store";
 
-/**
- * 对账与清理：
- *   vpr db:check           # 只报告，不改
- *   vpr db:check --fix     # 修复索引：补缺、删脏、删孤儿
- *   vpr db:check --prune   # 额外清理：孤正文文件、过期 http_cache / 抓取日志
- *
- * 抓取是自动流程，正常不会不一致；这个脚本用于「有人直接改过库」和「下架后的收尾」。
- */
-
 const bodies = openBodyStore();
 
 const flags = new Set(process.argv.slice(2).filter((arg) => arg.startsWith("--")));
@@ -31,7 +22,6 @@ const fts = checkFts(db);
 console.log(`索引对账：缺失 ${fts.missing.length} / 孤儿 ${fts.orphan.length}`);
 
 if (fix) {
-  // 修复是一个整体：要么全补上，要么一条不动，中途崩了索引也不会停在半态
   const repaired = db.$client.transaction(() => {
     for (const id of fts.orphan) deletePostFts(db, id);
     let rebuilt = 0;
@@ -48,7 +38,6 @@ if (fix) {
   issues.push("索引与 posts 不一致（用 --fix 修复）");
 }
 
-/** 孤正文文件：帖子已删但仍占磁盘 */
 const bodyIds = new Set(bodies.ids());
 const postIds = new Set(
   (db.$client.prepare("select id from posts").all() as { id: number }[]).map((row) => row.id),
@@ -71,7 +60,6 @@ console.log(
   `正文文件 ${bodyIds.size} 个 / 可展示帖子 ${visible} 条（差额来自正文抓取失败，下一轮会补）`,
 );
 
-/** 被挡住的源：需要人工判断，脚本不会自动解除 */
 const blocked = db
   .select()
   .from(sources)

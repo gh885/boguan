@@ -130,7 +130,6 @@ describe("formatCount / formatList", () => {
 
 describe("formatDate", () => {
   it("按北京时间展示", () => {
-    // UTC 2024-01-01 20:00 → 北京时间 2024-01-02
     const date = "2024-01-01T20:00:00.000Z";
     expect(formatDate(date, "zh-CN")).toContain("2024");
     expect(formatDate(date, "zh-CN")).toContain("2");
@@ -140,7 +139,6 @@ describe("formatDate", () => {
 
 describe("formatLongDate / formatNumber", () => {
   it("刊头日期同时给出日期与星期", () => {
-    // UTC 2024-01-01 20:00 → 北京时间 2024-01-02，星期二
     const date = "2024-01-01T20:00:00.000Z";
     expect(formatLongDate(date, "zh-CN")).toContain("星期二");
     expect(formatLongDate(date, "zh-CN")).toContain("·");

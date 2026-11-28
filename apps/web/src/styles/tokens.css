@@ -1,20 +1,6 @@
-/**
- * 设计令牌。命名与分层见 docs/ARCHITECTURE.md §10。
- *
- * 视觉基线取自参考站（engineering.fyi）：近黑背景、1px 细边框、
- * 蓝紫强调色与 12px 卡片圆角；亮色主题是对应的白底版本。
- *
- * - 原语（--neutral-*、--accent-*）只在这里出现，组件不许直接用。
- * - 语义（--color-*）是组件唯一可用的颜色来源，每个角色都有亮/暗两值。
- * - 亮暗只靠 color-scheme 切换，不要再写 `@media (prefers-color-scheme)` 去改令牌。
- *
- * 改了颜色记得跑 `vpr test`：src/styles/tokens.test.ts 会实测对比度。
- */
-
 :root {
   color-scheme: light dark;
 
-  /* 中性色：色相固定 265，接近 zinc 的冷灰 */
   --neutral-0: oklch(1 0 0);
   --neutral-25: oklch(0.96 0.002 265);
   --neutral-50: oklch(0.967 0.003 265);
@@ -26,11 +12,9 @@
   --neutral-850: oklch(0.175 0.004 265);
   --neutral-900: oklch(0.145 0.003 265);
 
-  /* 强调色：链接与可交互元素；亮色用饱和蓝，暗色提亮保证对比度 */
   --accent-300: oklch(0.72 0.14 258);
   --accent-600: oklch(0.55 0.24 264);
 
-  /* 语义色：组件只用这一层 */
   --color-bg: light-dark(var(--neutral-0), var(--neutral-900));
   --color-surface: light-dark(var(--neutral-0), var(--neutral-850));
   --color-surface-muted: light-dark(var(--neutral-50), var(--neutral-800));
@@ -39,12 +23,11 @@
   --color-text-secondary: light-dark(var(--neutral-500), var(--neutral-300));
   --color-accent: light-dark(var(--accent-600), var(--accent-300));
 
-  /* 排版：不加载 Web 字体，中文走系统字体栈（Inter 只在系统已安装时参与） */
   --font-sans:
     "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
     "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif;
   --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, Consolas, monospace;
-  /* 关于页的展示字体：不加载 Web 字体，优先系统里有的中文衬线 */
+
   --font-serif:
     "Noto Serif SC", "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", "SimSun",
     serif;
@@ -59,13 +42,11 @@
   --weight-semibold: 600;
   --tracking-tight: -0.015em;
 
-  /* 间距 */
   --space-xs: 0.5rem;
   --space-sm: 0.75rem;
   --space-md: 1rem;
   --space-xl: 2rem;
 
-  /* 形状与布局 */
   --radius-sm: 4px;
   --radius-full: 999px;
   --focus-ring-width: 2px;
@@ -73,7 +54,6 @@
   --transition-fast: 120ms ease;
 }
 
-/* 主题覆盖：值只有 light / dark，缺省即跟随系统 */
 :root[data-theme="light"] {
   color-scheme: light;
 }

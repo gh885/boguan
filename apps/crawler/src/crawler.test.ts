@@ -264,7 +264,6 @@ describe("TagResolver", () => {
 
     expect(resolved.map((tag) => tag.slug)).toEqual(["frontend", "da-shu-ju"]);
     expect(unmapped.has("内部拼音别名")).toBe(true);
-    // 大数据：先建 tag，再写 alias，第二轮直接命中且不重复建
     const second = resolver.resolve([{ raw: "大数据", name: "大数据" }], new Set());
     expect(second.map((tag) => tag.slug)).toEqual(["da-shu-ju"]);
     expect(db.select().from(tags).all()).toHaveLength(2);
@@ -296,8 +295,6 @@ describe("跨源去重", () => {
     expect(rows.find((row) => row.id === repost)?.duplicateOfId).toBe(official);
     expect(rows.find((row) => row.id === official)?.duplicateOfId).toBeNull();
 
-    // 索引与可见性解耦：两条都在索引里，搜索靠 duplicate_of_id 过滤，
-    // 这样「胜出方被删 → 改判」时不需要补索引
     const indexed = db.$client
       .prepare("select rowid as id from posts_fts")
       .all()

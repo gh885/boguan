@@ -6,22 +6,13 @@ import "../styles/tokens.css";
 import "../styles/base.css";
 
 interface Props {
-	/** 页面自己的标题，不含站名；`<title>` 由 layout 统一拼上站名。 */
 	title: string;
 	description: string;
-	/** 搜索页、筛选组合页等薄页面传 true。 */
 	noindex?: boolean;
-	/** 默认从 `Astro.currentLocale` 推导，一般不用传。 */
 	locale?: Locale;
-	/**
-	 * 本页实际生成的语言，默认全部。页面只在部分语言下存在时（例如某个只有中文的专题），
-	 * 在这里收窄，否则 hreflang 与语言切换都会指向 404。
-	 */
 	alternateLocales?: readonly Locale[];
-	/** 分页页的上一页 / 下一页，输出成 <link rel="prev/next">。 */
 	prevHref?: string;
 	nextHref?: string;
-	/** 结构化数据；由页面传入，layout 只负责序列化。 */
 	jsonLd?: Record<string, unknown>;
 }
 
@@ -49,10 +40,6 @@ const robots = noindex ? "noindex, follow" : "index, follow";
 <html lang={locale}>
 	<head>
 		<meta charset="utf-8" />
-		{/*
-			主题在首屏绘制前定好，避免白闪；只读本地偏好，不改任何页面状态。
-			见 docs/ARCHITECTURE.md §10。
-		*/}
 		<script is:inline>
 			(() => {
 				const root = document.documentElement;
@@ -61,7 +48,6 @@ const robots = noindex ? "noindex, follow" : "index, follow";
 					const stored = localStorage.getItem("boguan:theme");
 					if (stored === "light" || stored === "dark") root.dataset.theme = stored;
 				} catch {
-					// 隐私模式下 localStorage 不可用，跟随系统即可
 				}
 			})();
 		</script>
@@ -136,7 +122,6 @@ const robots = noindex ? "noindex, follow" : "index, follow";
 		<script>
 			import { createRumConfig } from "../lib/rum";
 
-			// Only production traffic belongs in the paid workspace; respect DNT.
 			if (
 				import.meta.env.PROD &&
 				location.protocol === "https:" &&
@@ -156,7 +141,7 @@ const robots = noindex ? "noindex, follow" : "index, follow";
 </html>
 
 <style>
-	/* 页面骨架只剩一条：head 与 skip-link 归这里管，版面交给各页面自己的样式 */
+
 	.main {
 		min-height: 100dvh;
 		width: 100%;

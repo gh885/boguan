@@ -3,19 +3,11 @@ import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vite-plus/test";
 
-/**
- * 设计令牌的守卫：色板是否仍在 sRGB 内、每个角色两套值是否齐全、
- * 语义色是否只有一套切换机制、以及实测对比度是否达标。
- *
- * 改颜色后跑 `vpr test`；失败就是真的不达标，不要放宽阈值。
- */
-
 const stylesDir = fileURLToPath(new URL(".", import.meta.url));
 const srcDir = fileURLToPath(new URL("..", import.meta.url));
 
 const tokenCss = readFileSync(join(stylesDir, "tokens.css"), "utf8");
 
-/** 组件与全局样式，用来检查它们引用的颜色令牌是否真的存在 */
 const allCss: Record<string, string> = {};
 for (const file of readdirSync(srcDir, { recursive: true })) {
   const path = String(file);
@@ -39,7 +31,6 @@ function parseOklch(value: string): Oklch {
   return [l, c, h];
 }
 
-/** oklch → 线性 sRGB */
 function toLinearRgb([l, c, h]: Oklch): [number, number, number] {
   const rad = (h * Math.PI) / 180;
   const a = c * Math.cos(rad);
@@ -65,7 +56,6 @@ function contrast(a: Oklch, b: Oklch): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-/** 去掉注释再匹配，否则注释里提到的写法会被当成真实代码 */
 const flat = tokenCss.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\s+/g, " ");
 
 const primitives = new Map<string, Oklch>();
@@ -80,7 +70,6 @@ for (const match of flat.matchAll(
   semantic.set(match[1]!, { light: match[2]!, dark: match[3]! });
 }
 
-/** tokens.css 里定义的全部令牌名(不含颜色值解析,任何类型的令牌都算) */
 const definedTokens = new Set<string>();
 for (const match of tokenCss.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/^\s*--([a-z0-9-]+):/gm)) {
   definedTokens.add(match[1]!);
@@ -108,7 +97,6 @@ describe("设计令牌", () => {
   });
 
   it("语义色只通过 light-dark() 定义，没有第二套切换机制", () => {
-    // 统计所有 --color-* 定义，必须与 light-dark() 的数量一致
     const definitions = [...flat.matchAll(/--color-[a-z-]+:/g)].length;
     expect(definitions).toBe(semantic.size);
     expect(flat).not.toMatch(/prefers-color-scheme[^}]*--color-/);
@@ -153,7 +141,6 @@ describe("设计令牌", () => {
     expect(dead, "tokens.css 里这些令牌没有任何 var() 引用，删掉或用起来").toEqual([]);
   });
 
-  /** 正文 ≥ 4.5:1，边框/分隔 ≥ 1.4:1（分隔线是装饰性弱边界，但必须看得见） */
   const checkedPairs: Array<[string, string, number]> = [
     ["text-primary", "bg", 4.5],
     ["text-secondary", "bg", 4.5],

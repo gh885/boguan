@@ -18,11 +18,6 @@ import { INDEX_PAGE_SIZE, pageCount, pageOffset, pagePath } from "../../../../..
 import { collectionJsonLd } from "../../../../../lib/structured-data";
 import { site } from "../../../../../lib/site";
 
-/**
- * 期页的续版：一期刊得多（例如创刊号一次入版几百篇）才需要翻页。
- * 与首页续版同构：第 1 页不带 `/page/1`，避免同一内容两个 URL。
- */
-
 export const getStaticPaths = (() => {
 	const latest = Math.max(1, editionNumberAt(new Date()) ?? 1);
 	const summaries = new Map(editionSummaries(openWebDatabase()).map((row) => [row.number, row.count]));

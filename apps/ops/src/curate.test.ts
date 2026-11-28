@@ -66,15 +66,11 @@ describe("db:curate", () => {
     expect(report.hidden).toBe(1);
 
     const after = db.select().from(posts).all();
-    // 站点后缀被剥掉
     expect(after[0]!.title).toBe("得物直播低延迟探索");
-    // 真副标题原样保留
     expect(after[1]!.title).toBe("一次慢查的分析｜归因篇");
-    // 活动页数据还在，只是不可见
     expect(after[2]!.title).toBe("技术活动 | 有赞数据库技术开放日（已结束）");
     expect(after[2]!.isVisible).toBe(false);
     expect(after[2]!.hiddenReason).toBe(HIDDEN_NON_ARTICLE);
-    // 其它行不被误伤（这是「UPDATE 漏了 where」那次事故的回归测试）
     expect(after[0]!.isVisible).toBe(true);
     expect(after[1]!.summary).toBe("摘要二");
     expect(new Set(after.map((row) => row.title)).size).toBe(3);
@@ -103,7 +99,6 @@ describe("db:curate", () => {
       .returning()
       .get();
 
-    // 源站把「团队文化」类文章也打了这个标签：OKR 实践不该被下架
     db.update(posts)
       .set({ title: "透过 OKR 进行项目过程管理" })
       .where(eq(posts.id, rows[1]!.id))
@@ -113,7 +108,6 @@ describe("db:curate", () => {
     curate(db);
     const after = db.select().from(posts).all();
     expect(after.find((post) => post.id === rows[1]!.id)!.isVisible).toBe(true);
-    // 标题确实是团队介绍的那条（tag 命中 + 标题命中）下架
     expect(after[0]!.title).toBe("得物直播低延迟探索");
   });
 });

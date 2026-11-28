@@ -20,7 +20,6 @@ import { segment, toMatchQuery } from "@boguan/search";
 import { dayInTimeZone, editionRange } from "@boguan/domain";
 import * as schema from "./schema";
 
-/** 每个用例一个内存库：迁移真跑一遍，schema 与迁移文件不一致会直接失败 */
 function freshDb(): Db {
   const raw = new Database(":memory:");
   raw.pragma("foreign_keys = ON");
@@ -39,7 +38,6 @@ interface SeedOptions {
   publishedAt?: string | null;
   publishedYear?: number | null;
   contentHash?: string;
-  /** 入库时间；期页按它归属期号（不传就用默认的 now） */
   firstSeenAt?: string;
 }
 
@@ -106,7 +104,6 @@ describe("数据模型", () => {
     ]) {
       expect(names, table).toContain(table);
     }
-    // 正文在 crawler 私有目录里，web 用的这张库不该有承载全文的表
     expect(names).not.toContain("post_bodies");
   });
 
@@ -207,7 +204,6 @@ describe("FTS 同步", () => {
       .get(post.id) as { title_tokens: unknown; body_tokens: unknown };
     expect(row.title_tokens).toBeNull();
     expect(row.body_tokens).toBeNull();
-    // 也因此拿不到命中上下文：snippet/highlight 返回 NULL（§7 的取舍）
     const snippet = db.$client
       .prepare(
         "select snippet(posts_fts, 1, '[', ']', '…', 8) as s from posts_fts where posts_fts match ?",
@@ -222,11 +218,9 @@ describe("FTS 同步", () => {
     upsertPostFts(db, post.id, post.title, "正文");
     expect(checkFts(db)).toEqual({ missing: [], orphan: [] });
 
-    // 下架不影响索引：可见性在查询时过滤，索引不参与判断
     db.$client.prepare("update posts set is_visible = 0 where id = ?").run(post.id);
     expect(checkFts(db)).toEqual({ missing: [], orphan: [] });
 
-    // 帖子被删但索引还在 → orphan
     db.$client.prepare("delete from posts where id = ?").run(post.id);
     expect(checkFts(db).orphan).toEqual([post.id]);
   });
@@ -305,7 +299,6 @@ describe("列表查询", () => {
 
   it("年份归档按源站时区取年，缺年份的不进任何年份页", () => {
     const db = freshDb();
-    // UTC 16:30 = 北京时间次日 00:30，应归到 2024
     const lateNight = seed(db, {
       title: "跨年",
       publishedAt: "2023-12-31T16:30:00.000Z",
@@ -364,10 +357,9 @@ describe("分词", () => {
 describe("期页（按期归属，不按发布时间）", () => {
   it("同一自然日入库的稿子归同一期，跨北京零点就分成两期", () => {
     const db = freshDb();
-    // 上海 11-01 07:00 / 11-01 23:59 → 第 2 期（UTC 仍是 10-31）
     seed(db, { firstSeenAt: "2026-10-31T23:00:00.000Z" });
-    seed(db, { firstSeenAt: "2026-10-31T15:59:59.999Z" }); // 上海 10-31 23:59 → 创刊号
-    seed(db, { firstSeenAt: "2026-10-31T16:00:00.000Z" }); // 上海 11-01 00:00 → 第 2 期
+    seed(db, { firstSeenAt: "2026-10-31T15:59:59.999Z" });
+    seed(db, { firstSeenAt: "2026-10-31T16:00:00.000Z" });
 
     const summaries = editionSummaries(db);
     expect(summaries.map((row) => [row.number, row.count])).toEqual([

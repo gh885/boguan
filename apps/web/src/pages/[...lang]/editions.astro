@@ -16,13 +16,6 @@ import {
 import type { Locale } from "../../lib/i18n/config";
 import { site } from "../../lib/site";
 
-/**
- * 合订本：按期回看的入口（docs/ARCHITECTURE.md §6「期号」）。
- *
- * 只列**有稿入库**的期；没有新增的日子照样出刊、照样有期号，但不在目录里占一行——
- * 目录是给人翻的，不是日历。期号连续这件事由 `/edition/[n]` 自己保证。
- */
-
 export const getStaticPaths = (() => localeRoutes()) satisfies GetStaticPaths;
 
 interface Props {

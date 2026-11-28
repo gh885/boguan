@@ -23,21 +23,15 @@ import ThemeToggle from "./ThemeToggle.astro";
 
 interface Props {
   locale: Locale;
-  /** 最新收录网格；首页第一页不含头条，其余页就是本页全部条目。 */
   items: PostCard[];
-  /** 首页第一页的头条；分页页不传。 */
   lead?: PostCard;
-  /** 首页第一页的「本期要目」；分页页不传。 */
   topics?: TagCard[];
   page: number;
   totalPages: number;
-  /** 本期期号（见 @boguan/domain）：一个自然日一期，从创刊号连续编号 */
   editionNumber: number;
-  /** 本期新入库的稿件数；没有新增也是 0，不跳号 */
   editionNew: number;
   prevHref?: string;
   nextHref?: string;
-  /** 「年份」导航的落点；没有年份归档时退化到标签索引。 */
   yearHref?: string;
 }
 
@@ -64,7 +58,6 @@ const editionsHref = localizePath("/editions", locale);
 const editionNo = formatNumber(locale, editionNumber);
 const editionHref = localizePath(`/edition/${editionNumber}`, locale);
 
-/** 头版网格一行 5 个版位;「更多」卡片是补空的,最后一行已满就不再渲染 */
 const GRID_COLUMNS = 5;
 
 const editionDate = formatLongDate(new Date(), locale);

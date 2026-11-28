@@ -5,7 +5,6 @@ interface Item {
   url: string;
 }
 
-/** 首页：WebSite + SearchAction + 最新文章 ItemList */
 export function homeJsonLd(
   items: readonly Item[],
   description: string,
@@ -48,7 +47,6 @@ interface CollectionInput {
   items: readonly Item[];
 }
 
-/** 公司页 / 标签页 / 年份页 / 分页：CollectionPage + ItemList（外链原文） */
 export function collectionJsonLd(input: CollectionInput): Record<string, unknown> {
   return {
     "@context": "https://schema.org",

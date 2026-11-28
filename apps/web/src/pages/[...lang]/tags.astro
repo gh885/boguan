@@ -18,7 +18,6 @@ interface Props {
 const { locale } = Astro.props;
 const t = useTranslations(locale);
 const db = openWebDatabase();
-// 只列 ≥3 篇的标签：薄标签页是 noindex 的，从这里连过去只会制造孤岛
 const tags = tagIndex(db).filter((tag) => isIndexableCollection(tag.count));
 const groups = groupTags(tags);
 const years = postYears(db);

@@ -1,14 +1,3 @@
-/**
- * 报纸纸面：首页与索引页共享的底层。
- *
- * 这里只放「所有报纸页面都一样」的东西：页面级语义色、纸面底纹、
- * 检索框、主题/语言控件与页脚。具体版式（报头、头版、目录）由
- * home.css 与 index-sheet.css 各自叠加。
- *
- * 颜色仍是页面级 `--home-*`，用 light-dark() 跟随全站主题；
- * 不改变 tokens.css 里全站 `--color-*` 的角色定义。
- */
-
 :root {
   --home-paper: light-dark(#efe6d3, #1a1611);
   --home-paper-raised: light-dark(#f6efdf, #221c15);
@@ -41,7 +30,6 @@ body:has(.paper-page) .skip-link {
   background-image: radial-gradient(var(--home-texture) 0.5px, transparent 0.5px);
   background-size: 5px 5px;
   color: var(--home-ink);
-  /* 字体与行高沿用 body 的全局基线,不在此重复 */
 }
 
 .paper-page ::selection {
@@ -52,8 +40,6 @@ body:has(.paper-page) .skip-link {
 .paper-page :focus-visible {
   outline-color: var(--home-red);
 }
-
-/* 检索框：首页导航行与索引页报眉共用 */
 
 .paper-search {
   position: relative;
@@ -101,8 +87,6 @@ body:has(.paper-page) .skip-link {
 .paper-search button:hover {
   color: var(--home-red);
 }
-
-/* 报眉：桌面吸顶，长列表里随时能搜；移动端不吸顶，避免吃掉首屏 */
 
 .paper-runninghead {
   position: sticky;
@@ -164,8 +148,6 @@ body:has(.paper-page) .skip-link {
   width: min(20rem, 100%);
   margin-inline-start: auto;
 }
-
-/* 版头：一页的身份 */
 
 .paper-kicker {
   margin: 0 0 0.4rem;
@@ -234,8 +216,6 @@ body:has(.paper-page) .skip-link {
   margin-block: 0.7rem 0;
   background-color: var(--home-rule-strong);
 }
-
-/* 反馈只做颜色，不做位移或缩放 */
 
 .paper-nav a,
 .paper-wordmark,
@@ -318,8 +298,6 @@ body:has(.paper-page) .skip-link {
   }
 }
 
-/* 主题与语言：两套页面共用同一套辅助色 */
-
 .paper-utility {
   display: flex;
   align-items: center;
@@ -347,8 +325,6 @@ body:has(.paper-page) .skip-link {
 .paper-page .paper-utility .language-switch a[aria-current="true"] {
   color: var(--home-ink);
 }
-
-/* 页脚：首页与索引页共用 */
 
 .paper-footer {
   margin-block-start: 1.5rem;
@@ -403,7 +379,6 @@ body:has(.paper-page) .skip-link {
   color: var(--home-red);
 }
 
-/* 备案号：法规要求的固定展示位，居中、最轻的一层，不与正文抢注意力 */
 .paper-footer-legal {
   margin-block: 0.5rem 0;
   padding-block-start: 0.4rem;

@@ -1,17 +1,6 @@
 import type { Db } from "../connection";
 import { editionNumber } from "@boguan/domain";
 
-/**
- * 列表页的只读查询（docs/ARCHITECTURE.md §6）。
- *
- * 三条共同的规矩，集中在这里实现，页面不重复写：
- * 1. 只出 `is_visible = 1 and duplicate_of_id is null` 的帖子（下架与判重输掉的不出现）；
- * 2. 排序固定 `published_at desc nulls last, id desc`——缺时间的沉底，且分页稳定；
- * 3. 只选页面要用的列，正文不在这张库里，想选也选不到。
- *
- * 卡片要的标签、阅读时长与「含代码」都是元数据，不是正文；正文仍只在 crawler 的私有目录。
- */
-
 export interface PostCardTag {
   slug: string;
   name: string;
@@ -25,11 +14,8 @@ export interface PostCard {
   author: string | null;
   publishedAt: string | null;
   publishedYear: number | null;
-  /** 文章内容语言；在另一种语言的界面上给标题/摘要加 lang 属性 */
   lang: string;
-  /** 按正文估算的阅读分钟数；没有正文或旧数据未回填时为 null */
   readingMinutes: number | null;
-  /** 详情页是否含代码；列表层不知道时为 null */
   hasCode: boolean | null;
   companySlug: string;
   companyName: string;
@@ -53,14 +39,11 @@ export interface ListFilters {
   tagSlug?: string;
   year?: number;
   hasCode?: boolean;
-  /** 只取该区间内首次入库的稿件（左闭右开，ISO UTC）。期页用它，语义见 domain/edition.ts */
   firstSeenFrom?: string;
   firstSeenTo?: string;
 }
 
 export const VISIBLE = "p.is_visible = 1 and p.duplicate_of_id is null";
-// 语义与 coalesce(published_at, '') 一致:ISO 串字典序,DESC 时 NULL 排最后(缺时间沉底)。
-// 不用 coalesce 表达式排序,否则 posts_visible_published_idx 的有序扫描用不上。
 const ORDER = "order by p.published_at desc, p.id desc";
 
 export const CARD_COLUMNS = `p.id as id,
@@ -80,7 +63,6 @@ export const CARD_COLUMNS = `p.id as id,
 
 const FROM = "from posts p join companies c on c.id = p.company_id";
 
-/** companies join 只在按公司过滤时才用得上:count / 年份分布不必陪跑 */
 function fromFor(filters: ListFilters): string {
   return filters.companySlug ? FROM : "from posts p";
 }
@@ -130,7 +112,6 @@ export function filterSql(filters: ListFilters): { where: string; params: (strin
   };
 }
 
-/** 一次查出当前页所有帖子的标签，避免每张卡片一个查询 */
 export function attachPostTags(rows: Omit<PostCard, "tags">[], db: Db): PostCard[] {
   if (rows.length === 0) return [];
 
@@ -159,7 +140,6 @@ export function attachPostTags(rows: Omit<PostCard, "tags">[], db: Db): PostCard
   }));
 }
 
-/** 满足过滤条件的可见帖子数。分页页只需要 total 时用它,别为个数拉整行卡片。 */
 export function countPosts(db: Db, filters: ListFilters = {}): number {
   const { where, params } = filterSql(filters);
   return (
@@ -187,10 +167,6 @@ export function latestPosts(db: Db, options: PageOptions = {}): Paged<PostCard> 
   return listPosts(db, {}, options);
 }
 
-/**
- * 某一期的稿件：按**入库时间**取，与期号定义一致（`@boguan/domain`）。
- * 注意不是 `postsByYear` 那套——一期装的是「那天登了什么稿」，不是「那天发了什么文」。
- */
 export function postsByEdition(
   db: Db,
   range: { startIso: string; endIso: string },
@@ -201,18 +177,10 @@ export function postsByEdition(
 
 export interface EditionSummary {
   number: number;
-  /** 出版日（上海自然日） */
   day: string;
   count: number;
 }
 
-/**
- * 有稿入库的期，按期号倒序（合订本、期页静态路径与 sitemap 门槛都用它）。
- * 没有稿子的日期不入表，期号仍然连续；要枚举全部期号请用 `editionDay` 推算。
- *
- * 按上海自然日分组：中国无夏令时，`date(..., '+8 hours')` 与 TS 侧的
- * `dayInTimeZone(..., 'Asia/Shanghai')` 等价（对账用例在 domain/edition.test.ts）。
- */
 export function editionSummaries(db: Db): EditionSummary[] {
   const rows = db.$client
     .prepare(
@@ -244,15 +212,10 @@ export function postsByTag(db: Db, tagSlug: string, options: PageOptions = {}): 
   return listPosts(db, { tagSlug }, options);
 }
 
-/**
- * 按年归档。用派生列 `published_year`（按 `sources.timezone` 取年），所以能走索引；
- * 没有发布时间的帖子不进任何年份页——这是「宁可缺失不要编造」的代价，见 §4。
- */
 export function postsByYear(db: Db, year: number, options: PageOptions = {}): Paged<PostCard> {
   return listPosts(db, { year }, options);
 }
 
-/** /year/[year] 的静态路径来源：只有真的有文章（且可展示）的年份才建页 */
 export function postYears(db: Db): { year: number; count: number }[] {
   return db.$client
     .prepare(
@@ -274,7 +237,6 @@ export interface CompanyCard {
   count: number;
 }
 
-/** 公司页、侧边栏与 /companies 共用；accounting 只算可展示的帖子 */
 export function companyCards(db: Db): CompanyCard[] {
   return db.$client
     .prepare(
@@ -344,7 +306,6 @@ export function tagBySlug(db: Db, slug: string): TagCard | null {
   return row ?? null;
 }
 
-/** 公司页的「Top Technologies」：该公司可见帖子里出现最多的标签 */
 export function companyTopTags(db: Db, companySlug: string, limit = 10): TagCard[] {
   return db.$client
     .prepare(
@@ -361,7 +322,6 @@ export function companyTopTags(db: Db, companySlug: string, limit = 10): TagCard
     .all(companySlug, limit) as TagCard[];
 }
 
-/** 标签页的「Companies Using This」 */
 export function companiesByTag(db: Db, tagSlug: string, limit = 12): CompanyCard[] {
   return db.$client
     .prepare(
@@ -383,7 +343,6 @@ export function companiesByTag(db: Db, tagSlug: string, limit = 12): CompanyCard
     .all(tagSlug, limit) as CompanyCard[];
 }
 
-/** 某个切片（标签 / 公司 / 全部）下的年份分布，供索引页的年份筛选使用。 */
 export function postYearsByFilters(
   db: Db,
   filters: ListFilters = {},
@@ -400,7 +359,6 @@ export function postYearsByFilters(
     .all(...params) as { year: number; count: number }[];
 }
 
-/** 全局热门标签；索引页右栏与搜索着陆页用，避免每次都查完整 tagIndex。 */
 export function topTags(db: Db, limit = 12): TagCard[] {
   return db.$client
     .prepare(
@@ -416,7 +374,6 @@ export function topTags(db: Db, limit = 12): TagCard[] {
     .all(limit) as TagCard[];
 }
 
-/** 某一年里的热门标签 */
 export function topTagsByYear(db: Db, year: number, limit = 8): TagCard[] {
   return db.$client
     .prepare(
@@ -432,7 +389,6 @@ export function topTagsByYear(db: Db, year: number, limit = 8): TagCard[] {
     .all(year, limit) as TagCard[];
 }
 
-/** 某一年里收录最多的公司 */
 export function topCompaniesByYear(db: Db, year: number, limit = 6): CompanyCard[] {
   return db.$client
     .prepare(

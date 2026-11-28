@@ -1,6 +1,3 @@
-/** 索引页（切片版）的共享数据形状。组件与页面都从这里取类型，避免从 .astro 导出。 */
-
-/** 报眉主导航里的栏目，用于给当前页加 `aria-current` */
 export type PaperSection = "home" | "companies" | "tags" | "years" | "editions";
 
 export interface IndexFacetItem {
@@ -8,7 +5,6 @@ export interface IndexFacetItem {
   lang?: string;
   href?: string;
   active?: boolean;
-  /** 已激活的筛选项：点击整个 chip 移除；不传则渲染成不可点的当前项。 */
   removeHref?: string;
   count?: number;
 }

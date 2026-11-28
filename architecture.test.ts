@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vite-plus/test";
 
 const repo = fileURLToPath(new URL(".", import.meta.url));
-const roots = ["src", "scripts", "apps", "packages"];
+const roots = ["apps", "packages"];
 
 const sourceFile = /\.(ts|astro|mjs)$/;
 
@@ -77,6 +77,23 @@ describe("包边界", () => {
         importsOf(path)
           .filter((specifier) => /(src\/(pages|components|layouts)|apps\/web)/.test(specifier))
           .map((specifier) => `${id(path)} → ${specifier}`),
+      );
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("源码不含注释", () => {
+    const directive = /^\/{3}|^\/\/\s*@ts-|^\/\/\s*!/;
+    const comment = /^\s*(\/{2}|\/\*|<!--)/;
+
+    const offenders = files
+      .filter((path) => !path.endsWith(".d.ts"))
+      .flatMap((path) =>
+        readFileSync(path, "utf8")
+          .split(String.fromCharCode(10))
+          .map((line, index) => ({ line, index }))
+          .filter(({ line }) => comment.test(line) && !directive.test(line.trim()))
+          .map(({ line, index }) => `${id(path)}:${index + 1} ${line.trim().slice(0, 40)}`),
       );
 
     expect(offenders).toEqual([]);

@@ -11,7 +11,6 @@ import { searchHref } from "../../lib/search-url";
 import { homeJsonLd } from "../../lib/structured-data";
 import { site } from "../../lib/site";
 
-// 一份页面 × 所有语言：/ 和 /en/
 export const getStaticPaths = (() => localeRoutes()) satisfies GetStaticPaths;
 
 interface Props {
@@ -34,7 +33,6 @@ const yearHref = years[0]
 
 const totalPages = pageCount(total);
 
-// 本期：一个自然日一期（@boguan/domain）。没有新增也照样出刊，只是「本期新增 0 篇」
 const editionNumber = editionNumberAt(new Date()) ?? 1;
 const editionWindow = editionRange(editionNumber);
 const editionNew = editionWindow

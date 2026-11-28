@@ -18,15 +18,12 @@ import PaperSectionHead from "./PaperSectionHead.astro";
 
 interface Props {
   locale: Locale;
-  /** 版头眉批，例如「标签 / TOPIC」；由页面传本地化文案。 */
   kicker: string;
   title: string;
   titleLang?: string;
   facts?: string[];
-  /** 当前所在栏目，用于报眉主导航的高亮。 */
   current?: PaperSection;
   posts: PostCard[];
-  /** 匹配总数，只用于编号补零与分页口径。 */
   total: number;
   page: number;
   totalPages: number;
@@ -42,12 +39,9 @@ interface Props {
   emptyTitle?: string;
   emptyBody?: string;
   emptyAction?: IndexEmptyAction;
-  /** 搜索框预填；索引页没有查询时留空。 */
   searchValue?: string;
-  /** 在切片内继续搜索时要保留的条件。 */
   searchHidden?: Record<string, string>;
   footerNote?: string;
-  /** 「年份」导航的落点；不传则退化到标签索引。 */
   navYearsHref?: string;
 }
 

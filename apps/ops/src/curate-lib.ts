@@ -11,21 +11,7 @@ import { openBodyStore } from "@boguan/body-store";
 
 const bodies = openBodyStore();
 
-/**
- * 把清洗规则应用到**已入库**的数据（ARCHITECTURE §5「清洗」）。
- *
- * 规则本身在 `@boguan/domain`，抓取入库时用的是同一份实现；
- * 这里只负责让存量数据追上规则，可反复跑（幂等）。
- *
- * 三件事：
- * 1. 剥掉标题末尾的站点名后缀（`…｜得物技术`），并重算 `title_norm`（参与跨源去重）
- * 2. `content_hash` 与「标题 + 摘要 + 正文」对不上时重算——改标题必须一起改它，
- *    否则下一轮抓取会把整批当成「内容变了」
- * 3. 把非文章页标成 `is_visible = false` + 记原因（数据保留，可改判）
- */
-
 export interface CurateOptions {
-  /** 只报告，不写库 */
   dryRun?: boolean;
   log?: (message: string) => void;
 }
@@ -75,13 +61,11 @@ export function curate(db: Db, options: CurateOptions = {}): CurateReport {
     duplicates: 0,
   };
 
-  // 批量写进一个事务：存量清洗动辄几百行，逐条自动提交在 WAL 下开销可观
   const apply = db.$client.transaction(() => {
     for (const post of db.select().from(posts).all()) {
       const brands = companyBrands.get(post.companyId) ?? [];
       const title = stripSiteSuffix(post.title, brands);
 
-      // 标题进了 content_hash：改标题就要一起重算
       const body = bodies.read(post.id) ?? "";
       const hash = contentHash(title, post.summary, body);
       const titleChanged = title !== post.title;
@@ -101,7 +85,6 @@ export function curate(db: Db, options: CurateOptions = {}): CurateReport {
           .run();
       }
 
-      // 人工下架（原因不是 non-article）不碰，规则只管自己那一类
       if (post.hiddenReason && post.hiddenReason !== HIDDEN_NON_ARTICLE) continue;
 
       const shouldHide = isNonArticle(title, tagSlugsByPost.get(post.id) ?? []);
@@ -128,10 +111,8 @@ export function curate(db: Db, options: CurateOptions = {}): CurateReport {
   });
   if (!dryRun) apply();
 
-  // 标题变了就要重算索引：FTS 是 contentless，改不了单列，只能整表重建（正文从私有文件读）
   if (report.retitled > 0 && !dryRun) {
     report.indexed = rebuildAllPostFts(db, bodies.read);
-    // 标题归一变了，之前的判重结论可能不再成立
     report.duplicates = dedupe(db, log);
   }
 

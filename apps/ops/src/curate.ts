@@ -1,16 +1,6 @@
 import { openDatabase } from "@boguan/database/ops";
 import { curate } from "./curate-lib";
 
-/**
- * 把清洗规则应用到**已入库**的数据。
- *
- *   vpr db:curate --dry-run   # 只看会改什么
- *   vpr db:curate             # 真正执行
- *
- * 规则在 `@boguan/domain`，抓取入库时用的是同一份实现；
- * 这个脚本让存量数据追上规则。幂等：第二次跑应该什么也不改。
- */
-
 const dryRun = process.argv.includes("--dry-run");
 const report = curate(openDatabase(), { dryRun, log: (message) => console.log(message) });
 

@@ -7,31 +7,10 @@ import { parseSitemapUrls } from "../sitemap";
 import type { Detail, ListItem, TagRef } from "../types";
 import type { SourceAdapter } from "./types";
 
-/**
- * 有赞技术团队（Ghost 站）。
- *
- * **列表入口是 sitemap，不是翻页**：`sitemap-posts.xml` 一次请求给出全量文章 URL
- * （实测 351 条），翻页要 70+ 次请求、还得靠「第 N 页 404」判底。回填与增量共用同一条路：
- * 增量时已知 URL 一次请求都不发（管道对「列表只给 URL」的条目直接跳过），所以稳态仍是 1 次/天。
- * 代价是列表层拿不到标题与时间——都由详情页补，列表只负责「发现新条目」。
- *
- * 三个实测结论，都是踩过才知道的：
- * - 详情页时间是 `28 Oct 2022`，没有时区，交给 normalize 按源站时区解释。
- * - 标签在 `<article class="post tag-big-data ...">` 里是 **slug**，中文名在侧栏标签导航里。
- *   对不上名字的（源站自己的拼音别名）不入库，记进日志等人工补映射。
- * - 这一站的 HTML 会让轻量解析器丢掉整段正文，所以用 cheerio，并且**解析不到正文就抛错**：
- *   宁可让这一条进 `crawl_failures`，也不要静默入一条空正文。
- */
-
 const TAG_PREFIX = "tag-";
 
-/**
- * 每个「页」切多少条 URL。分片是为了让 `--max-pages` 在所有源上语义一致，
- * 也让回填有进度可看；分片之间不再发请求（sitemap 只取一次，缓存在进程内）。
- */
 const SITEMAP_PAGE_SIZE = 50;
 
-/** Ghost 的固定路径段，不是文章；sitemap 里混进来就排掉 */
 const RESERVED_SEGMENTS = new Set([
   "page",
   "tag",
@@ -45,7 +24,6 @@ const RESERVED_SEGMENTS = new Set([
 
 let cache: { source: string; urls: string[] } | null = null;
 
-/** 文章页判定：单段路径 + 结尾斜杠，且不是保留路径（导出供测试） */
 export function isPostUrl(url: URL): boolean {
   const match = url.pathname.match(/^\/([^/]+)\/$/);
   if (!match) return false;
@@ -57,12 +35,10 @@ async function sitemapUrls(ctx: Parameters<SourceAdapter["fetchList"]>[0]): Prom
   if (cache?.source === source) return cache.urls;
 
   const response = await ctx.fetcher.page(source);
-  // 304 = 站点地图没更新，当「没有新文章」处理
   const xml = requirePageText(response, `站点地图（${source}）`);
   if (xml === null) return [];
 
   const urls = parseSitemapUrls(xml, source, { keep: isPostUrl });
-  // 200 但一条都没解析出来，几乎一定是站点结构变了——让它响，不要静默当成「没有文章」
   if (urls.length === 0) {
     throw new Error(`站点地图里没有文章 URL，路径或格式可能变了：${source}`);
   }
@@ -104,7 +80,6 @@ export const youzanAdapter: SourceAdapter = {
   slug: "youzan",
   capabilities: { list: "sitemap", detail: "html" },
 
-  // 站点地图没有翻页概念：每一「页」都是同一份清单的不同切片
   pageUrl(listUrl) {
     return listUrl;
   },
@@ -114,10 +89,7 @@ export const youzanAdapter: SourceAdapter = {
     const start = (page - 1) * SITEMAP_PAGE_SIZE;
     if (start >= urls.length) return [];
 
-    const items: ListItem[] = urls
-      .slice(start, start + SITEMAP_PAGE_SIZE)
-      // 列表只给 URL：标题、时间、作者、标签、正文全部来自详情页
-      .map((url) => ({ url }));
+    const items: ListItem[] = urls.slice(start, start + SITEMAP_PAGE_SIZE).map((url) => ({ url }));
     return items;
   },
 

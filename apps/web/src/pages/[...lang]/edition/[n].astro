@@ -18,15 +18,7 @@ import { INDEX_PAGE_SIZE, pageCount, pagePath } from "../../../lib/pagination";
 import { collectionJsonLd } from "../../../lib/structured-data";
 import { site } from "../../../lib/site";
 
-/**
- * 一期一张报纸（docs/ARCHITECTURE.md §6「期号」）。
- *
- * 版面是**该期新入库的稿件**（按 `first_seen_at` 归属，不是 `published_at`），
- * 所以相邻期不会互相重复九成内容。没有新增的日子也照样出刊：期号连续，版面留空。
- */
-
 export const getStaticPaths = (() => {
-	// 从创刊号到今天，逐日生成；期号不能跳号，缺的那天就是「本期无新增」
 	const latest = Math.max(1, editionNumberAt(new Date()) ?? 1);
 	return Array.from({ length: latest }, (_, index) => index + 1).flatMap((number) =>
 		localeRoutes({ n: String(number) }),
@@ -103,7 +95,6 @@ const rail: IndexRailModule[] = [
 	},
 ];
 
-// 空版面的出路是「读上一期」，而不是让读者停在一个空页面上
 const emptyActionHref =
 	number > 1 ? localizePath(`/edition/${number - 1}`, locale) : localizePath("/editions", locale);
 const emptyActionLabel = number > 1 ? t("edition.previous") : t("edition.all");

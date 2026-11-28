@@ -1,18 +1,9 @@
-/**
- * 首页「技术晨报」版式。只由 HomeNewspaper.astro 引入。
- *
- * 纸面底层（--home-*、底纹、检索框、页脚）在 paper.css；
- * 这里只写头版特有的报头、头条、要目与最新收录网格。
- */
-
 .home-sheet {
   width: 100%;
   max-width: 90rem;
   margin-inline: auto;
   padding: clamp(1rem, 1.6vw, 1.75rem);
 }
-
-/* 报头 */
 
 .home-masthead {
   display: grid;
@@ -36,7 +27,6 @@
   display: block;
 }
 
-/* 期号是链接（进该期版面），「本期新增」跟在下面一行做补充 */
 .home-edition-link {
   color: var(--home-ink);
   text-decoration: none;
@@ -88,8 +78,6 @@
   border-block-end: 1px solid var(--home-rule-strong);
 }
 
-/* 导航、检索与工具 */
-
 .home-navrow {
   display: flex;
   flex-wrap: wrap;
@@ -129,8 +117,6 @@
   align-items: center;
   gap: 1rem;
 }
-
-/* 头条与要目 */
 
 .home-main {
   display: grid;
@@ -335,8 +321,6 @@
   color: var(--home-red);
 }
 
-/* 最新收录 */
-
 .home-latest {
   margin-block-start: 0.75rem;
   padding-block-start: 0.5rem;
@@ -501,8 +485,6 @@
   margin: 0;
 }
 
-/* 更多收录 */
-
 .home-more {
   display: flex;
   flex-direction: column;
@@ -626,8 +608,6 @@
     padding-block-start: 0.15rem;
   }
 }
-
-/* 响应式 */
 
 @media (max-width: 980px) {
   .home-main {

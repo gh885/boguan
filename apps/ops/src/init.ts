@@ -1,13 +1,5 @@
 import { checkFts, defaultDatabasePath, migrateDatabase, openDatabase } from "@boguan/database/ops";
 
-/**
- * 建库 / 应用未执行的迁移。幂等，可以反复跑。
- *   vpr db:init
- *   BOGUAN_DB=data/scratch.db vpr db:init
- *
- * 只建表结构，不写数据；种子数据在 `vpr db:seed`。
- */
-
 const db = openDatabase();
 migrateDatabase(db);
 

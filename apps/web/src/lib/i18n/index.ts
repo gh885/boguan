@@ -12,11 +12,6 @@ import zhCN from "./messages/zh-CN.json";
 export { isLocale, localeLabels, resolveLocale } from "./config";
 export type { Locale } from "./config";
 
-/**
- * 界面文案的唯一来源。key 用扁平的 `area.name` 写法，与 x18n 的 key 推断一致。
- * 新增 key 先写 `messages/zh-CN.json`（源语言），再补 `en.json`；
- * `vp run i18n:check` 与 `messages.test.ts` 会拦住漏翻和多余。
- */
 export type MessageKey = keyof typeof zhCN;
 
 export type MessageParams = Record<string, string | number>;
@@ -36,10 +31,6 @@ function interpolate(template: string, params: MessageParams | undefined): strin
   });
 }
 
-/**
- * 取一条文案。当前语言缺 key 时回退到默认语言；两边都没有就直接抛错，
- * 让构建失败，而不是把 key 渲染到页面上。
- */
 export function translate(locale: Locale, key: MessageKey, params?: MessageParams): string {
   const value = messages[locale][key] ?? messages[defaultLocale][key];
   if (value === undefined) {
@@ -48,21 +39,12 @@ export function translate(locale: Locale, key: MessageKey, params?: MessageParam
   return interpolate(value, params);
 }
 
-/**
- * 页面里实际的取词方式。x18n 通过 `usage.calls` 里的 `factory` 规则识别 `t('key')`。
- *
- * ```astro
- * const t = useTranslations(locale);
- * <h1>{t("home.building.title")}</h1>
- * ```
- */
 export function useTranslations(locale: Locale) {
   return (key: MessageKey, params?: MessageParams): string => translate(locale, key, params);
 }
 
 const pluralRules = new Map<Locale, Intl.PluralRules>();
 
-/** 英文单复数走 Intl.PluralRules；中文两种形式文案相同，读起来也自然。 */
 export type CountUnit = "articles" | "companies" | "tags";
 
 export function formatCount(locale: Locale, unit: CountUnit, count: number): string {
@@ -73,7 +55,6 @@ export function formatCount(locale: Locale, unit: CountUnit, count: number): str
   }
   const form = rules.select(count) === "one" ? "one" : "other";
 
-  // 每种单位写死两条 translate 调用：动态拼 key 会让 x18n 把文案误判为未使用。
   if (unit === "articles") {
     return form === "one"
       ? translate(locale, "count.articles.one", { count })
@@ -91,7 +72,6 @@ export function formatCount(locale: Locale, unit: CountUnit, count: number): str
 
 const listFormatters = new Map<Locale, Intl.ListFormat>();
 
-/** 把公司名/标签名连成一句；中文顿号、英文牛津逗号交给 Intl。 */
 export function formatList(locale: Locale, items: readonly string[]): string {
   if (items.length === 0) return "";
   let formatter = listFormatters.get(locale);
@@ -104,7 +84,6 @@ export function formatList(locale: Locale, items: readonly string[]): string {
 
 const dateFormatters = new Map<Locale, Intl.DateTimeFormat>();
 
-/** 入库时间是 UTC，展示一律按北京时间。 */
 export function formatDate(value: Date | string, locale: Locale): string {
   const date = typeof value === "string" ? new Date(value) : value;
   let formatter = dateFormatters.get(locale);
@@ -121,7 +100,6 @@ export function formatDate(value: Date | string, locale: Locale): string {
 const longDateFormatters = new Map<Locale, Intl.DateTimeFormat>();
 const weekdayFormatters = new Map<Locale, Intl.DateTimeFormat>();
 
-/** 报纸刊头的「日期 · 星期」，同样按北京时间。 */
 export function formatLongDate(value: Date | string, locale: Locale): string {
   const date = typeof value === "string" ? new Date(value) : value;
   let dateFormatter = longDateFormatters.get(locale);
@@ -145,7 +123,6 @@ export function formatLongDate(value: Date | string, locale: Locale): string {
 
 const monthFormatters = new Map<Locale, Intl.DateTimeFormat>();
 
-/** 合订本的分组标题：「2026 年 11 月」/「November 2026」；「日期键 `YYYY-MM-DD` 取该月 */
 export function formatMonth(dayKey: string, locale: Locale): string {
   let formatter = monthFormatters.get(locale);
   if (!formatter) {
@@ -161,7 +138,6 @@ export function formatMonth(dayKey: string, locale: Locale): string {
 
 const numberFormatters = new Map<Locale, Intl.NumberFormat>();
 
-/** 期号、计数等需要本地化数字分组的场景。 */
 export function formatNumber(locale: Locale, value: number): string {
   let formatter = numberFormatters.get(locale);
   if (!formatter) {
@@ -177,7 +153,6 @@ function ensureLeadingSlash(value: string): string {
   return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
 }
 
-/** 给站内路径加上语言前缀：`/company/meituan` → `/en/company/meituan`（默认语言原样返回）。 */
 export function localizePath(pathname: string, locale: Locale): string {
   const path = ensureLeadingSlash(pathname);
   const segment = pathSegment(locale);
@@ -185,7 +160,6 @@ export function localizePath(pathname: string, locale: Locale): string {
   return path === "/" ? `/${segment}/` : `/${segment}${path}`;
 }
 
-/** 从 pathname 判断语言；只认配置过的、且不是默认语言的前缀段。 */
 export function localeFromPathname(pathname: string): Locale {
   const [first = ""] = pathname.replace(/^\/+/, "").split("/");
   const segment = first.toLowerCase();
@@ -195,7 +169,6 @@ export function localeFromPathname(pathname: string): Locale {
   return match ?? defaultLocale;
 }
 
-/** 去掉语言前缀，得到与语言无关的站内路径。 */
 export function stripLocale(pathname: string): string {
   const locale = localeFromPathname(pathname);
   const segment = pathSegment(locale);
@@ -206,19 +179,10 @@ export function stripLocale(pathname: string): string {
 
 export interface AlternateLink {
   locale: Locale;
-  /** 站内相对路径，带该语言的前缀。 */
   href: string;
-  /** 直接可用于 `<link rel="alternate" hreflang>`。 */
   hreflang: string;
 }
 
-/**
- * 同一份内容的各语言地址。slug 与语言无关，因此只需替换前缀，
- * 页面里不用手写 hreflang 列表。
- *
- * `available` 是本页真正生成过的语言：只生成部分语言时传进来，
- * 避免 hreflang 指向不存在的页面。
- */
 export function alternateLinks(
   pathname: string,
   available: readonly Locale[] = locales,
@@ -231,7 +195,6 @@ export function alternateLinks(
   }));
 }
 
-/** `getStaticPaths()` 的 params：值只能是字符串、数字或 undefined。 */
 export type RouteParams = Record<string, string | number | undefined>;
 
 export interface LocaleRoute {
@@ -239,18 +202,6 @@ export interface LocaleRoute {
   props: { locale: Locale };
 }
 
-/**
- * 一条页面路由 × 所有语言。页面只写一份，语言作为数据：
- *
- * ```astro
- * export const getStaticPaths = (() => localeRoutes()) satisfies GetStaticPaths;
- * // 带动态段时传进去，例如 localeRoutes({ slug: company.slug })
- * ```
- *
- * 默认语言用 `lang: undefined` 生成不带前缀的路径（`/`、`/company/meituan`），
- * 其它语言生成带前缀的路径（`/en/`、`/en/company/meituan`），
- * 正好对得上 `prefixDefaultLocale: false`。
- */
 export function localeRoutes(
   params: RouteParams = {},
   languages: readonly Locale[] = locales,

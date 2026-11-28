@@ -14,6 +14,21 @@
 | `src/pipeline.ts`  | 单条目的入库判断与写库、批次收尾                     |
 | `src/sitemap.ts`   | sitemap 作为列表入口时的解析                         |
 
+## 命令
+
+`vpr crawl` 由根脚本触发，参数直接透给 `src/cli.ts`：
+
+| 参数          | 默认             | 作用                                          |
+| :------------ | :--------------- | :-------------------------------------------- |
+| `--mode`      | `incremental`    | `incremental` 按水位增量；`backfill` 回填历史 |
+| `--max-pages` | 增量 5 / 回填 20 | 最多翻多少列表页；`0` = 翻到底                |
+| `--page`      | `1`              | 从第几页开始                                  |
+| `--source`    | 全部启用的源     | 只跑一个源（slug）                            |
+| `--dry-run`   | 关               | 只抓一页并打印解析结果，不写库                |
+| `--force`     | 关               | 忽略 blocked 标记跑一次                       |
+
+`sitemap` 当列表入口的源在增量模式下不受 `--max-pages` 约束：切片之间不发请求，必须走完全部切片才能发现后段的新文章，那里它只约束回填。
+
 ## 技术栈
 
 Bun、`fetch`、Cheerio、`rss-parser`、`robots-parser`、Drizzle；@boguan/database、@boguan/domain、@boguan/search、@boguan/catalog、@boguan/body-store。

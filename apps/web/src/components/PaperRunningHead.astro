@@ -10,12 +10,9 @@ import ThemeToggle from "./ThemeToggle.astro";
 
 interface Props {
   locale: Locale;
-  /** 当前所在栏目；用于给主导航加 aria-current。 */
   current?: PaperSection;
   searchValue?: string;
-  /** 在切片内继续搜索时要保留的条件。 */
   searchHidden?: Record<string, string>;
-  /** 「年份」导航的落点；不传则退化到标签索引。 */
   navYearsHref?: string;
 }
 

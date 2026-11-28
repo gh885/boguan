@@ -3,41 +3,25 @@ import { originOf } from "@boguan/domain";
 import { eq } from "drizzle-orm";
 import { RobotsCache } from "./robots";
 
-/**
- * 唯一能发 HTTP 的地方（docs/ARCHITECTURE.md §5）。
- *
- * 限速、robots、条件请求、重试、编码判定全在这一层，适配器只负责把响应变成结构化字段。
- * 合规是结构保证的：适配器没有别的途径发请求，也就没法绕开间隔或 robots。
- */
-
-/**
- * UA 必须是 ASCII：HTTP header 字段值不能含非 ASCII 字符，否则 fetch 会直接抛错。
- * 想解释自己是谁，把说明放进首页的说明段落，别塞进 UA。
- */
 export const USER_AGENT = "boguan/0.1 (+https://boguan.org.cn; aggregator; honors robots.txt)";
 
 export interface FetchOptions {
-  /** 同一 host 的两次请求最小间隔；robots 的 Crawl-delay 更大时以它为准 */
   minIntervalMs?: number;
   maxRetries?: number;
   timeoutMs?: number;
-  /** 只读演练：不写 http_cache */
   dryRun?: boolean;
 }
 
 export interface FetchedPage {
   url: string;
   status: number;
-  /** 304 / robots 挡住时没有正文 */
   text: string | null;
   notModified: boolean;
-  /** robots.txt 不允许 */
   denied: boolean;
   error: string | null;
 }
 
 export interface FetchStats {
-  /** 尝试次数（含重试），不等于实际发出的页面数 */
   requests: number;
   notModified: number;
   denied: number;
@@ -46,14 +30,8 @@ export interface FetchStats {
 const RETRYABLE = new Set([408, 425, 429, 500, 502, 503, 504]);
 const DEFAULT_INTERVAL_MS = 1000;
 
-/** 单个响应的体积上限：误配的下载链接不该拖爆进程（正文入库时另有 6 万字截断） */
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
 
-/**
- * 适配器取正文用：304 = 内容没变，返回 null 让调用方走「跳过」路径；
- * 其他失败（网络错、HTTP 4xx/5xx）抛错。适配器不得自己判 `!response.text`——
- * 那会把 304 当成「页面为空」抛错，条件请求缓存就成了一颗雷。
- */
 export function requirePageText(response: FetchedPage, what: string): string | null {
   if (response.notModified) return null;
   if (!response.text) throw new Error(response.error ?? `${what}为空`);
@@ -72,7 +50,6 @@ function retryAfterMs(header: string | null): number | null {
   return Number.isNaN(date) ? null : Math.max(0, date - Date.now());
 }
 
-/** 超大响应不值得重试，直接记失败 */
 function tooLarge(url: string, status: number, bytes: number): FetchedPage {
   return {
     url,
@@ -84,12 +61,10 @@ function tooLarge(url: string, status: number, bytes: number): FetchedPage {
   };
 }
 
-/** Content-Type 与 `<meta charset>` 双保险：不少老站点仍是 GBK */
 export function detectCharset(contentType: string | null, head: Uint8Array): string {
   const fromHeader = contentType?.match(/charset=["']?([\w-]+)/i)?.[1];
   if (fromHeader) return normalizeCharset(fromHeader);
 
-  // 用 latin1 看字节，只为嗅 meta 标签
   const sniff = new TextDecoder("latin1").decode(head.slice(0, 2048));
   const fromMeta =
     sniff.match(/<meta[^>]+charset=["']?([\w-]+)/i)?.[1] ??
@@ -99,7 +74,6 @@ export function detectCharset(contentType: string | null, head: Uint8Array): str
 
 function normalizeCharset(label: string): string {
   const lower = label.toLowerCase();
-  // GBK/GB2312 是 GB18030 的子集，统一用它解，避免生僻字变问号
   if (["gbk", "gb2312", "gb-2312", "gb18030"].includes(lower)) return "gb18030";
   return lower;
 }
@@ -132,7 +106,6 @@ export class PoliteFetcher {
     this.robots = new RobotsCache((url) => this.rawGet(url));
   }
 
-  /** 这次运行对该 host 的 robots 判定结果，写进日志便于解释「为什么没抓」 */
   async robotsNote(url: string): Promise<string> {
     const origin = originOf(url);
     if (!origin) return "invalid-url";
@@ -144,7 +117,6 @@ export class PoliteFetcher {
     this.stats = { requests: 0, notModified: 0, denied: 0 };
   }
 
-  /** robots.txt 自身，不经过 robots 判定，但仍走 host 排队与限速 */
   private async rawGet(url: string) {
     const origin = originOf(url);
     if (!origin) throw new Error(`非法 URL：${url}`);
@@ -288,10 +260,6 @@ export class PoliteFetcher {
       .run();
   }
 
-  /**
-   * 同一个 host 串行 + 间隔控制。
-   * 跨 host 才并发，这里用「按 host 串成一条链」实现，天然满足「并发 ≤ 1」。
-   */
   private async withHost<T>(origin: string, delayMs: number, task: () => Promise<T>): Promise<T> {
     const previous = this.queues.get(origin) ?? Promise.resolve();
     let release!: () => void;
@@ -310,7 +278,6 @@ export class PoliteFetcher {
       return await task();
     } finally {
       release();
-      // 链尾已经没有等待者时清掉，避免 Map 无限增长
       if (this.queues.get(origin) === chained) this.queues.delete(origin);
     }
   }

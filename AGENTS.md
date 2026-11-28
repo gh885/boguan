@@ -157,7 +157,7 @@ vpr dev stop           # 停止
 ## 编码约定
 
 - 组件优先 `.astro`；只有在确实需要客户端交互时才引入岛屿。
-- 源码零注释：仓库源码不得含行注释、块注释或 HTML/CSS 注释。决策写入 `docs/adr/`，ADR 能短则短。
+- 源码零注释：仓库源码不得含行注释、块注释或 HTML/CSS 注释，由根目录 `architecture.test.ts` 守。决策写入 `docs/adr/`，ADR 能短则短；编译指令（`/// <reference>`、`@ts-check`）保留。
 - 数据查询函数返回已确定的类型，类型从 Drizzle schema 推导，不手写重复 interface。
 - 日期统一以 UTC 存储，展示时用 `formatDate(value, locale)`（内部按 `Asia/Shanghai`）。
 - 站内链接用 `localizePath(path, locale)`，不要在模板里手拼 `/en` 前缀。

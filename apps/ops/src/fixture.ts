@@ -13,16 +13,6 @@ import { mkdirSync, rmSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-/**
- * 构建用的最小数据集：`vpr db:fixture` → `data/fixture.db`。
- *
- * 为什么需要它：站点是数据驱动的，CI 里不能跑抓取（没网也得能构建，更不该去骚扰源站）。
- * 有了固定数据集，构建在 CI 与本机表现一致，也不会因为某天源站改版而变红。
- *
- * 安全约定：路径固定为 `data/fixture.db`，**不读 `BOGUAN_DB`**——绝不可能覆盖真实的抓取库。
- * 需要让构建用它：`BOGUAN_DB=data/fixture.db vpr build`（CI 就是这么做的）。
- */
-
 const fixturePath = fileURLToPath(new URL("../../../data/fixture.db", import.meta.url));
 
 rmSync(fixturePath, { force: true });
@@ -122,7 +112,6 @@ const fixtures = [
     body: "知识库检索匹配可以抽象为文本相似度计算，本文介绍服务化的工程实现。",
   },
   {
-    // 故意留一条没有发布时间的：列表要「沉底但不消失」，年份归档要跳过它
     source: youzanSource,
     company: youzan,
     title: "没有发布时间的旧文",

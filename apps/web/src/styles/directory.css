@@ -1,10 +1,3 @@
-/**
- * 目录页：/companies 与 /tags。
- *
- * 不套切片目录：没有筛选条、右栏与分页，只有分组清单。
- * 纸面、报眉、版头与页脚来自 paper.css。
- */
-
 .directory-sheet {
   width: 100%;
   max-width: 90rem;
@@ -15,8 +8,6 @@
 .directory-body {
   padding-block-start: 0.75rem;
 }
-
-/* 公司索引：按收录数从多到少，三栏 */
 
 .directory-companies {
   display: grid;
@@ -78,8 +69,6 @@
   font-size: 0.6875rem;
   font-variant-numeric: tabular-nums;
 }
-
-/* 标签索引：先给分组跳转，再按主题分组 */
 
 .directory-jump {
   display: flex;
@@ -186,8 +175,6 @@
   overflow-wrap: anywhere;
 }
 
-/* 合订本：按期列出，三栏（期号 + 日期较长，比标签索引略宽） */
-
 .directory-editions {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -195,8 +182,6 @@
 .directory-editions li:nth-child(-n + 3) {
   border-block-start: 0;
 }
-
-/* 空态 */
 
 .directory-empty {
   padding-block: 2.5rem 2rem;
@@ -218,8 +203,6 @@
   font-size: 0.875rem;
   line-height: 1.65;
 }
-
-/* 响应式 */
 
 @media (max-width: 1199px) {
   .directory-companies,
@@ -266,8 +249,6 @@
     font-size: 1.0625rem;
   }
 }
-
-/* 合订本的响应式要盖过 .directory-tags 的四栏规则，所以放在文件末尾 */
 
 @media (max-width: 1199px) {
   .directory-editions {

@@ -4,12 +4,10 @@ import type { Locale } from "../lib/i18n/config";
 
 interface Props {
   locale: Locale;
-  /** 版头眉批，例如「标签 / TOPIC」；由页面传本地化文案。 */
   kicker: string;
   title: string;
   titleLang?: string;
   facts?: string[];
-  /** 标题下的一句补充，例如目录页的排序说明。 */
   description?: string;
   clearHref?: string;
   clearLabel?: string;

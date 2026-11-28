@@ -1,12 +1,3 @@
-/**
- * 索引页「切片版」：标签 / 公司 / 年份 / 搜索共用。
- *
- * 版头换，目录不换。纸面与检索框、页脚来自 paper.css；
- * 这里只写报眉、版头、筛选条、目录、右栏与分页。
- */
-
-/* 反馈只做颜色，不做位移或缩放 */
-
 .index-facet,
 .index-facetclear,
 .index-entry-title a,
@@ -19,16 +10,12 @@
   transition: color var(--transition-fast);
 }
 
-/* 版面 */
-
 .index-sheet {
   width: 100%;
   max-width: 90rem;
   margin-inline: auto;
   padding: clamp(1.25rem, 2vw, 2rem) clamp(1rem, 1.6vw, 1.75rem) 1rem;
 }
-
-/* 筛选条：只放还能继续收窄的维度 */
 
 .index-facetbar {
   display: flex;
@@ -132,8 +119,6 @@
 .index-facetclear:hover {
   color: var(--home-red);
 }
-
-/* 目录与右栏 */
 
 .index-body {
   display: grid;
@@ -244,8 +229,6 @@
   -webkit-line-clamp: 2;
 }
 
-/* 右栏：相关切片。细线框、小字，不重复版头已有的数字 */
-
 .index-rail {
   min-width: 0;
   padding-inline-start: 1.5rem;
@@ -335,8 +318,6 @@
   color: var(--home-red);
 }
 
-/* 空态 */
-
 .index-empty {
   padding-block: 2.5rem 2rem;
   border-block-start: 1px solid var(--home-rule-soft);
@@ -369,8 +350,6 @@
 .index-empty-action:hover {
   text-decoration: underline;
 }
-
-/* 搜索着陆页：无查询时先给一句检索提示，再直接列出最近收录 */
 
 .index-landing-intro {
   padding-block-start: 0.9rem;
@@ -405,8 +384,6 @@
   font-weight: 600;
   letter-spacing: 0.06em;
 }
-
-/* 分页 */
 
 .index-pager {
   display: flex;
@@ -446,8 +423,6 @@
   color: var(--home-muted);
   opacity: 0.45;
 }
-
-/* 响应式 */
 
 @media (max-width: 1199px) {
   .index-list {
