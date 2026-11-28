@@ -9,11 +9,20 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vite-plus/test";
 import { deleteBody, listBodyIds, pruneBodies, putBody, readBody } from "./bodies";
 import { checkFts, deletePostFts, upsertPostFts } from "./fts";
-import { latestPosts, postYears, postsByTag, postsByYear } from "./queries/posts";
+import {
+  latestPosts,
+  editionSummaries,
+  postYears,
+  postsByEdition,
+  postsByTag,
+  postsByYear,
+} from "./queries/posts";
 import { searchPosts } from "./queries/search";
 import { companies, crawlJobs, posts, sources, tagAliases, tags } from "./schema";
 import type { Db } from "./index";
 import { segment, toMatchQuery } from "../search/tokenize";
+import { dayInTimeZone } from "../domain/date";
+import { editionRange } from "../domain/edition";
 import * as schema from "./schema";
 
 const migrationsFolder = fileURLToPath(new URL("../../../drizzle", import.meta.url));
@@ -37,6 +46,8 @@ interface SeedOptions {
   publishedAt?: string | null;
   publishedYear?: number | null;
   contentHash?: string;
+  /** 入库时间；期页按它归属期号（不传就用默认的 now） */
+  firstSeenAt?: string;
 }
 
 function seed(db: Db, options: SeedOptions = {}) {
@@ -72,6 +83,7 @@ function seed(db: Db, options: SeedOptions = {}) {
         options.publishedAt === undefined ? "2024-03-01T02:00:00.000Z" : options.publishedAt,
       publishedYear: options.publishedYear === undefined ? 2024 : options.publishedYear,
       contentHash: options.contentHash ?? "hash-a",
+      ...(options.firstSeenAt ? { firstSeenAt: options.firstSeenAt } : {}),
     })
     .returning()
     .get();
@@ -381,5 +393,63 @@ describe("分词", () => {
     expect(segment("多级缓存架构实践")).toContain("缓存");
     expect(toMatchQuery("缓存 AND 淘汰")).toMatch(/^"缓存"/);
     expect(toMatchQuery('说 "引号" 呢')).not.toContain('"" 呢"');
+  });
+});
+
+describe("期页（按期归属，不按发布时间）", () => {
+  it("同一自然日入库的稿子归同一期，跨北京零点就分成两期", () => {
+    const db = freshDb();
+    // 上海 11-01 07:00 / 11-01 23:59 → 第 2 期（UTC 仍是 10-31）
+    seed(db, { firstSeenAt: "2026-10-31T23:00:00.000Z" });
+    seed(db, { firstSeenAt: "2026-10-31T15:59:59.999Z" }); // 上海 10-31 23:59 → 创刊号
+    seed(db, { firstSeenAt: "2026-10-31T16:00:00.000Z" }); // 上海 11-01 00:00 → 第 2 期
+
+    const summaries = editionSummaries(db);
+    expect(summaries.map((row) => [row.number, row.count])).toEqual([
+      [2, 2],
+      [1, 1],
+    ]);
+  });
+
+  it("postsByEdition 只返回该期入库的稿子", () => {
+    const db = freshDb();
+    const first = seed(db, { title: "创刊号里的稿子", firstSeenAt: "2026-10-31T03:00:00.000Z" });
+    seed(db, { title: "第二期的稿子", firstSeenAt: "2026-11-02T03:00:00.000Z" });
+
+    const range = editionRange(1) as { startIso: string; endIso: string };
+    const { items, total } = postsByEdition(db, range);
+    expect(total).toBe(1);
+    expect(items.map((item) => item.id)).toEqual([first.post.id]);
+  });
+
+  it("SQL 的 date(+8 hours) 与 TS 的 dayInTimeZone 给同一个出版日", () => {
+    const db = freshDb();
+    const stamps = [
+      "2026-10-31T15:59:59.999Z",
+      "2026-10-31T16:00:00.000Z",
+      "2026-11-28T03:00:00.000Z",
+      "2027-01-01T16:30:00.000Z",
+    ];
+    for (const stamp of stamps) {
+      seed(db, { firstSeenAt: stamp, contentHash: `hash-${stamp}` });
+    }
+
+    const fromSql = db.$client
+      .prepare(
+        `select date(first_seen_at, '+8 hours') as day
+         from posts order by first_seen_at asc`,
+      )
+      .all() as { day: string }[];
+
+    expect(fromSql.map((row) => row.day)).toEqual(
+      [...stamps].sort().map((stamp) => dayInTimeZone(stamp) as string),
+    );
+  });
+
+  it("下架与判重的稿子不计入期号", () => {
+    const db = freshDb();
+    const { post } = seed(db, { firstSeenAt: "2026-10-31T03:00:00.000Z" });
+    db.update(posts).set({ isVisible: false }).where(eq(posts.id, post.id)).run();
+    expect(editionSummaries(db)).toEqual([]);
   });
 });

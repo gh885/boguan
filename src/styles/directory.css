@@ -186,6 +186,16 @@
   overflow-wrap: anywhere;
 }
 
+/* 合订本：按期列出，三栏（期号 + 日期较长，比标签索引略宽） */
+
+.directory-editions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.directory-editions li:nth-child(-n + 3) {
+  border-block-start: 0;
+}
+
 /* 空态 */
 
 .directory-empty {
@@ -254,5 +264,35 @@
 
   .directory-name {
     font-size: 1.0625rem;
+  }
+}
+
+/* 合订本的响应式要盖过 .directory-tags 的四栏规则，所以放在文件末尾 */
+
+@media (max-width: 1199px) {
+  .directory-editions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .directory-editions li:nth-child(-n + 3) {
+    border-block-start: 1px solid var(--home-rule-soft);
+  }
+
+  .directory-editions li:nth-child(-n + 2) {
+    border-block-start: 0;
+  }
+}
+
+@media (max-width: 680px) {
+  .directory-editions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .directory-editions li:nth-child(-n + 2) {
+    border-block-start: 1px solid var(--home-rule-soft);
+  }
+
+  .directory-editions li:first-child {
+    border-block-start: 0;
   }
 }

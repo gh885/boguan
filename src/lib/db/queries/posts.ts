@@ -1,4 +1,5 @@
 import type { Db } from "../index";
+import { editionNumber } from "../../domain/edition";
 
 /**
  * 列表页的只读查询（docs/ARCHITECTURE.md §6）。
@@ -52,6 +53,9 @@ export interface ListFilters {
   tagSlug?: string;
   year?: number;
   hasCode?: boolean;
+  /** 只取该区间内首次入库的稿件（左闭右开，ISO UTC）。期页用它，语义见 domain/edition.ts */
+  firstSeenFrom?: string;
+  firstSeenTo?: string;
 }
 
 export const VISIBLE = "p.is_visible = 1 and p.duplicate_of_id is null";
@@ -110,6 +114,14 @@ export function filterSql(filters: ListFilters): { where: string; params: (strin
   if (filters.hasCode !== undefined) {
     clauses.push("p.has_code = ?");
     params.push(filters.hasCode ? 1 : 0);
+  }
+  if (filters.firstSeenFrom) {
+    clauses.push("p.first_seen_at >= ?");
+    params.push(filters.firstSeenFrom);
+  }
+  if (filters.firstSeenTo) {
+    clauses.push("p.first_seen_at < ?");
+    params.push(filters.firstSeenTo);
   }
 
   return {
@@ -173,6 +185,51 @@ export function listPosts(
 
 export function latestPosts(db: Db, options: PageOptions = {}): Paged<PostCard> {
   return listPosts(db, {}, options);
+}
+
+/**
+ * 某一期的稿件：按**入库时间**取，与期号定义一致（`src/lib/domain/edition.ts`）。
+ * 注意不是 `postsByYear` 那套——一期装的是「那天登了什么稿」，不是「那天发了什么文」。
+ */
+export function postsByEdition(
+  db: Db,
+  range: { startIso: string; endIso: string },
+  options: PageOptions = {},
+): Paged<PostCard> {
+  return listPosts(db, { firstSeenFrom: range.startIso, firstSeenTo: range.endIso }, options);
+}
+
+export interface EditionSummary {
+  number: number;
+  /** 出版日（上海自然日） */
+  day: string;
+  count: number;
+}
+
+/**
+ * 有稿入库的期，按期号倒序（合订本、期页静态路径与 sitemap 门槛都用它）。
+ * 没有稿子的日期不入表，期号仍然连续；要枚举全部期号请用 `editionDay` 推算。
+ *
+ * 按上海自然日分组：中国无夏令时，`date(..., '+8 hours')` 与 TS 侧的
+ * `dayInTimeZone(..., 'Asia/Shanghai')` 等价（对账用例在 domain/edition.test.ts）。
+ */
+export function editionSummaries(db: Db): EditionSummary[] {
+  const rows = db.$client
+    .prepare(
+      `select date(p.first_seen_at, '+8 hours') as day, count(*) as count
+       from posts p
+       where ${VISIBLE}
+       group by day
+       order by day desc`,
+    )
+    .all() as { day: string | null; count: number }[];
+
+  return rows.flatMap((row) => {
+    const number = row.day === null ? null : editionNumber(row.day);
+    return row.day !== null && number !== null && number >= 1
+      ? [{ number, day: row.day, count: row.count }]
+      : [];
+  });
 }
 
 export function postsByCompany(

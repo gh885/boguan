@@ -36,6 +36,23 @@
   display: block;
 }
 
+/* 期号是链接（进该期版面），「本期新增」跟在下面一行做补充 */
+.home-edition-link {
+  color: var(--home-ink);
+  text-decoration: none;
+}
+
+.home-edition-link:hover {
+  color: var(--home-red);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.15em;
+}
+
+.home-edition-new {
+  color: var(--home-muted);
+}
+
 .home-brand {
   text-align: center;
 }

@@ -7,6 +7,7 @@ import type {
 	IndexEmptyAction,
 	IndexFacetGroup,
 	IndexRailModule,
+	PaperSection,
 } from "../lib/index-sheet";
 import "../styles/paper.css";
 import "../styles/index-sheet.css";
@@ -23,7 +24,7 @@ interface Props {
   titleLang?: string;
   facts?: string[];
   /** 当前所在栏目，用于报眉主导航的高亮。 */
-  current?: "home" | "companies" | "tags" | "years";
+  current?: PaperSection;
   posts: PostCard[];
   /** 匹配总数，只用于编号补零与分页口径。 */
   total: number;

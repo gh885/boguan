@@ -266,11 +266,12 @@ interface SourceAdapter {
 
 **静态优先，搜索与筛选按需 SSR。**
 
-| 页面                                         | 渲染方式                   | 索引       |
-| :------------------------------------------- | :------------------------- | :--------- |
-| `/`、`/company/*`、`/tag/*`、`/year/*`、分页 | 构建时静态生成             | ✅ index   |
-| `/search`、带筛选参数的结果页                | SSR（需服务端分词 + FTS5） | ❌ noindex |
-| sitemap.xml、robots.txt                      | 构建时生成                 | —          |
+| 页面                                         | 渲染方式                   | 索引                  |
+| :------------------------------------------- | :------------------------- | :-------------------- |
+| `/`、`/company/*`、`/tag/*`、`/year/*`、分页 | 构建时静态生成             | ✅ index              |
+| `/edition/*`、`/editions`、期页分页          | 构建时静态生成             | ✅ index（薄期见 §8） |
+| `/search`、带筛选参数的结果页                | SSR（需服务端分词 + FTS5） | ❌ noindex            |
+| sitemap.xml、robots.txt                      | 构建时生成                 | —                     |
 
 列表页的「含代码」筛选入口指向 `/search?has_code=1`（可叠加 company / tag / year）：
 静态页读不到查询串，筛选统一在唯一的 SSR 结果页里完成，视觉上仍是同一套卡片与筛选条。
@@ -278,6 +279,30 @@ interface SourceAdapter {
 分页同样是静态路由：首页 `/page/[n]`，公司 / 标签 / 年份分别是
 `/company/[slug]/page/[n]`、`/tag/[slug]/page/[n]`、`/year/[year]/page/[n]`；第 1 页不带
 `/page/1`，避免同一内容两个 URL。
+
+### 期号：首页报头那个「第 N 期」必须是真概念
+
+首页报头曾经把「可见文章总数」当作期号显示。那是个假概念：读者会读成「第 533 期周刊」，
+而它既没有日期含义，也不能点进去回看。现在的定义只有三条：
+
+- **一期 = 一个自然日（`Asia/Shanghai`）的定版**；期号 = 从创刊日（`2026-10-31`，仓库首次上线、
+  全量稿件一次性入版）起的第几天。期号与日期互为函数：看到「第 29 期」就知道是 11 月 28 日。
+- **出版日归 `first_seen_at`（入库时间），不归 `published_at`（原发时间）**。前者决定这篇稿子
+  登在哪一期，后者只决定列表怎么排序。两条时间轴不许互相借。
+- **没有新增的日子照常出刊**：期号连续、不跳号，版面标「本期无新增」。跳号等于让读者失去坐标系。
+
+版面是**该期新入库的稿件**，不是「当时的最新 N 条」——否则相邻期会重复九成内容，
+既过不了唯一 `title` / `description` 那条，也是典型的重复内容。一期刊得多就分页
+（`/edition/[n]/page/[page]`），与首页续版同构。
+
+实现：纯计算在 `src/lib/domain/edition.ts`（`editionNumber` / `editionDay` / `editionRange` /
+`editionNumberAt`），查询在 `queries/posts.ts` 的 `postsByEdition`（复用
+`ListFilters.firstSeenFrom/To`）与 `editionSummaries`。期界必须用
+`startOfDayInTimeZone(day, "Asia/Shanghai")`，**不要用 UTC 零点**——不然北京时间每天 20:00
+之后入库的稿子会登错期。
+
+`/editions` 是合订本目录：只列有稿入库的期，按期倒序、按年月分组。没有新增的日子不出现在目录里，
+但 `/edition/[n]` 照样存在——期号的连续性由路由自己保证，目录是给人翻的，不是日历。
 
 - 每日抓取完成后触发一次重建；列表页最多滞后一天，可接受。
 - 搜索是唯一必须动态渲染的页面，因此站点需要 Node 适配器（而非纯静态托管）。
@@ -339,7 +364,7 @@ select rowid from posts_fts where posts_fts match 'title_tokens : ("缓存")'
 聚合站最大的 SEO 风险不是"渲染不出来"，而是**被判为重复内容**。因此：
 
 1. **详情页不存在**。文章卡片直接外链原文，不在本站复制正文。
-2. **可索引的是列表页**：公司页、标签页、年份页。这些页面承载了"聚合"本身的独特价值——同一主题下跨公司、跨时间的文章集合，是原文页面没有的。**这是本站的 SEO 资产。**
+2. **可索引的是列表页**：公司页、标签页、年份页、期页与合订本目录。这些页面承载了"聚合"本身的独特价值——同一主题下跨公司、跨时间的文章集合，或者同一天登了什么稿，是原文页面没有的。**这是本站的 SEO 资产。**
 3. `sitemap.xml` 用 `@astrojs/sitemap` 生成，只收录列表页并带 `hreflang` 互链；搜索页与筛选组合页 `noindex` 且被 `filter` 排除。
 4. 每个页面输出唯一的 `<title>`、`description`、`canonical`、OG 标签。
 5. 列表页输出 `ItemList` / `CollectionPage` 结构化数据。
@@ -350,6 +375,9 @@ select rowid from posts_fts where posts_fts match 'title_tokens : ("缓存")'
    门槛常量在 `src/lib/tags.ts`，页面与 sitemap 用的是同一个。
 8. 多语言页面互相声明：每页输出各语言的 `hreflang` 与 `x-default`，canonical 指自己。见 §9。
 9. 站内 feed（`/rss.xml`、`/en/rss.xml`）只放**标题 + 摘要 + 原文链接**，与页面同一套内容边界（硬性规则 1）；`BaseLayout` 输出 `<link rel="alternate" type="application/rss+xml">` 便于订阅发现。共享页脚（`PaperFooter.astro`）**不放可见的订阅链接**：feed 是免费的纯技术输出，不构成经营性或收费服务，界面上的「订阅」措辞在备案期容易被误读，发现路径只留 head 的 alternate link，读者与抓取器照样能取到。
+10. **薄期页 `noindex, follow`**：一期新增 < 3 篇的期页照样生成（期号不能断），但不进 sitemap。
+    日报必然有「今天只来了一篇」的薄日子，这类页面不该占索引位；可索引的是较厚的期与 `/editions`
+    目录。门槛常量在 `src/lib/domain/edition.ts` 的 `EDITION_MIN_POSTS`，页面与 sitemap 共用。
 
 ---
 

@@ -1,5 +1,5 @@
 ---
-import type { PostCard, SiteStats, TagCard } from "../lib/db/queries";
+import type { PostCard, TagCard } from "../lib/db/queries";
 import { tagGroupOf } from "../lib/domain/tag-group";
 import {
   formatCount,
@@ -29,9 +29,12 @@ interface Props {
   lead?: PostCard;
   /** 首页第一页的「本期要目」；分页页不传。 */
   topics?: TagCard[];
-  stats: SiteStats;
   page: number;
   totalPages: number;
+  /** 本期期号（见 lib/domain/edition.ts）：一个自然日一期，从创刊号连续编号 */
+  editionNumber: number;
+  /** 本期新入库的稿件数；没有新增也是 0，不跳号 */
+  editionNew: number;
   prevHref?: string;
   nextHref?: string;
   /** 「年份」导航的落点；没有年份归档时退化到标签索引。 */
@@ -43,9 +46,10 @@ const {
   items,
   lead,
   topics = [],
-  stats,
   page,
   totalPages,
+  editionNumber,
+  editionNew,
   prevHref,
   nextHref,
   yearHref,
@@ -56,12 +60,15 @@ const homeHref = localizePath("/", locale);
 const companiesHref = localizePath("/companies", locale);
 const tagsHref = localizePath("/tags", locale);
 const yearsHref = yearHref ?? tagsHref;
+const editionsHref = localizePath("/editions", locale);
+const editionNo = formatNumber(locale, editionNumber);
+const editionHref = localizePath(`/edition/${editionNumber}`, locale);
 
 /** 头版网格一行 5 个版位;「更多」卡片是补空的,最后一行已满就不再渲染 */
 const GRID_COLUMNS = 5;
 
 const editionDate = formatLongDate(new Date(), locale);
-const issue = t("home.issue", { count: formatNumber(locale, stats.posts) });
+const issue = t("edition.issue", { number: editionNo });
 const issueWithPage = page > 1 ? `${issue} · ${t("home.page", { page })}` : issue;
 const latestMark = t("home.latestMark", { count: String(items.length).padStart(2, "0") });
 const pageOf = t("pagination.pageOf", { page, total: totalPages });
@@ -90,7 +97,12 @@ const topicItems = topics.map((topic) => ({
 			</div>
 			<div class="home-edition">
 				<span>{t("meta.home.title")}</span>
-				<span>{issueWithPage}</span>
+				<span>
+					<a class="home-edition-link" href={editionHref}>{issueWithPage}</a>
+					<span class="home-edition-new">
+						{t("home.issueNew", { count: formatNumber(locale, editionNew) })}
+					</span>
+				</span>
 			</div>
 		</header>
 		<div class="home-rule"></div>
@@ -101,6 +113,7 @@ const topicItems = topics.map((topic) => ({
 				<a href={companiesHref}>{t("nav.companies")}</a>
 				<a href={tagsHref}>{t("nav.tags")}</a>
 				<a href={yearsHref}>{t("nav.years")}</a>
+				<a href={editionsHref}>{t("nav.editions")}</a>
 			</nav>
 
 			<form class="home-search paper-search" action={searchHref(locale)} method="get" role="search">

@@ -1,6 +1,7 @@
 ---
 import { localizePath, useTranslations } from "../lib/i18n";
 import type { Locale } from "../lib/i18n/config";
+import type { PaperSection } from "../lib/index-sheet";
 import { searchHref } from "../lib/search-url";
 import { site } from "../lib/site";
 import Icon from "./Icon.astro";
@@ -10,7 +11,7 @@ import ThemeToggle from "./ThemeToggle.astro";
 interface Props {
   locale: Locale;
   /** 当前所在栏目；用于给主导航加 aria-current。 */
-  current?: "home" | "companies" | "tags" | "years";
+  current?: PaperSection;
   searchValue?: string;
   /** 在切片内继续搜索时要保留的条件。 */
   searchHidden?: Record<string, string>;
@@ -30,6 +31,7 @@ const homeHref = localizePath("/", locale);
 const companiesHref = localizePath("/companies", locale);
 const tagsHref = localizePath("/tags", locale);
 const yearsHref = navYearsHref ?? tagsHref;
+const editionsHref = localizePath("/editions", locale);
 ---
 
 <div class="paper-runninghead">
@@ -48,6 +50,9 @@ const yearsHref = navYearsHref ?? tagsHref;
 			</a>
 			<a href={yearsHref} aria-current={current === "years" ? "page" : undefined}>
 				{t("nav.years")}
+			</a>
+			<a href={editionsHref} aria-current={current === "editions" ? "page" : undefined}>
+				{t("nav.editions")}
 			</a>
 		</nav>
 
