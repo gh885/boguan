@@ -1,16 +1,9 @@
 ---
+import { companiesByTag, openWebDatabase, postYearsByFilters, postsByTag, tagBySlug, tagIndex } from "@boguan/database/web-read";
 import { tagGroupOf, isIndexableCollection } from "@boguan/domain";
 import type { GetStaticPaths } from "astro";
 import BaseLayout from "../../../../../layouts/BaseLayout.astro";
 import TagView from "../../../../../components/TagView.astro";
-import {
-	companiesByTag,
-	openWebDatabase,
-	postYearsByFilters,
-	postsByTag,
-	tagBySlug,
-	tagIndex,
-} from "../../../../../lib/db/queries";
 import { localizePath, localeRoutes, useTranslations } from "../../../../../lib/i18n";
 import type { Locale } from "../../../../../lib/i18n/config";
 import {

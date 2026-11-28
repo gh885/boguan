@@ -1,15 +1,8 @@
 ---
+import { companyBySlug, companyCards, companyTopTags, openWebDatabase, postYearsByFilters, postsByCompany } from "@boguan/database/web-read";
 import type { GetStaticPaths } from "astro";
 import BaseLayout from "../../../../../layouts/BaseLayout.astro";
 import CompanyView from "../../../../../components/CompanyView.astro";
-import {
-	companyBySlug,
-	companyCards,
-	companyTopTags,
-	openWebDatabase,
-	postYearsByFilters,
-	postsByCompany,
-} from "../../../../../lib/db/queries";
 import { localizePath, localeRoutes, useTranslations } from "../../../../../lib/i18n";
 import { companyDisplayName } from "../../../../../lib/i18n/company";
 import type { Locale } from "../../../../../lib/i18n/config";

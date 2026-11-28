@@ -1,4 +1,4 @@
-import type { Db } from "../index";
+import type { Db } from "../connection";
 import { editionNumber } from "@boguan/domain";
 
 /**

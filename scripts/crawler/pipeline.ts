@@ -1,16 +1,7 @@
 import {
-  HIDDEN_NON_ARTICLE,
-  isNonArticle,
-  normalizeRawTag,
-  canonicalizeUrl,
-  slugify,
-} from "@boguan/domain";
-import { and, desc, eq, isNotNull, ne } from "drizzle-orm";
-import { openBodyStore } from "@boguan/body-store";
-import { upsertPostFts } from "../../src/lib/db/fts";
-import type { Db } from "../../src/lib/db/index";
-import { openDatabase } from "../../src/lib/db/index";
-import {
+  upsertPostFts,
+  type Db,
+  openDatabase,
   companies,
   crawlFailures,
   crawlJobs,
@@ -20,7 +11,16 @@ import {
   sources,
   tagAliases,
   tags,
-} from "../../src/lib/db/schema";
+} from "@boguan/database/crawler";
+import {
+  HIDDEN_NON_ARTICLE,
+  isNonArticle,
+  normalizeRawTag,
+  canonicalizeUrl,
+  slugify,
+} from "@boguan/domain";
+import { and, desc, eq, isNotNull, ne } from "drizzle-orm";
+import { openBodyStore } from "@boguan/body-store";
 import { adapterFor } from "./adapters";
 import type { AdapterContext, SourceAdapter } from "./adapters/types";
 import { PoliteFetcher } from "./fetch";

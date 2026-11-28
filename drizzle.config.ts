@@ -1,5 +1,5 @@
 import { defineConfig } from "drizzle-kit";
-import { defaultDatabasePath } from "./src/lib/db/index";
+import { defaultDatabasePath } from "@boguan/database/ops";
 
 /**
  * 迁移文件的生成配置。日常用法：
@@ -10,8 +10,8 @@ import { defaultDatabasePath } from "./src/lib/db/index";
  */
 export default defineConfig({
   dialect: "sqlite",
-  schema: "./src/lib/db/schema.ts",
-  out: "./drizzle",
+  schema: "./packages/database/src/schema.ts",
+  out: "./packages/database/drizzle",
   dbCredentials: { url: defaultDatabasePath },
   strict: true,
   verbose: true,

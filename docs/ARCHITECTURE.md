@@ -309,7 +309,7 @@ interface SourceAdapter {
 - 报纸与目录页用 `BaseLayout` 的 `chrome="bare"`：隐藏侧栏与移动栏，但 `<head>`、canonical、hreflang 仍由 layout 统一维护；页面自己提供顶部导航。不要为它复制一份 head。
 - **筛选只能走 SSR**：静态页读不到 `?company=&tag=&year=`。所以「筛选组合页」与搜索一样是 SSR + `noindex`，不要把筛选做成静态路径组合（数量爆炸且都是薄页面）。
 - 筛选状态全部在 URL 查询参数里（硬性规则 5），不引入客户端状态。
-- **页面只有一个数据库入口**：`@boguan/database/web-read`。页面与 endpoint 不许直接 `openReadonlyDatabase`（`guard.test.ts` 守），查找与过滤规则也就不会各写一份。
+- **页面只有一个数据库入口**：`@boguan/database/web-read`。页面与 endpoint 不许直接开连接（根目录的 `architecture.test.ts` 守这条边界），查找与过滤规则也就不会各写一份。
 - **CI 构建用固定数据集**：`vpr db:fixture` 生成 `data/fixture.db`（4 条覆盖「有/无发布时间、两家公司」），
   `BOGUAN_DB=data/fixture.db vpr build`。构建不依赖网络与源站可用性；本地开发则用真实抓取库。
 

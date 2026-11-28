@@ -1,5 +1,5 @@
 import { toMatchQuery } from "@boguan/search";
-import type { Db } from "../index";
+import type { Db } from "../connection";
 import {
   attachPostTags,
   CARD_COLUMNS,

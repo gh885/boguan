@@ -1,6 +1,6 @@
+import { latestPosts, openWebDatabase } from "@boguan/database/web-read";
 import rss from "@astrojs/rss";
 import type { APIRoute } from "astro";
-import { latestPosts, openWebDatabase } from "../../lib/db/queries";
 import { localeRoutes, useTranslations } from "../../lib/i18n";
 import type { Locale } from "../../lib/i18n/config";
 import { site } from "../../lib/site";

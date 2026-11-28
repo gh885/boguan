@@ -1,9 +1,7 @@
+import { rebuildAllPostFts, type Db, companies, posts } from "@boguan/database/ops";
 import { HIDDEN_NON_ARTICLE, isNonArticle, stripSiteSuffix, titleNorm } from "@boguan/domain";
 import { eq } from "drizzle-orm";
 import { openBodyStore } from "@boguan/body-store";
-import { rebuildAllPostFts } from "../../src/lib/db/fts";
-import type { Db } from "../../src/lib/db/index";
-import { companies, posts } from "../../src/lib/db/schema";
 import { contentHash } from "../crawler/normalize";
 import { dedupe } from "../crawler/pipeline";
 

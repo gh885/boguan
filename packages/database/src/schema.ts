@@ -18,7 +18,7 @@ import {
  * - **正文不在这份 schema 里**：它在 crawler 私有的文件目录（@boguan/body-store），
  *   所以 web 进程即使拿到数据库连接也读不到正文。索引 `posts_fts` 是 contentless 的，
  *   列值不可读回，只有 term 与位置。
- * - 这个文件是 crawler 与 web 唯一的共享点，不放任何查询逻辑（查询在 src/lib/db/queries/）。
+ * - 这个文件是 crawler 与 web 唯一的共享点，不放任何查询逻辑（查询在 `queries/`）。
  */
 
 /** 与 `strftime` 一致的当前时间，避免应用层和 SQLite 写出两种格式 */
@@ -247,5 +247,5 @@ export const crawlFailures = sqliteTable(
  * rowid 约定为 posts.id；中文经 @node-rs/jieba 切词后以空格连接写入。
  * contentless 的两个后果要记住：列值取不回来（`select body_tokens` 是 NULL），
  * 且 `snippet()` / `highlight()` 不可用——所以搜索结果只给摘要，不给命中上下文（§7）。
- * 它不在 Drizzle schema 里（Drizzle 不支持虚拟表），同步逻辑在 src/lib/db/fts.ts。
+ * 它不在 Drizzle schema 里（Drizzle 不支持虚拟表），同步逻辑在 `fts.ts`。
  */

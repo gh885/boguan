@@ -1,8 +1,8 @@
 ---
+import { companyCards, openWebDatabase, postYears } from "@boguan/database/web-read";
 import type { GetStaticPaths } from "astro";
 import DirectorySheet from "../../components/DirectorySheet.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import { companyCards, openWebDatabase, postYears } from "../../lib/db/queries";
 import { formatCount, localizePath, localeRoutes, useTranslations } from "../../lib/i18n";
 import { companyDisplayName } from "../../lib/i18n/company";
 import type { Locale } from "../../lib/i18n/config";

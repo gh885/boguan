@@ -1,9 +1,8 @@
+import { openDatabase, posts } from "@boguan/database/ops";
 import { looksLikeCode, readingMinutes } from "@boguan/domain";
 import { parseArgs } from "node:util";
 import { eq } from "drizzle-orm";
-import { openDatabase } from "../../src/lib/db/index";
 import { openBodyStore } from "@boguan/body-store";
-import { posts } from "../../src/lib/db/schema";
 
 /**
  * 从 crawler 私有的正文文件回填阅读元数据：

@@ -1,8 +1,13 @@
+import {
+  checkFts,
+  deletePostFts,
+  upsertPostFts,
+  openDatabase,
+  posts,
+  sources,
+} from "@boguan/database/ops";
 import { eq } from "drizzle-orm";
 import { openBodyStore } from "@boguan/body-store";
-import { checkFts, deletePostFts, upsertPostFts } from "../../src/lib/db/fts";
-import { openDatabase } from "../../src/lib/db/index";
-import { posts, sources } from "../../src/lib/db/schema";
 
 /**
  * 对账与清理：

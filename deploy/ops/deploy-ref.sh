@@ -45,7 +45,7 @@ rm -f -- "$BUNDLE"
 PREVIOUS=$(git rev-parse HEAD)
 git merge-base --is-ancestor "$PREVIOUS" "$TARGET" || { log '拒绝自动降级或分叉'; exit 1; }
 # 共享依赖、数据库结构及有权限的配置无法随产物回滚，必须人工升级。
-if ! git diff --quiet "$PREVIOUS" "$TARGET" -- package.json bun.lock bun.lockb bunfig.toml .npmrc patches/ drizzle/ src/lib/db/schema.ts deploy/ops/ deploy/systemd/ deploy/Caddyfile deploy/ops.env.example deploy/ossutilconfig.example; then
+if ! git diff --quiet "$PREVIOUS" "$TARGET" -- package.json bun.lock bun.lockb bunfig.toml .npmrc patches/ packages/database/ deploy/ops/ deploy/systemd/ deploy/Caddyfile deploy/ops.env.example deploy/ossutilconfig.example; then
   log '依赖、迁移或运维配置变化，需要人工升级；运行版本未改变'
   exit 1
 fi

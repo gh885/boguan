@@ -1,3 +1,4 @@
+import { openDatabase, companies, sources, tagAliases, tags } from "@boguan/database/ops";
 import {
   allRuleTags,
   COMPANIES,
@@ -7,8 +8,6 @@ import {
   TAG_ALIASES,
 } from "@boguan/catalog";
 import { eq } from "drizzle-orm";
-import { openDatabase } from "../../src/lib/db/index";
-import { companies, sources, tagAliases, tags } from "../../src/lib/db/schema";
 
 const db = openDatabase();
 

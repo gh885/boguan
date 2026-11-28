@@ -1,16 +1,8 @@
 ---
+import { companyCards, countPosts, latestPosts, openWebDatabase, postYears, siteStats, topTags } from "@boguan/database/web-read";
 import type { GetStaticPaths } from "astro";
 import IndexSheet from "../../../components/IndexSheet.astro";
 import BaseLayout from "../../../layouts/BaseLayout.astro";
-import {
-	companyCards,
-	countPosts,
-	latestPosts,
-	openWebDatabase,
-	postYears,
-	siteStats,
-	topTags,
-} from "../../../lib/db/queries";
 import { companyDisplayName } from "../../../lib/i18n/company";
 import { formatCount, localizePath, localeRoutes, useTranslations } from "../../../lib/i18n";
 import type { Locale } from "../../../lib/i18n/config";

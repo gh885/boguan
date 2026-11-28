@@ -1,14 +1,10 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vite-plus/test";
-import { openBodyStore } from "@boguan/body-store";
 import { checkFts, deletePostFts, upsertPostFts } from "./fts";
+import { migrationsFolder } from "./migrate";
 import {
   latestPosts,
   editionSummaries,
@@ -19,12 +15,10 @@ import {
 } from "./queries/posts";
 import { searchPosts } from "./queries/search";
 import { companies, crawlJobs, posts, sources, tagAliases, tags } from "./schema";
-import type { Db } from "./index";
+import type { Db } from "./connection";
 import { segment, toMatchQuery } from "@boguan/search";
 import { dayInTimeZone, editionRange } from "@boguan/domain";
 import * as schema from "./schema";
-
-const migrationsFolder = fileURLToPath(new URL("../../../drizzle", import.meta.url));
 
 /** 每个用例一个内存库：迁移真跑一遍，schema 与迁移文件不一致会直接失败 */
 function freshDb(): Db {
@@ -178,36 +172,6 @@ describe("数据模型", () => {
       .all()
       .find((row) => row.id === copy.id);
     expect(after?.duplicateOfId).toBeNull();
-  });
-});
-
-describe("正文存储（crawler 私有目录）", () => {
-  it("写入 → 读回 → 删除，内容是 gzip 后的文本", () => {
-    const dir = mkdtempSync(join(tmpdir(), "boguan-bodies-"));
-    try {
-      const store = openBodyStore(dir);
-      store.put(7, "多级缓存\n的分层设计");
-      expect(store.read(7)).toBe("多级缓存\n的分层设计");
-      expect(store.ids()).toEqual([7]);
-      store.delete(7);
-      expect(store.read(7)).toBeNull();
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it("对账删除不在 keep 里的孤文件", () => {
-    const dir = mkdtempSync(join(tmpdir(), "boguan-bodies-"));
-    try {
-      const store = openBodyStore(dir);
-      store.put(1, "a");
-      store.put(2, "b");
-      store.put(3, "c");
-      expect(store.prune(new Set([1, 3]))).toBe(1);
-      expect(store.ids()).toEqual([1, 3]);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
   });
 });
 

@@ -1,5 +1,5 @@
 import { segment } from "@boguan/search";
-import type { Db } from "./index";
+import type { Db } from "./connection";
 
 /**
  * posts_fts 的写入与对账。虚拟表不在 Drizzle schema 里，只能走原生 SQL。
@@ -54,7 +54,7 @@ export function checkFts(db: Db): FtsReport {
 }
 
 /**
- * 全量重建。换分词器 / 改分词参数后用：正文从私有文件里读（见 bodies.ts），
+ * 全量重建。换分词器 / 改分词参数后用：正文从 `@boguan/body-store` 读，
  * 不下数据库读，`posts_fts` 也不回读自己的列（contentless 读不回来）。
  */
 export function rebuildAllPostFts(db: Db, loadBody: (postId: number) => string | null): number {

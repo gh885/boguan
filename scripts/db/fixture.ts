@@ -1,11 +1,17 @@
+import {
+  openDatabase,
+  upsertPostFts,
+  companies,
+  postTags,
+  posts,
+  sources,
+  tags,
+} from "@boguan/database/ops";
 import { titleNorm } from "@boguan/domain";
 import { mkdirSync, rmSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-import { openDatabase } from "../../src/lib/db/index";
-import { upsertPostFts } from "../../src/lib/db/fts";
-import { companies, postTags, posts, sources, tags } from "../../src/lib/db/schema";
 
 /**
  * 构建用的最小数据集：`vpr db:fixture` → `data/fixture.db`。

@@ -2,22 +2,25 @@
 
 ## 责任
 
-拥有 SQLite schema、迁移、连接策略、FTS 持久化与所有数据库查询/命令。
+SQLite 的 schema、迁移与全部读写能力。单一包、按能力分入口，调用方只能拿到自己那一份：
+
+| 入口                        | 给谁                              | 内容                                  |
+| :-------------------------- | :-------------------------------- | :------------------------------------ |
+| `@boguan/database/web-read` | Web（页面、endpoint、构建与 SSR） | 只读连接 + 列表与检索查询             |
+| `@boguan/database/crawler`  | crawler                           | 读写连接 + 表 + FTS 写入              |
+| `@boguan/database/ops`      | ops                               | 读写连接 + 迁移 + FTS 对账与重建 + 表 |
+| `@boguan/database`          | 需要表定义的只读场景              | 表对象                                |
+
+`web-read` 不导出读写连接，也不导出 FTS 写入：页面拿不到写库能力，不是靠自律。
 
 ## 技术栈
 
-Bun 1.4、`bun:sqlite`、Drizzle ORM / Drizzle Kit、SQLite FTS5。
-
-## 公开能力
-
-- `@boguan/database/web-read`：Web 只读连接与页面/搜索查询。
-- `@boguan/database/crawler`：Crawler 读写接口。
-- `@boguan/database/ops`：迁移、维护、对账与管理接口。
-- `@boguan/database/schema`：仅供迁移、测试与需要 schema 类型的包使用。
+`bun:sqlite`、Drizzle ORM、SQLite FTS5（虚拟表为手写迁移）。迁移文件在 `drizzle/`。
 
 ## 约束
 
-- Web 入口不导出写连接、维护接口或正文文件路径。
-- 连接与 Drizzle schema 为内部实现；应用通过能力接口访问数据。
-- 写操作通过事务保持数据库不变量；FTS5 自定义迁移与普通 schema 迁移同属本包所有。
-- 不拥有正文文件，不依赖应用包；可依赖 `@boguan/search` 与 `@boguan/domain`。
+- 时间列一律 ISO 8601 UTC 字符串；`published_year` 是派生列，与 `published_at` 同时更新。
+- `posts_fts` 是 contentless 表：列值读不回来，`snippet()` / `highlight()` 不可用；token 列只在本包出现。
+- 索引与可见性解耦：每篇帖子都有一行索引，`is_visible` / `duplicate_of_id` 在查询时过滤。
+- 不依赖任何应用包，也不依赖 `@boguan/body-store`（正文不在这张库里）。
+- 已提交的迁移只增不改。

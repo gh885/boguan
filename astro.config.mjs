@@ -1,9 +1,9 @@
 // @ts-check
+import { editionSummaries, openWebDatabase, tagIndex } from "@boguan/database/web-read";
 import { isIndexableCollection } from "@boguan/domain";
 import sitemap from "@astrojs/sitemap";
 import node from "@astrojs/node";
 import { defineConfig } from "astro/config";
-import { editionSummaries, openWebDatabase, tagIndex } from "./src/lib/db/queries";
 
 const webDb = openWebDatabase();
 

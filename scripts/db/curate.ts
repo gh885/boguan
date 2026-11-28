@@ -1,4 +1,4 @@
-import { openDatabase } from "../../src/lib/db/index";
+import { openDatabase } from "@boguan/database/ops";
 import { curate } from "./curate-lib";
 
 /**

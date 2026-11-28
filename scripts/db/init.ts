@@ -1,7 +1,4 @@
-import { fileURLToPath } from "node:url";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-import { checkFts } from "../../src/lib/db/fts";
-import { defaultDatabasePath, openDatabase } from "../../src/lib/db/index";
+import { checkFts, defaultDatabasePath, migrateDatabase, openDatabase } from "@boguan/database/ops";
 
 /**
  * 建库 / 应用未执行的迁移。幂等，可以反复跑。
@@ -11,10 +8,8 @@ import { defaultDatabasePath, openDatabase } from "../../src/lib/db/index";
  * 只建表结构，不写数据；种子数据在 `vpr db:seed`。
  */
 
-const migrationsFolder = fileURLToPath(new URL("../../drizzle", import.meta.url));
-
 const db = openDatabase();
-migrate(db, { migrationsFolder });
+migrateDatabase(db);
 
 const counts = db.$client
   .prepare(

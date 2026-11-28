@@ -1,15 +1,9 @@
 ---
+import { countPosts, editionSummaries, openWebDatabase, postsByEdition, postYears } from "@boguan/database/web-read";
 import { editionDay, editionNumberAt, editionRange, isIndexableCollection } from "@boguan/domain";
 import type { GetStaticPaths } from "astro";
 import IndexSheet from "../../../components/IndexSheet.astro";
 import BaseLayout from "../../../layouts/BaseLayout.astro";
-import {
-	countPosts,
-	editionSummaries,
-	openWebDatabase,
-	postsByEdition,
-	postYears,
-} from "../../../lib/db/queries";
 import {
 	formatDate,
 	formatLongDate,

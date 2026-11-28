@@ -10,6 +10,7 @@
         "@astrojs/sitemap": "^3.7.4",
         "@boguan/body-store": "workspace:*",
         "@boguan/catalog": "workspace:*",
+        "@boguan/database": "workspace:*",
         "@boguan/domain": "workspace:*",
         "@boguan/search": "workspace:*",
         "@node-rs/jieba": "^2.0.4",
@@ -77,8 +78,14 @@
     "packages/database": {
       "name": "@boguan/database",
       "dependencies": {
+        "@boguan/domain": "workspace:*",
         "@boguan/search": "workspace:*",
+        "better-sqlite3": "^13.0.3",
         "drizzle-orm": "^0.45.4",
+      },
+      "devDependencies": {
+        "@boguan/body-store": "workspace:*",
+        "@types/better-sqlite3": "^9.6.0",
       },
     },
     "packages/domain": {

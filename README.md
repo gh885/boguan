@@ -79,7 +79,7 @@ boguan/
 ├── scripts/
 │   ├── crawler/            # 抓取管道：fetch/robots → adapters → normalize → pipeline
 │   └── db/                 # init / seed / check / metrics
-├── drizzle/                # SQL 迁移（FTS5 为手写迁移）
+├── packages/database/drizzle/  # SQL 迁移（FTS5 为手写迁移）
 ├── data/                   # 本地 SQLite 与正文文件（不进仓库）
 ├── src/
 │   ├── assets/             # 需要被构建处理的资源

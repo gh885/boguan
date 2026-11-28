@@ -1,9 +1,9 @@
 ---
+import { openWebDatabase, postYears, tagIndex } from "@boguan/database/web-read";
 import { groupTags, type TagGroupId, isIndexableCollection } from "@boguan/domain";
 import type { GetStaticPaths } from "astro";
 import DirectorySheet from "../../components/DirectorySheet.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import { openWebDatabase, postYears, tagIndex } from "../../lib/db/queries";
 import { formatCount, localizePath, localeRoutes, useTranslations } from "../../lib/i18n";
 import type { Locale } from "../../lib/i18n/config";
 import { collectionJsonLd } from "../../lib/structured-data";

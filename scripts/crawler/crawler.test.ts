@@ -1,21 +1,17 @@
-import { fileURLToPath } from "node:url";
+import { upsertPostFts, type Db, companies, posts, sources, tags } from "@boguan/database/crawler";
 import Database from "better-sqlite3";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vite-plus/test";
-import { upsertPostFts } from "../../src/lib/db/fts";
-import type { Db } from "../../src/lib/db/index";
-import * as schema from "../../src/lib/db/schema";
-import { companies, posts, sources, tags } from "../../src/lib/db/schema";
+import * as schema from "@boguan/database/ops";
+import { migrationsFolder } from "@boguan/database/ops";
 import { isPostUrl } from "./adapters/youzan";
 import { requirePageText, type FetchedPage } from "./fetch";
 import { dedupe, TagResolver } from "./pipeline";
 import { parseSitemapUrls } from "./sitemap";
 import { contentHash, normalizePost } from "./normalize";
 import { ruleTags } from "@boguan/catalog";
-
-const migrationsFolder = fileURLToPath(new URL("../../drizzle", import.meta.url));
 
 function freshDb(): Db {
   const raw = new Database(":memory:");
