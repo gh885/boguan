@@ -26,7 +26,7 @@ import type { AdapterContext, SourceAdapter } from "./adapters/types";
 import { PoliteFetcher } from "./fetch";
 import { contentHash, normalizePost, type NormalizedPost } from "./normalize";
 import type { Detail } from "./types";
-import { ruleTags } from "./rules/tags";
+import { ruleTags } from "@boguan/catalog";
 import type { ListItem, TagRef } from "./types";
 
 /**

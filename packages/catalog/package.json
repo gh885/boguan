@@ -1,5 +1,8 @@
 {
   "name": "@boguan/catalog",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  }
 }

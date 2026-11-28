@@ -13,7 +13,7 @@ import { requirePageText, type FetchedPage } from "./fetch";
 import { dedupe, TagResolver } from "./pipeline";
 import { parseSitemapUrls } from "./sitemap";
 import { contentHash, normalizePost } from "./normalize";
-import { ruleTags } from "./rules/tags";
+import { ruleTags } from "@boguan/catalog";
 
 const migrationsFolder = fileURLToPath(new URL("../../drizzle", import.meta.url));
 

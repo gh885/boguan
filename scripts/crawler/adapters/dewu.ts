@@ -13,7 +13,7 @@ import type { SourceAdapter } from "./types";
  *   后面的空页当作到底」——否则选择器失效会被当成「没有下一页」静默吞掉。
  * - 列表给绝对时间 `2026-07-13 17:07:05`（无时区）→ 按源站时区解释。
  * - 分类只有 8 个（技术思考 / AI&数据 / Java / 运维&稳定生产 / 大前端 / 测试 / Golang / 音视频），
- *   是中文名，靠 `SEED_TAG_ALIASES` 映射到已有标签，跨公司也能对齐（大前端 → 前端、测试 → 测试）。
+ *   是中文名，靠 `@boguan/catalog` 的 `TAG_ALIASES` 映射到已有标签，跨公司也能对齐（大前端 → 前端、测试 → 测试）。
  * - 详情页正文是 `#articleCont`（markdown 渲染结果），标题 `h1.title`，作者与时间在 `.author` / `.created-at`。
  */
 

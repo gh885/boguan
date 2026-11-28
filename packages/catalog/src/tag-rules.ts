@@ -1,10 +1,3 @@
-/**
- * 关键词打标规则（docs/ARCHITECTURE.md §5「标签」）。
- *
- * v1 不用 LLM：规则可解释、可离线重跑、改一条就能看到影响面。
- * 判定阈值刻意保守——宁可少打一个标签，也不要在列表页上出现「这篇跟缓存有什么关系」。
- */
-
 export interface TagDef {
   slug: string;
   name: string;
@@ -12,12 +5,10 @@ export interface TagDef {
 
 interface Rule extends TagDef {
   patterns: RegExp[];
-  /** 同分时的优先顺序，数字小的先出 */
   order: number;
 }
 
-/** 标签清单就是这里的并集；新增标签只改这个文件 */
-export const TAG_RULES: Rule[] = [
+export const TAG_RULES: readonly Rule[] = [
   {
     slug: "cache",
     name: "缓存",
@@ -34,7 +25,7 @@ export const TAG_RULES: Rule[] = [
     slug: "golang",
     name: "Go",
     order: 6,
-    patterns: [/golang/i, /go.*(协程|goroutine|channel)/i, /goroutine/i],
+    patterns: [/golang/i, /go.*(协程|goroutine|channel)/i, /goroutine/i],
   },
   {
     slug: "media",
@@ -134,19 +125,21 @@ export const TAG_RULES: Rule[] = [
   },
 ];
 
-/** 正文里出现几次才算命中：一次可能只是顺带提了一句 */
 const BODY_THRESHOLD = 3;
+
+const DEFAULT_LIMIT = 3;
 
 function countMatches(text: string, pattern: RegExp): number {
   const global = new RegExp(pattern.source, pattern.flags.includes("i") ? "gi" : "g");
   return [...text.matchAll(global)].length;
 }
 
-/**
- * 按标题/摘要/正文打标签。标题命中直接算数；正文里要反复出现才计入。
- * 最多返回 `limit` 个，避免每篇都挂七八个标签、标签页退化成全站列表。
- */
-export function ruleTags(title: string, summary: string, body: string, limit = 3): TagDef[] {
+export function ruleTags(
+  title: string,
+  summary: string,
+  body: string,
+  limit = DEFAULT_LIMIT,
+): TagDef[] {
   const bodyText = `${summary}\n${body}`;
   const scored: { rule: Rule; score: number }[] = [];
 
@@ -166,7 +159,6 @@ export function ruleTags(title: string, summary: string, body: string, limit = 3
     .map(({ rule }) => ({ slug: rule.slug, name: rule.name }));
 }
 
-/** 规则标签的 slug 清单，seed 用它预建标签行 */
 export function allRuleTags(): TagDef[] {
   return TAG_RULES.map(({ slug, name }) => ({ slug, name }));
 }
