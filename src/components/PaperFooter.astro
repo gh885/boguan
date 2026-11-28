@@ -14,7 +14,6 @@ const t = useTranslations(locale);
 const homeHref = localizePath("/", locale);
 const companiesHref = localizePath("/companies", locale);
 const tagsHref = localizePath("/tags", locale);
-const rssHref = localizePath("/rss.xml", locale);
 ---
 
 <footer class="paper-footer">
@@ -23,7 +22,6 @@ const rssHref = localizePath("/rss.xml", locale);
 		<nav class="paper-footer-nav" aria-label={t("nav.primary")}>
 			<a href={tagsHref}>{t("nav.tags")}</a>
 			<a href={companiesHref}>{t("nav.companies")}</a>
-			<a href={rssHref}>{t("nav.digestAction")}</a>
 			<a href={site.repo} target="_blank" rel="noopener noreferrer">{t("nav.repo")}</a>
 		</nav>
 	</div>
