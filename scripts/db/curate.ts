@@ -7,7 +7,7 @@ import { curate } from "./curate-lib";
  *   vpr db:curate --dry-run   # 只看会改什么
  *   vpr db:curate             # 真正执行
  *
- * 规则在 `src/lib/domain/curate.ts`，抓取入库时用的是同一份实现；
+ * 规则在 `@boguan/domain`，抓取入库时用的是同一份实现；
  * 这个脚本让存量数据追上规则。幂等：第二次跑应该什么也不改。
  */
 

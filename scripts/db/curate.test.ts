@@ -1,3 +1,4 @@
+import { HIDDEN_NON_ARTICLE } from "@boguan/domain";
 import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
@@ -7,7 +8,6 @@ import { describe, expect, it } from "vite-plus/test";
 import type { Db } from "../../src/lib/db/index";
 import * as schema from "../../src/lib/db/schema";
 import { companies, posts, sources, tags, postTags } from "../../src/lib/db/schema";
-import { HIDDEN_NON_ARTICLE } from "../../src/lib/domain/curate";
 import { curate } from "./curate-lib";
 
 const migrationsFolder = fileURLToPath(new URL("../../drizzle", import.meta.url));

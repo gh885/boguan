@@ -1,5 +1,5 @@
+import { hasCodeInHtml } from "@boguan/domain";
 import Parser from "rss-parser";
-import { hasCodeInHtml } from "../../../src/lib/domain/code";
 import { htmlToText } from "../extract";
 import { requirePageText } from "../fetch";
 import type { Detail, ListItem, TagRef } from "../types";

@@ -1,7 +1,7 @@
+import { originOf } from "@boguan/domain";
 import { eq } from "drizzle-orm";
 import type { Db } from "../../src/lib/db/index";
 import { httpCache } from "../../src/lib/db/schema";
-import { originOf } from "../../src/lib/domain/url";
 import { RobotsCache } from "./robots";
 
 /**

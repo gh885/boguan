@@ -1,19 +1,15 @@
 import { describe, expect, it } from "vite-plus/test";
-import { dayInTimeZone, startOfDayInTimeZone } from "./date";
 import {
-  EDITION_MIN_POSTS,
+  dayInTimeZone,
   EDITION_TIME_ZONE,
   editionDay,
   editionNumber,
   editionNumberAt,
   editionRange,
-  isIndexableEdition,
-} from "./edition";
-
-/**
- * 「期」的定义（docs/ARCHITECTURE.md §6）：一期 = 一个自然日，期号 = 从创刊日起的第几天。
- * 这份测试守三件事：期号与日期互推、期界在**北京时间零点**而不是 UTC 零点、没有新增的期不跳号。
- */
+  isIndexableCollection,
+  MIN_POSTS_FOR_INDEX,
+  startOfDayInTimeZone,
+} from "./index";
 
 describe("期号与日期互推", () => {
   it("创刊号是第 1 期", () => {
@@ -26,7 +22,6 @@ describe("期号与日期互推", () => {
     expect(editionNumber("2026-11-30")).toBe(31);
     expect(editionNumber("2026-12-01")).toBe(32);
     expect(editionNumber("2027-01-01")).toBe(63);
-    // 2028 是闰年
     expect(editionDay(editionNumber("2028-02-29") as number)).toBe("2028-02-29");
   });
 
@@ -53,9 +48,7 @@ describe("期界在 Asia/Shanghai 的零点", () => {
   });
 
   it("北京时间零点前后的稿子分属两期，UTC 日期不作数", () => {
-    // 上海 10-31 23:59:59 → 创刊号
     expect(editionNumberAt("2026-10-31T15:59:59.999Z")).toBe(1);
-    // 上海 11-01 00:00:00 → 第 2 期（UTC 还是 10-31）
     expect(editionNumberAt("2026-10-31T16:00:00.000Z")).toBe(2);
   });
 
@@ -81,8 +74,8 @@ describe("期界在 Asia/Shanghai 的零点", () => {
 
 describe("薄期门槛", () => {
   it("门槛是 3 篇，与薄标签页同一套思路", () => {
-    expect(EDITION_MIN_POSTS).toBe(3);
-    expect(isIndexableEdition(2)).toBe(false);
-    expect(isIndexableEdition(3)).toBe(true);
+    expect(MIN_POSTS_FOR_INDEX).toBe(3);
+    expect(isIndexableCollection(2)).toBe(false);
+    expect(isIndexableCollection(3)).toBe(true);
   });
 });

@@ -1,5 +1,5 @@
+import { collapseWhitespace } from "@boguan/domain";
 import { load } from "cheerio";
-import { collapseWhitespace } from "../../src/lib/domain/text";
 
 /**
  * HTML → 纯文本。

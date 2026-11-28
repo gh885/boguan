@@ -2,7 +2,14 @@
   "name": "@boguan/domain",
   "private": true,
   "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "dependencies": {
+    "entities": "^4.5.0",
     "luxon": "^3.7.2"
+  },
+  "devDependencies": {
+    "@types/luxon": "^3.4.2"
   }
 }

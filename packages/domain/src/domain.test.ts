@@ -1,15 +1,18 @@
 import { describe, expect, it } from "vite-plus/test";
-import { parsePublishedAt, yearInTimeZone, zonedToUtc } from "./date";
-import { normalizeRawTag, normalizeRawTags } from "./tag";
 import {
+  canonicalizeUrl,
   collapseWhitespace,
   decodeEntities,
+  normalizeRawTag,
+  normalizeRawTags,
+  parsePublishedAt,
+  slugify,
   stripHtml,
   SUMMARY_MAX,
+  titleNorm,
   truncateSummary,
-} from "./text";
-import { slugify, titleNorm } from "./title";
-import { canonicalizeUrl } from "./url";
+  yearInTimeZone,
+} from "./index";
 
 describe("canonicalizeUrl", () => {
   it("去掉追踪参数、锚点与末尾斜杠", () => {
@@ -65,12 +68,6 @@ describe("parsePublishedAt", () => {
     expect(parsePublishedAt("2024-03-10 12:00", "America/Los_Angeles")).toBe(
       "2024-03-10T19:00:00.000Z",
     );
-    expect(
-      zonedToUtc(
-        { year: 2024, month: 7, day: 1, hour: 12, minute: 0, second: 0 },
-        "America/Los_Angeles",
-      ),
-    ).toBe(Date.UTC(2024, 6, 1, 19, 0, 0));
   });
 
   it("解析不出来就返回 null，不编造", () => {
@@ -89,12 +86,9 @@ describe("文本归一", () => {
   it("解实体 + 去标签 + 折叠空白", () => {
     expect(stripHtml("<p>知识&amp;图谱</p><br/>　　第二段&hellip;</p>")).toBe("知识&图谱 第二段…");
     expect(decodeEntities("&#20013;&#x6587;")).toBe("中文");
-    // 命名实体全集交给 entities，不再依赖手写映射表
     expect(decodeEntities("&ldquo;引号&rdquo; &trade; &mdash; &hellip;")).toBe("“引号” ™ — …");
-    // 不认识的实体原样保留（`&not` 这类是 HTML5 允许省略分号的实体前缀，会按规范解码）
     expect(decodeEntities("&zzzUnknown;")).toBe("&zzzUnknown;");
     expect(decodeEntities("R&D 与 Tom&Jerry")).toBe("R&D 与 Tom&Jerry");
-    // 零宽字符直接删掉，不制造空格（避免把词拆开）
     expect(collapseWhitespace("a\u3000b\u200bc\n")).toBe("a bc");
   });
 

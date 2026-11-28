@@ -1,4 +1,5 @@
 ---
+import { editionNumberAt, editionRange, isIndexableCollection } from "@boguan/domain";
 import type { GetStaticPaths } from "astro";
 import HomeNewspaper from "../../components/HomeNewspaper.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
@@ -9,14 +10,12 @@ import {
 	postYears,
 	tagIndex,
 } from "../../lib/db/queries";
-import { editionNumberAt, editionRange } from "../../lib/domain/edition";
 import { localizePath, localeRoutes, useTranslations } from "../../lib/i18n";
 import type { Locale } from "../../lib/i18n/config";
 import { PAGE_SIZE, pageCount, pagePath } from "../../lib/pagination";
 import { searchHref } from "../../lib/search-url";
 import { homeJsonLd } from "../../lib/structured-data";
 import { site } from "../../lib/site";
-import { isIndexableTag } from "../../lib/tags";
 
 // 一份页面 × 所有语言：/ 和 /en/
 export const getStaticPaths = (() => localeRoutes()) satisfies GetStaticPaths;
@@ -32,7 +31,7 @@ const db = openWebDatabase();
 const { items, total } = latestPosts(db, { limit: PAGE_SIZE });
 const [lead, ...latest] = items;
 const topics = tagIndex(db)
-	.filter((tag) => isIndexableTag(tag.count))
+	.filter((tag) => isIndexableCollection(tag.count))
 	.slice(0, 3);
 const years = postYears(db);
 const yearHref = years[0]
@@ -41,7 +40,7 @@ const yearHref = years[0]
 
 const totalPages = pageCount(total);
 
-// 本期：一个自然日一期（lib/domain/edition.ts）。没有新增也照样出刊，只是「本期新增 0 篇」
+// 本期：一个自然日一期（@boguan/domain）。没有新增也照样出刊，只是「本期新增 0 篇」
 const editionNumber = editionNumberAt(new Date()) ?? 1;
 const editionWindow = editionRange(editionNumber);
 const editionNew = editionWindow

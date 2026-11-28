@@ -1,6 +1,6 @@
 ---
+import { tagGroupOf } from "@boguan/domain";
 import type { PostCard, TagCard } from "../lib/db/queries";
-import { tagGroupOf } from "../lib/domain/tag-group";
 import {
   formatCount,
   formatDate,
@@ -31,7 +31,7 @@ interface Props {
   topics?: TagCard[];
   page: number;
   totalPages: number;
-  /** 本期期号（见 lib/domain/edition.ts）：一个自然日一期，从创刊号连续编号 */
+  /** 本期期号（见 @boguan/domain）：一个自然日一期，从创刊号连续编号 */
   editionNumber: number;
   /** 本期新入库的稿件数；没有新增也是 0，不跳号 */
   editionNew: number;

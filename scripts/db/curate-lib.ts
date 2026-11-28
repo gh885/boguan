@@ -1,17 +1,16 @@
+import { HIDDEN_NON_ARTICLE, isNonArticle, stripSiteSuffix, titleNorm } from "@boguan/domain";
 import { eq } from "drizzle-orm";
 import { readBody } from "../../src/lib/db/bodies";
 import { rebuildAllPostFts } from "../../src/lib/db/fts";
 import type { Db } from "../../src/lib/db/index";
 import { companies, posts } from "../../src/lib/db/schema";
-import { HIDDEN_NON_ARTICLE, isNonArticle, stripSiteSuffix } from "../../src/lib/domain/curate";
-import { titleNorm } from "../../src/lib/domain/title";
 import { contentHash } from "../crawler/normalize";
 import { dedupe } from "../crawler/pipeline";
 
 /**
  * 把清洗规则应用到**已入库**的数据（ARCHITECTURE §5「清洗」）。
  *
- * 规则本身在 `src/lib/domain/curate.ts`，抓取入库时用的是同一份实现；
+ * 规则本身在 `@boguan/domain`，抓取入库时用的是同一份实现；
  * 这里只负责让存量数据追上规则，可反复跑（幂等）。
  *
  * 三件事：

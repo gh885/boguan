@@ -1,24 +1,23 @@
 // @ts-check
+import { isIndexableCollection } from "@boguan/domain";
 import sitemap from "@astrojs/sitemap";
 import node from "@astrojs/node";
 import { defineConfig } from "astro/config";
 import { editionSummaries, openWebDatabase, tagIndex } from "./src/lib/db/queries";
-import { isIndexableEdition } from "./src/lib/domain/edition";
-import { isIndexableTag } from "./src/lib/tags";
 
 const webDb = openWebDatabase();
 
-// 薄标签页只有站内入口，不进 sitemap：门槛常量在 src/lib/tags.ts，页面侧用的也是它
+// 薄标签页只有站内入口，不进 sitemap：门槛常量在 @boguan/domain，页面侧用的也是它
 const indexableTags = new Set(
   tagIndex(webDb)
-    .filter((tag) => isIndexableTag(tag.count))
+    .filter((tag) => isIndexableCollection(tag.count))
     .map((tag) => tag.slug),
 );
 
 // 薄期页同理：日报必然有「今天只来了一篇」的日子，它们 noindex、也不进 sitemap
 const indexableEditions = new Set(
   editionSummaries(webDb)
-    .filter((row) => isIndexableEdition(row.count))
+    .filter((row) => isIndexableCollection(row.count))
     .map((row) => row.number),
 );
 

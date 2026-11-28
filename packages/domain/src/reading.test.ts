@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { hasCodeInHtml, looksLikeCode } from "./code";
-import { readingMinutes } from "./reading";
-import { groupTags, tagGroupOf } from "./tag-group";
+import { groupTags, hasCodeInHtml, looksLikeCode, readingMinutes, tagGroupOf } from "./index";
 
 describe("阅读时长", () => {
   it("中文按 400 字/分钟，英文按 200 词/分钟，至少 1 分钟", () => {

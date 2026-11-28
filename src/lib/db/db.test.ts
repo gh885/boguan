@@ -21,8 +21,7 @@ import { searchPosts } from "./queries/search";
 import { companies, crawlJobs, posts, sources, tagAliases, tags } from "./schema";
 import type { Db } from "./index";
 import { segment, toMatchQuery } from "../search/tokenize";
-import { dayInTimeZone } from "../domain/date";
-import { editionRange } from "../domain/edition";
+import { dayInTimeZone, editionRange } from "@boguan/domain";
 import * as schema from "./schema";
 
 const migrationsFolder = fileURLToPath(new URL("../../../drizzle", import.meta.url));

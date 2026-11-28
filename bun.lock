@@ -8,10 +8,12 @@
         "@astrojs/node": "11.1.9",
         "@astrojs/rss": "^4.0.19",
         "@astrojs/sitemap": "^3.7.4",
+        "@boguan/domain": "workspace:*",
         "@node-rs/jieba": "^2.0.4",
         "astro": "^7.4.4",
         "better-sqlite3": "^13.0.3",
         "cheerio": "^1.2.0",
+        "domhandler": "^5.0.3",
         "drizzle-orm": "^0.45.4",
         "entities": "^4.5.0",
         "robots-parser": "^3.0.1",
@@ -79,7 +81,11 @@
     "packages/domain": {
       "name": "@boguan/domain",
       "dependencies": {
+        "entities": "^4.5.0",
         "luxon": "^3.7.2",
+      },
+      "devDependencies": {
+        "@types/luxon": "^3.4.2",
       },
     },
     "packages/search": {
@@ -565,6 +571,8 @@
     "@types/estree-jsx": ["@types/estree-jsx@1.0.5", "https://registry.npmmirror.com/@types/estree-jsx/-/estree-jsx-1.0.5.tgz", { "dependencies": { "@types/estree": "*" } }, "sha512-52CcUVNFyfb1A2ALocQw/Dd1BQFNmSdkuC3BkZ6iqhdMfQz7JWOFRuJFloOzjk+6WijU56m9oKXFAXc7o3Towg=="],
 
     "@types/hast": ["@types/hast@3.0.5", "https://registry.npmmirror.com/@types/hast/-/hast-3.0.5.tgz", { "dependencies": { "@types/unist": "*" } }, "sha512-rp/ezSWaD1m44dPKICGhiskI13nVr7qTloFwDa/IYkhhf5nzwP+zIQcIJh3WIFSBOy/H1PzB40jPjMDksN4F+g=="],
+
+    "@types/luxon": ["@types/luxon@3.7.6", "https://registry.npmmirror.com/@types/luxon/-/luxon-3.7.6.tgz", {}, "sha512-6KSjliQAXK8ZLgFQO4B7iE4Rpf/B3rItzCFuXezBY/XIAGxOdLd7vRNK9/StRPwiS/yJsVbB7HKpW46B8tcEuQ=="],
 
     "@types/mdast": ["@types/mdast@4.0.4", "https://registry.npmmirror.com/@types/mdast/-/mdast-4.0.4.tgz", { "dependencies": { "@types/unist": "*" } }, "sha512-kGaNbPh1k7AFzgpud/gMdvIm5xuECykRR+JnWKQno9TAXVa6WIVCGTPvYGekIDL4uwCZQSYbUxNBSb1aUo79oA=="],
 

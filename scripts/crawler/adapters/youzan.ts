@@ -1,5 +1,5 @@
+import { hasCodeInHtml } from "@boguan/domain";
 import type { CheerioAPI } from "cheerio";
-import { hasCodeInHtml } from "../../../src/lib/domain/code";
 import { fetchDetailContent } from "./detail";
 import { firstTextNode } from "../extract";
 import { requirePageText } from "../fetch";

@@ -1,4 +1,5 @@
 ---
+import { tagGroupOf, isIndexableCollection } from "@boguan/domain";
 import type { GetStaticPaths } from "astro";
 import BaseLayout from "../../../layouts/BaseLayout.astro";
 import TagView from "../../../components/TagView.astro";
@@ -10,9 +11,7 @@ import {
 	type TagCard,
 	tagIndex,
 } from "../../../lib/db/queries";
-import { tagGroupOf } from "../../../lib/domain/tag-group";
 import { localizePath, localeRoutes, useTranslations } from "../../../lib/i18n";
-import { isIndexableTag } from "../../../lib/tags";
 import type { Locale } from "../../../lib/i18n/config";
 import { INDEX_PAGE_SIZE, pageCount, pagePath } from "../../../lib/pagination";
 import { collectionJsonLd } from "../../../lib/structured-data";
@@ -68,7 +67,7 @@ const description = t("meta.tag.description", { name: tag.name });
 	title={title}
 	description={description}
 	chrome="bare"
-	noindex={!isIndexableTag(tag.count)}
+	noindex={!isIndexableCollection(tag.count)}
 	nextHref={totalPages > 1 ? localizePath(pagePath(`/tag/${slug}`, 2), locale) : undefined}
 	jsonLd={collectionJsonLd({
 		name: title,

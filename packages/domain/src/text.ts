@@ -1,25 +1,11 @@
-/**
- * 文本归一：HTML → 纯文本、摘要截断、空白折叠。
- *
- * 摘要上限是硬性规则 1 的底线，数据库里还有 CHECK 约束兜底（`length(summary) <= 200`）。
- * 这里用码点计数，与 SQLite 的 `length()` 对齐，避免 emoji 让两边算出不同长度。
- */
-
 import { decodeHTML } from "entities";
 
-/** 摘要硬上限（字）。**这是规则上限，不是展示目标**：卡片上按两行裁（见 ARCHITECTURE §10） */
 export const SUMMARY_MAX = 200;
 
-/**
- * 实体解码交给 `entities`（HTML5 命名实体全集 + 数字实体），不自己维护映射表：
- * 手写的表永远覆盖不全，`&ldquo;` / `&mdash;` / `&trade;` 这类漏一个就是页面上多一行乱码。
- * `entities` 是纯 JS，web 与 crawler 都能用，不破坏进程边界。
- */
 export function decodeEntities(input: string): string {
   return decodeHTML(input);
 }
 
-/** 空白折叠：普通空白 + 全角空格 + 零宽字符 */
 export function collapseWhitespace(input: string): string {
   return input
     .replace(/[\u200B-\u200D\uFEFF]/g, "")
@@ -31,7 +17,6 @@ export function collapseWhitespace(input: string): string {
 const BLOCK_BOUNDARY =
   /<\s*(?:br|hr|\/p|\/div|\/li|\/h[1-6]|\/blockquote|\/pre|\/tr|\/section|\/article)\s*\/?>/gi;
 
-/** HTML 片段 → 纯文本。只处理「抽取」需要的程度，不追求完整 HTML 语义 */
 export function stripHtml(input: string): string {
   const withoutHidden = input
     .replace(/<script\b[\s\S]*?<\/script>/gi, " ")
@@ -42,20 +27,11 @@ export function stripHtml(input: string): string {
   return collapseWhitespace(decodeEntities(withBreaks.replace(/<[^>]+>/g, " ")));
 }
 
-function codePoints(text: string): string[] {
-  return Array.from(text);
-}
-
-/** 句末收口：在句末标点后截断，不留半个词（§5「归一」第 3 条） */
 const SENTENCE_END = /[。！？!?；;\n]/g;
 
-/**
- * 把文本截成 ≤ `max` 字的摘要。
- * 策略：优先在 60% 之后的第一个句末标点处收口；找不到就硬切到 `max` 并去掉尾部的半个标点。
- */
 export function truncateSummary(input: string, max = SUMMARY_MAX): string {
   const text = collapseWhitespace(input);
-  const chars = codePoints(text);
+  const chars = Array.from(text);
   if (chars.length <= max) return text;
 
   const head = chars.slice(0, max).join("");

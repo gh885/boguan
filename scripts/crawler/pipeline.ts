@@ -1,3 +1,10 @@
+import {
+  HIDDEN_NON_ARTICLE,
+  isNonArticle,
+  normalizeRawTag,
+  canonicalizeUrl,
+  slugify,
+} from "@boguan/domain";
 import { and, desc, eq, isNotNull, ne } from "drizzle-orm";
 import { hasBody, putBody, readBody } from "../../src/lib/db/bodies";
 import { upsertPostFts } from "../../src/lib/db/fts";
@@ -14,10 +21,6 @@ import {
   tagAliases,
   tags,
 } from "../../src/lib/db/schema";
-import { HIDDEN_NON_ARTICLE, isNonArticle } from "../../src/lib/domain/curate";
-import { normalizeRawTag } from "../../src/lib/domain/tag";
-import { canonicalizeUrl } from "../../src/lib/domain/url";
-import { slugify } from "../../src/lib/domain/title";
 import { adapterFor } from "./adapters";
 import type { AdapterContext, SourceAdapter } from "./adapters/types";
 import { PoliteFetcher } from "./fetch";

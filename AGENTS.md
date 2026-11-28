@@ -208,7 +208,7 @@ Docs are local at `node_modules/vite-plus/docs` or online at https://viteplus.de
 
 ## Running Scripts
 
-Run project scripts with `vpr <script>`; Vite+ invokes them through Bun. Keep scripts in the owning workspace and do not add `tsx` or `ts-node`.
+Run TypeScript and JavaScript files with `vpx <file>`, for example `vpx ./scripts/seed.ts --dry-run`. It handles enums, decorators, JSX, and tsconfig `paths`, so do not add `tsx` or `ts-node` to run scripts. `vpx --watch <file>` reruns the file when a file it uses changes, in place of `tsx watch`. `vp node <file>` runs plain Node.js.
 
 ## Tool Versions
 

@@ -1,10 +1,9 @@
+import { looksLikeCode, readingMinutes } from "@boguan/domain";
 import { parseArgs } from "node:util";
 import { eq } from "drizzle-orm";
 import { openDatabase } from "../../src/lib/db/index";
 import { readBody } from "../../src/lib/db/bodies";
 import { posts } from "../../src/lib/db/schema";
-import { looksLikeCode } from "../../src/lib/domain/code";
-import { readingMinutes } from "../../src/lib/domain/reading";
 
 /**
  * 从 crawler 私有的正文文件回填阅读元数据：

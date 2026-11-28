@@ -1,9 +1,9 @@
 ---
+import { editionDay } from "@boguan/domain";
 import type { GetStaticPaths } from "astro";
 import DirectorySheet from "../../components/DirectorySheet.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { editionSummaries, openWebDatabase, postYears } from "../../lib/db/queries";
-import { editionDay } from "../../lib/domain/edition";
 import {
 	formatCount,
 	formatDate,

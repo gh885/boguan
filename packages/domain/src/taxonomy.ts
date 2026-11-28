@@ -1,8 +1,3 @@
-/**
- * `/tags` 的分组只影响展示，不写数据库：标签本身仍然由抓取与人工映射产生。
- * 新增标签时把它放进合适的组即可；忘了放也不会消失，会落到「其他」。
- */
-
 export type TagGroupId =
   | "ai"
   | "data"
@@ -86,7 +81,6 @@ export interface TagGroup<T extends TagLike> {
   tags: T[];
 }
 
-/** 组内保持调用方给的顺序（标签索引按文章数倒序），组之间按 TAG_GROUPS 的顺序。 */
 export function groupTags<T extends TagLike>(tags: readonly T[]): TagGroup<T>[] {
   const buckets = new Map<TagGroupId, T[]>();
   for (const tag of tags) {

@@ -155,7 +155,7 @@ export const postTags = sqliteTable(
 /** 源站标签写法五花八门（「前端优化」「前端性能」），都映射到规范标签 */
 export const tagAliases = sqliteTable("tag_aliases", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  /** 归一后的原始标签（见 src/lib/domain/tag.ts 的 normalizeRawTag） */
+  /** 归一后的原始标签（见 @boguan/domain 的 normalizeRawTag） */
   raw: text("raw").notNull().unique(),
   tagId: integer("tag_id")
     .notNull()

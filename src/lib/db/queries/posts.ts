@@ -1,5 +1,5 @@
 import type { Db } from "../index";
-import { editionNumber } from "../../domain/edition";
+import { editionNumber } from "@boguan/domain";
 
 /**
  * 列表页的只读查询（docs/ARCHITECTURE.md §6）。
@@ -188,7 +188,7 @@ export function latestPosts(db: Db, options: PageOptions = {}): Paged<PostCard> 
 }
 
 /**
- * 某一期的稿件：按**入库时间**取，与期号定义一致（`src/lib/domain/edition.ts`）。
+ * 某一期的稿件：按**入库时间**取，与期号定义一致（`@boguan/domain`）。
  * 注意不是 `postsByYear` 那套——一期装的是「那天登了什么稿」，不是「那天发了什么文」。
  */
 export function postsByEdition(

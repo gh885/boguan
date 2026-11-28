@@ -1,6 +1,6 @@
+import { hasCodeInHtml } from "@boguan/domain";
 import { load, type Cheerio } from "cheerio";
 import type { Element } from "domhandler";
-import { hasCodeInHtml } from "../../../src/lib/domain/code";
 import { fetchDetailContent } from "./detail";
 import type { Detail, ListItem, TagRef } from "../types";
 import type { SourceAdapter } from "./types";

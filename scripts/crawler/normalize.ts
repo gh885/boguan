@@ -1,10 +1,15 @@
+import {
+  canonicalizeUrl,
+  parsePublishedAt,
+  yearInTimeZone,
+  decodeEntities,
+  stripHtml,
+  truncateSummary,
+  stripSiteSuffix,
+  readingMinutes,
+  titleNorm,
+} from "@boguan/domain";
 import { createHash } from "node:crypto";
-import { canonicalizeUrl } from "../../src/lib/domain/url";
-import { parsePublishedAt, yearInTimeZone } from "../../src/lib/domain/date";
-import { decodeEntities, stripHtml, truncateSummary } from "../../src/lib/domain/text";
-import { stripSiteSuffix } from "../../src/lib/domain/curate";
-import { readingMinutes } from "../../src/lib/domain/reading";
-import { titleNorm } from "../../src/lib/domain/title";
 import type { Detail, ListItem, TagRef } from "./types";
 
 /**
