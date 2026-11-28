@@ -2,7 +2,7 @@ import { looksLikeCode, readingMinutes } from "@boguan/domain";
 import { parseArgs } from "node:util";
 import { eq } from "drizzle-orm";
 import { openDatabase } from "../../src/lib/db/index";
-import { readBody } from "../../src/lib/db/bodies";
+import { openBodyStore } from "@boguan/body-store";
 import { posts } from "../../src/lib/db/schema";
 
 /**
@@ -15,6 +15,8 @@ import { posts } from "../../src/lib/db/schema";
  * 更可靠——所以默认不覆盖已有值，确要重算时用 --force。
  * 只读正文文件、只写 posts 表，不碰 FTS，也不把正文带到 web 侧。
  */
+
+const bodies = openBodyStore();
 
 const { values } = parseArgs({
   args: process.argv.slice(2),
@@ -40,7 +42,7 @@ const apply = db.$client.transaction(() => {
       skipped += 1;
       continue;
     }
-    const body = readBody(row.id);
+    const body = bodies.read(row.id);
     if (!body) {
       skipped += 1;
       continue;

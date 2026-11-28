@@ -8,6 +8,7 @@
         "@astrojs/node": "11.1.9",
         "@astrojs/rss": "^4.0.19",
         "@astrojs/sitemap": "^3.7.4",
+        "@boguan/body-store": "workspace:*",
         "@boguan/catalog": "workspace:*",
         "@boguan/domain": "workspace:*",
         "@boguan/search": "workspace:*",

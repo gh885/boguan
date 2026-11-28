@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { describe, expect, it } from "vite-plus/test";
-import { deleteBody, listBodyIds, pruneBodies, putBody, readBody } from "./bodies";
+import { openBodyStore } from "@boguan/body-store";
 import { checkFts, deletePostFts, upsertPostFts } from "./fts";
 import {
   latestPosts,
@@ -185,11 +185,12 @@ describe("正文存储（crawler 私有目录）", () => {
   it("写入 → 读回 → 删除，内容是 gzip 后的文本", () => {
     const dir = mkdtempSync(join(tmpdir(), "boguan-bodies-"));
     try {
-      putBody(7, "多级缓存\n的分层设计", dir);
-      expect(readBody(7, dir)).toBe("多级缓存\n的分层设计");
-      expect(listBodyIds(dir)).toEqual([7]);
-      deleteBody(7, dir);
-      expect(readBody(7, dir)).toBeNull();
+      const store = openBodyStore(dir);
+      store.put(7, "多级缓存\n的分层设计");
+      expect(store.read(7)).toBe("多级缓存\n的分层设计");
+      expect(store.ids()).toEqual([7]);
+      store.delete(7);
+      expect(store.read(7)).toBeNull();
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -198,11 +199,12 @@ describe("正文存储（crawler 私有目录）", () => {
   it("对账删除不在 keep 里的孤文件", () => {
     const dir = mkdtempSync(join(tmpdir(), "boguan-bodies-"));
     try {
-      putBody(1, "a", dir);
-      putBody(2, "b", dir);
-      putBody(3, "c", dir);
-      expect(pruneBodies(new Set([1, 3]), dir)).toBe(1);
-      expect(listBodyIds(dir)).toEqual([1, 3]);
+      const store = openBodyStore(dir);
+      store.put(1, "a");
+      store.put(2, "b");
+      store.put(3, "c");
+      expect(store.prune(new Set([1, 3]))).toBe(1);
+      expect(store.ids()).toEqual([1, 3]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

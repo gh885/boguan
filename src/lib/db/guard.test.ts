@@ -8,7 +8,7 @@ import { describe, expect, it } from "vite-plus/test";
  *
  * 「正文不落到页面上」这条规则只靠注释不够——这里把它变成会失败的测试：
  * 1. 页面/组件/layout 只能通过 `src/lib/db/queries/` 读库，不能直接开连接；
- * 2. 正文存储（`bodies.ts`）只有 crawler 与它自己的可以引用；
+ * 2. 正文存储（`@boguan/body-store`）只有 crawler 与 ops 可以引用；
  * 3. FTS 的 token 列只在写入侧出现，页面侧碰不到，也就没法把正文拼出来；
  * 4. crawler 不许 import 任何 Astro 代码。
  *
@@ -54,7 +54,7 @@ describe("进程边界", () => {
     }
   });
 
-  it("正文存储只有 crawler 能引用", () => {
+  it("正文存储只有 crawler 与 ops 能引用", () => {
     const allowed = new Set([
       "scripts/crawler/pipeline.ts",
       "scripts/db/check.ts",
@@ -62,9 +62,9 @@ describe("进程边界", () => {
       "scripts/db/metrics.ts",
     ]);
     const offenders = [...srcFiles, ...scriptFiles]
-      .filter((path) => /from\s+["'][^"']*db\/bodies["']/.test(readFileSync(path, "utf8")))
+      .filter((path) => /from\s+["']@boguan\/body-store["']/.test(readFileSync(path, "utf8")))
       .map(relativeToRepo)
-      .filter((path) => !allowed.has(path) && !path.startsWith("src/lib/db/bodies"));
+      .filter((path) => !allowed.has(path));
 
     expect(offenders, "正文文件只给 crawler 用，web 侧不该有访问路径").toEqual([]);
   });

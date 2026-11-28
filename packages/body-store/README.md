@@ -2,14 +2,18 @@
 
 ## 责任
 
-管理 crawler 私有的正文文件：压缩、读写、删除、列举与孤儿清理。
+crawler 私有正文的压缩文件存储：`data/bodies/<post_id>.txt.gz`，一篇一个文件，gzip 压缩。
+
+对外只暴露一个绑定到目录的 `BodyStore`：写入、读回、存在性、删除、列出 id、按保留集清理。文件名约定、gzip、目录创建、原子写入都封在包内。
 
 ## 技术栈
 
-Bun 1.4 原生 `Bun.file`、`Bun.write`、`Bun.gzipSync`、`Bun.gunzipSync`；需要原子 rename 时使用 Bun 支持的 `node:fs/promises`。
+TypeScript strict、`node:fs`、`node:zlib`。无运行时依赖。
 
 ## 约束
 
-- 不导出给 Web；只有 crawler 和经授权的 Ops 命令可依赖。
-- 不依赖数据库；正文存储与元数据事务分离。
-- 文件写入采用临时文件与原子替换；损坏正文按缺失处理。
+- 与数据库无关：不 import `@boguan/database`，不读库、不进事务。
+- 正文是派生数据：最坏情况能从源站重抓，不做迁移、不做事务补偿。
+- 写入先落临时文件再 rename，进程中断只会留下 `.tmp` 或旧文件，不会留下半个 gzip。
+- 读失败（文件损坏）返回 `null`，调用方按「没有正文」处理，下一轮重抓覆盖。
+- 只有 crawler 与授权的 ops 命令可以依赖本包；Web 不依赖，也就没有正文的访问路径。

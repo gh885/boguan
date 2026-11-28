@@ -6,7 +6,7 @@ import {
   slugify,
 } from "@boguan/domain";
 import { and, desc, eq, isNotNull, ne } from "drizzle-orm";
-import { hasBody, putBody, readBody } from "../../src/lib/db/bodies";
+import { openBodyStore } from "@boguan/body-store";
 import { upsertPostFts } from "../../src/lib/db/fts";
 import type { Db } from "../../src/lib/db/index";
 import { openDatabase } from "../../src/lib/db/index";
@@ -26,6 +26,8 @@ import type { AdapterContext, SourceAdapter } from "./adapters/types";
 import { PoliteFetcher } from "./fetch";
 import { contentHash, normalizePost, type NormalizedPost } from "./normalize";
 import type { Detail } from "./types";
+
+const bodies = openBodyStore();
 import { ruleTags } from "@boguan/catalog";
 import type { ListItem, TagRef } from "./types";
 
@@ -481,7 +483,7 @@ async function processItem(env: ItemEnv, item: ListItem): Promise<ItemOutcome | 
 
   // 只为发现新条目的列表（sitemap）：库里已有正文就一次请求都不发。
   // 这是「sitemap 当列表」能天天跑的前提——否则每天要重抓全站详情页。
-  if (!listLevel && existing && !force && hasBody(existing.id)) {
+  if (!listLevel && existing && !force && bodies.has(existing.id)) {
     return { kind: "unchanged", canonicalUrl, publishedAt: existing.publishedAt };
   }
 
@@ -494,11 +496,11 @@ async function processItem(env: ItemEnv, item: ListItem): Promise<ItemOutcome | 
   // 能不打开详情页就不打开：新条目 / 元数据变了 / 正文文件丢了。
   // 最后一类包含「上次详情页抓失败、按列表层入了库」的条目——不重试，正文与索引正文就永久为空。
   const needsDetail =
-    canDetail && !item.body && (metadataChanged || (!!existing && !hasBody(existing.id)));
+    canDetail && !item.body && (metadataChanged || (!!existing && !bodies.has(existing.id)));
 
   // 元数据没变、详情也不用抓、正文文件还在：内容不可能变（正文只有 crawler 写），
   // 直接按未变处理——省掉每轮对全站正文的 gunzip + sha256
-  if (existing && listLevel && !needsDetail && !metadataChanged && hasBody(existing.id)) {
+  if (existing && listLevel && !needsDetail && !metadataChanged && bodies.has(existing.id)) {
     db.update(posts)
       .set({
         lastSeenAt: new Date().toISOString(),
@@ -550,7 +552,7 @@ async function processItem(env: ItemEnv, item: ListItem): Promise<ItemOutcome | 
     : { isVisible: true, hiddenReason: null };
 
   // 详情页没拿到就沿用库里已有的正文，避免把好的正文覆盖成空
-  const body = post.body || (existing ? (readBody(existing.id) ?? "") : "");
+  const body = post.body || (existing ? (bodies.read(existing.id) ?? "") : "");
   const hash = contentHash(post.title, post.summary, body);
   const now = new Date().toISOString();
 
@@ -581,7 +583,7 @@ async function processItem(env: ItemEnv, item: ListItem): Promise<ItemOutcome | 
         })
         .returning()
         .get();
-      putBody(row.id, body);
+      bodies.put(row.id, body);
       upsertPostFts(db, row.id, post.title, body);
       writePostTags(db, row.id, resolvedTags, post);
       return row;
@@ -633,7 +635,7 @@ async function processItem(env: ItemEnv, item: ListItem): Promise<ItemOutcome | 
       .where(eq(posts.id, existing.id))
       .run();
 
-    if (body) putBody(existing.id, body);
+    if (body) bodies.put(existing.id, body);
     upsertPostFts(db, existing.id, post.title, body);
     writePostTags(db, existing.id, resolvedTags, post);
   })();

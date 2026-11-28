@@ -9,12 +9,6 @@ export type Db = BetterSQLite3Database<typeof schema> & { $client: Database.Data
 /** 数据库文件位置；生产环境用环境变量指到宿主机挂载卷 */
 export const defaultDatabasePath = process.env.BOGUAN_DB ?? "data/boguan.db";
 
-/**
- * 正文文件目录。**只有 crawler 会碰这个路径**，web 的进程从不 import 这个常量，
- * 也不需要在部署时挂载它——这是「不转载全文」的结构性保证（见 docs/ARCHITECTURE.md §4）。
- */
-export const defaultBodiesDir = process.env.BOGUAN_BODIES ?? "data/bodies";
-
 function applyPragmas(raw: Database.Database): void {
   raw.pragma("journal_mode = WAL");
   raw.pragma("busy_timeout = 5000");

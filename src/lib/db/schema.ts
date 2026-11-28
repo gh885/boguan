@@ -15,7 +15,7 @@ import {
  * 约定：
  * - 时间一律存 ISO 8601 UTC 字符串（`2023-05-12T03:00:00.000Z`），可直接按字典序比较。
  * - 表名 / 列名用 snake_case，字段名用 camelCase（Drizzle 显式映射，不靠自动转换）。
- * - **正文不在这份 schema 里**：它在 crawler 私有的文件目录（src/lib/db/bodies.ts），
+ * - **正文不在这份 schema 里**：它在 crawler 私有的文件目录（@boguan/body-store），
  *   所以 web 进程即使拿到数据库连接也读不到正文。索引 `posts_fts` 是 contentless 的，
  *   列值不可读回，只有 term 与位置。
  * - 这个文件是 crawler 与 web 唯一的共享点，不放任何查询逻辑（查询在 src/lib/db/queries/）。

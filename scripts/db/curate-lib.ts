@@ -1,11 +1,13 @@
 import { HIDDEN_NON_ARTICLE, isNonArticle, stripSiteSuffix, titleNorm } from "@boguan/domain";
 import { eq } from "drizzle-orm";
-import { readBody } from "../../src/lib/db/bodies";
+import { openBodyStore } from "@boguan/body-store";
 import { rebuildAllPostFts } from "../../src/lib/db/fts";
 import type { Db } from "../../src/lib/db/index";
 import { companies, posts } from "../../src/lib/db/schema";
 import { contentHash } from "../crawler/normalize";
 import { dedupe } from "../crawler/pipeline";
+
+const bodies = openBodyStore();
 
 /**
  * 把清洗规则应用到**已入库**的数据（ARCHITECTURE §5「清洗」）。
@@ -78,7 +80,7 @@ export function curate(db: Db, options: CurateOptions = {}): CurateReport {
       const title = stripSiteSuffix(post.title, brands);
 
       // 标题进了 content_hash：改标题就要一起重算
-      const body = readBody(post.id) ?? "";
+      const body = bodies.read(post.id) ?? "";
       const hash = contentHash(title, post.summary, body);
       const titleChanged = title !== post.title;
       const hashStale = hash !== post.contentHash;
@@ -126,7 +128,7 @@ export function curate(db: Db, options: CurateOptions = {}): CurateReport {
 
   // 标题变了就要重算索引：FTS 是 contentless，改不了单列，只能整表重建（正文从私有文件读）
   if (report.retitled > 0 && !dryRun) {
-    report.indexed = rebuildAllPostFts(db, readBody);
+    report.indexed = rebuildAllPostFts(db, bodies.read);
     // 标题归一变了，之前的判重结论可能不再成立
     report.duplicates = dedupe(db, log);
   }

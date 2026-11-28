@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { listBodyIds, pruneBodies, readBody } from "../../src/lib/db/bodies";
+import { openBodyStore } from "@boguan/body-store";
 import { checkFts, deletePostFts, upsertPostFts } from "../../src/lib/db/fts";
 import { openDatabase } from "../../src/lib/db/index";
 import { posts, sources } from "../../src/lib/db/schema";
@@ -12,6 +12,8 @@ import { posts, sources } from "../../src/lib/db/schema";
  *
  * 抓取是自动流程，正常不会不一致；这个脚本用于「有人直接改过库」和「下架后的收尾」。
  */
+
+const bodies = openBodyStore();
 
 const flags = new Set(process.argv.slice(2).filter((arg) => arg.startsWith("--")));
 const fix = flags.has("--fix");
@@ -31,7 +33,7 @@ if (fix) {
     for (const id of fts.missing) {
       const post = db.select().from(posts).where(eq(posts.id, id)).get();
       if (!post) continue;
-      upsertPostFts(db, post.id, post.title, readBody(post.id) ?? "");
+      upsertPostFts(db, post.id, post.title, bodies.read(post.id) ?? "");
       rebuilt += 1;
     }
     return rebuilt;
@@ -42,14 +44,14 @@ if (fix) {
 }
 
 /** 孤正文文件：帖子已删但仍占磁盘 */
-const bodyIds = new Set(listBodyIds());
+const bodyIds = new Set(bodies.ids());
 const postIds = new Set(
   (db.$client.prepare("select id from posts").all() as { id: number }[]).map((row) => row.id),
 );
 const orphanBodies = [...bodyIds].filter((id) => !postIds.has(id));
 if (orphanBodies.length > 0) {
   if (prune) {
-    const removed = pruneBodies(postIds);
+    const removed = bodies.prune(postIds);
     console.log(`已删除孤正文文件 ${removed} 个`);
   } else {
     issues.push(`有 ${orphanBodies.length} 个孤正文文件（用 --prune 清理）`);
