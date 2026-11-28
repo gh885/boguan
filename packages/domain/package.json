@@ -6,7 +6,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "entities": "^4.5.0",
+    "entities": "^9.0.0",
     "luxon": "^3.7.2"
   },
   "devDependencies": {
