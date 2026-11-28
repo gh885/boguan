@@ -1,4 +1,4 @@
-import { segment } from "../search/tokenize";
+import { segment } from "@boguan/search";
 import type { Db } from "./index";
 
 /**

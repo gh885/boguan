@@ -20,7 +20,7 @@ import {
 import { searchPosts } from "./queries/search";
 import { companies, crawlJobs, posts, sources, tagAliases, tags } from "./schema";
 import type { Db } from "./index";
-import { segment, toMatchQuery } from "../search/tokenize";
+import { segment, toMatchQuery } from "@boguan/search";
 import { dayInTimeZone, editionRange } from "@boguan/domain";
 import * as schema from "./schema";
 

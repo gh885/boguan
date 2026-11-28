@@ -6,10 +6,11 @@
 
 ## 技术栈
 
-TypeScript strict、`@node-rs/jieba`、SQLite FTS5。
+TypeScript strict、`@node-rs/jieba`、依赖 `@boguan/domain` 做文本归一。
 
 ## 约束
 
 - 分词与查询表达式仅有一套实现。
+- 文本归一一律调用 `@boguan/domain`，不另写空白清洗。
 - FTS 表结构和 SQL 查询由 `@boguan/database` 所有。
 - 不依赖数据库连接、文件系统、网络或应用包。

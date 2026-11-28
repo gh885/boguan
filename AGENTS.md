@@ -49,7 +49,8 @@ web      → database/web-read, domain, search
 crawler  → database/crawler, domain, search, catalog, body-store
 ops      → database/ops, domain, catalog, body-store
 数据库   → domain, search
-domain / search / catalog / body-store → 不依赖应用包
+search   → domain
+domain / catalog / body-store → 不依赖其他包
 正文     → crawler 与授权的 ops 命令可用；web 不可依赖
 ```
 

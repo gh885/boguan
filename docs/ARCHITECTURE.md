@@ -53,7 +53,8 @@ web      → database/web-read, domain, search
 crawler  → database/crawler, domain, search, catalog, body-store
 ops      → database/ops, domain, catalog, body-store
 database → domain, search
-domain / search / catalog / body-store → 不依赖应用包
+search   → domain
+domain / catalog / body-store → 不依赖其他包
 ```
 
 `web` 与 `crawler` 不互相调用，只通过 SQLite 交汇。Web 仅获得只读数据库能力，不依赖正文存储；Crawler 与 Ops 分别依赖所需的写入、维护与正文能力。包的公开接口和依赖约束由各包维护。

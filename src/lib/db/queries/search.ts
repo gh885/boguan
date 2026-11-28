@@ -1,4 +1,4 @@
-import { toMatchQuery } from "../../search/tokenize";
+import { toMatchQuery } from "@boguan/search";
 import type { Db } from "../index";
 import {
   attachPostTags,

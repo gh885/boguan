@@ -9,6 +9,7 @@
         "@astrojs/rss": "^4.0.19",
         "@astrojs/sitemap": "^3.7.4",
         "@boguan/domain": "workspace:*",
+        "@boguan/search": "workspace:*",
         "@node-rs/jieba": "^2.0.4",
         "astro": "^7.4.4",
         "better-sqlite3": "^13.0.3",
@@ -91,6 +92,7 @@
     "packages/search": {
       "name": "@boguan/search",
       "dependencies": {
+        "@boguan/domain": "workspace:*",
         "@node-rs/jieba": "^2.0.4",
       },
     },
