@@ -4,6 +4,8 @@ import { isIndexableCollection } from "@boguan/domain";
 import sitemap from "@astrojs/sitemap";
 import node from "@astrojs/node";
 import { defineConfig } from "astro/config";
+import { defaultLocale, locales } from "./src/lib/i18n/config";
+import { site } from "./src/lib/site";
 
 const webDb = openWebDatabase();
 
@@ -20,11 +22,11 @@ const indexableEditions = new Set(
 );
 
 export default defineConfig({
-  site: "https://boguan.org.cn",
+  site: site.url,
   outDir: process.env.BOGUAN_OUT_DIR ?? "./dist",
   i18n: {
-    defaultLocale: "zh-CN",
-    locales: ["zh-CN", "en"],
+    defaultLocale,
+    locales: [...locales],
     routing: {
       prefixDefaultLocale: false,
     },
@@ -40,8 +42,8 @@ export default defineConfig({
   integrations: [
     sitemap({
       i18n: {
-        defaultLocale: "zh-CN",
-        locales: { "zh-CN": "zh-CN", en: "en" },
+        defaultLocale,
+        locales: Object.fromEntries(locales.map((locale) => [locale, locale])),
       },
       filter: (page) => {
         const path = new URL(page).pathname;

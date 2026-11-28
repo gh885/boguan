@@ -6,3 +6,8 @@ export const site = {
   icp: "晋ICP备2026019879号",
   icpUrl: "https://beian.miit.gov.cn/",
 } as const;
+
+export const siteHostnames: readonly string[] = [
+  new URL(site.url).hostname,
+  `www.${new URL(site.url).hostname}`,
+];

@@ -1,3 +1,5 @@
+import { site } from "./site";
+
 export const rumEndpoint =
   "https://proj-xtrace-f668d8d49a60567a472c54a97f4342ca-cn-hangzhou.cn-hangzhou.log.aliyuncs.com/rum/web/v2?workspace=default-cms-1236451801020363-cn-hangzhou&service_id=c6aa46364r@b7994f83a305c3105f5d1";
 
@@ -46,7 +48,7 @@ export function createRumConfig() {
     tracing: false,
     replay: false,
     profiling: false,
-    parseViewName: (url: string) => new URL(url, "https://boguan.org.cn").pathname,
+    parseViewName: (url: string) => new URL(url, site.url).pathname,
     parseResourceName: rumUrl,
     beforeReport: sanitizeRumPayload,
   };

@@ -121,11 +121,12 @@ const robots = noindex ? "noindex, follow" : "index, follow";
 		</main>
 		<script>
 			import { createRumConfig } from "../lib/rum";
+			import { siteHostnames } from "../lib/site";
 
 			if (
 				import.meta.env.PROD &&
 				location.protocol === "https:" &&
-				["boguan.org.cn", "www.boguan.org.cn"].includes(location.hostname) &&
+				siteHostnames.some((hostname) => hostname === location.hostname) &&
 				navigator.doNotTrack !== "1"
 			) {
 				Object.assign(window, { __rum: createRumConfig() });

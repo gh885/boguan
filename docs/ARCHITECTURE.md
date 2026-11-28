@@ -387,7 +387,7 @@ select rowid from posts_fts where posts_fts match 'title_tokens : ("缓存")'
 
 ### 语言与 URL
 
-- 语言清单是唯一事实源：`apps/web/src/lib/i18n/config.ts` 与 `astro.config.mjs` 的 `i18n.locales` 必须一致（加语言时两处一起改）。
+- 语言清单的唯一事实源是 `apps/web/src/lib/i18n/config.ts`：`astro.config.mjs` 的 i18n 与 sitemap 配置都从它取值，加语言只改这一处（文案另加一份 messages）。
 - 默认语言不带前缀，其它语言带前缀，**同一份内容共享 slug**：
 
 | URL                           | 语言  |
