@@ -1,0 +1,9 @@
+{
+  "name": "@boguan/database",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@boguan/search": "workspace:*",
+    "drizzle-orm": "^0.45.4"
+  }
+}

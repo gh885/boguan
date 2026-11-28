@@ -1,0 +1,8 @@
+{
+  "name": "@boguan/domain",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "luxon": "^3.7.2"
+  }
+}

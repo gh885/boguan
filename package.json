@@ -1,6 +1,10 @@
 {
   "name": "boguan",
   "version": "0.0.1",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "type": "module",
   "scripts": {
     "dev": "astro dev",
@@ -34,6 +38,7 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
+    "@types/bun": "^1.4.5",
     "@types/node": "^26.6.6",
     "@x18n/cli": "^0.1.4",
     "@x18n/core": "^0.1.4",
@@ -52,7 +57,7 @@
     }
   },
   "engines": {
-    "node": ">=24"
+    "bun": ">=1.4.4"
   },
   "trustedDependencies": [
     "esbuild"

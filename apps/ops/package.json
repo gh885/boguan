@@ -1,0 +1,12 @@
+{
+  "name": "@boguan/ops",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@boguan/body-store": "workspace:*",
+    "@boguan/catalog": "workspace:*",
+    "@boguan/database": "workspace:*",
+    "@boguan/domain": "workspace:*",
+    "drizzle-kit": "^0.31.11"
+  }
+}

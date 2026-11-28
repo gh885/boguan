@@ -1,0 +1,15 @@
+{
+  "name": "@boguan/crawler",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@boguan/body-store": "workspace:*",
+    "@boguan/catalog": "workspace:*",
+    "@boguan/database": "workspace:*",
+    "@boguan/domain": "workspace:*",
+    "@boguan/search": "workspace:*",
+    "cheerio": "^1.2.0",
+    "robots-parser": "^3.0.1",
+    "rss-parser": "^3.13.0"
+  }
+}
