@@ -349,7 +349,7 @@ select rowid from posts_fts where posts_fts match 'title_tokens : ("缓存")'
    而只出现在薄标签里、没有别的标签兜底的文章只有 3 篇——门槛几乎不损失可达性。
    门槛常量在 `src/lib/tags.ts`，页面与 sitemap 用的是同一个。
 8. 多语言页面互相声明：每页输出各语言的 `hreflang` 与 `x-default`，canonical 指自己。见 §9。
-9. 站内 feed（`/rss.xml`、`/en/rss.xml`）只放**标题 + 摘要 + 原文链接**，与页面同一套内容边界（硬性规则 1）；`BaseLayout` 输出 `<link rel="alternate" type="application/rss+xml">` 便于订阅发现。
+9. 站内 feed（`/rss.xml`、`/en/rss.xml`）只放**标题 + 摘要 + 原文链接**，与页面同一套内容边界（硬性规则 1）；`BaseLayout` 输出 `<link rel="alternate" type="application/rss+xml">` 便于订阅发现。共享页脚（`PaperFooter.astro`）**不放可见的订阅链接**：feed 是免费的纯技术输出，不构成经营性或收费服务，界面上的「订阅」措辞在备案期容易被误读，发现路径只留 head 的 alternate link，读者与抓取器照样能取到。
 
 ---
 
