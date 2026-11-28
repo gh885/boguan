@@ -15,7 +15,7 @@
     "cheerio": "^1.2.0",
     "domhandler": "^5.0.3",
     "drizzle-orm": "^0.45.4",
-    "robots-parser": "^3.0.1",
+    "robots-parser": "^3.1.1",
     "rss-parser": "^3.13.0"
   },
   "devDependencies": {
