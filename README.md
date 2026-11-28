@@ -56,7 +56,7 @@ https://boguan.org.cn
 | 框架            | Astro 7（静态优先，按需 SSR）     | ✅ 已就绪     |
 | 语言            | TypeScript（strict）              | ✅ 已就绪     |
 | 运行时 / 包管理 | Bun 1.4                           | ✅ 已就绪     |
-| 工具链          | Vite+（`vp` / `vpr` / `vpx`）     | ✅ 已就绪     |
+| 工具链          | Vite+（`vp` / `vpr`）             | ✅ 已就绪     |
 | 数据库          | SQLite                            | ✅ 已就绪     |
 | ORM             | Drizzle                           | ✅ 已就绪     |
 | 全文检索        | SQLite FTS5 + 中文分词（jieba）   | ✅ 查询可用   |
@@ -115,7 +115,7 @@ vpr preview        # 本地预览构建产物
 ```bash
 vp check           # 格式化 + 校验 + 类型检查
 vpr test           # 运行测试
-vpx scripts/foo.ts # 直接运行 TS 脚本（替代 tsx）
+bun scripts/foo.ts # 直接运行 TS 脚本（vpx 走 Node，不用）
 ```
 
 抓取管道（独立进程，与 Web 无关）：

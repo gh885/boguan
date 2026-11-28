@@ -15,7 +15,7 @@ SQLite 的 schema、迁移与全部读写能力。单一包、按能力分入口
 
 ## 技术栈
 
-`bun:sqlite`、Drizzle ORM、SQLite FTS5（虚拟表为手写迁移）。迁移文件在 `drizzle/`。
+better-sqlite3、Drizzle ORM、SQLite FTS5（虚拟表为手写迁移）。迁移文件在 `drizzle/`。
 
 ## 约束
 

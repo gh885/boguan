@@ -43,7 +43,7 @@ apps/ops ──维护──▶ packages/database
 | `packages/catalog`    | 代码管理的公司、数据源、标签别名与采集规则配置  | TypeScript，无运行时依赖                                                       |
 | `packages/domain`     | 纯业务规则与日期/时区能力                       | TypeScript、Luxon                                                              |
 | `packages/search`     | 中文分词与 FTS 查询表达式                       | `@node-rs/jieba`、SQLite FTS5                                                  |
-| `packages/database`   | schema、迁移、读写查询与能力接口                | `bun:sqlite`、Drizzle ORM、SQLite FTS5                                         |
+| `packages/database`   | schema、迁移、读写查询与能力接口                | better-sqlite3、Drizzle ORM、SQLite FTS5                                       |
 | `packages/body-store` | crawler 私有正文的压缩文件存储                  | `node:fs`、`node:zlib`                                                         |
 
 ### 依赖边界

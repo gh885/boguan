@@ -35,8 +35,8 @@ Web 与 crawler 不互相调用，只通过 SQLite 交汇。
 | 框架            | Astro 7（默认静态输出，按需 SSR）                    |
 | 语言            | TypeScript strict                                    |
 | 运行时 / 包管理 | Bun 1.4                                              |
-| 工具链          | Vite+（`vp` / `vpr` / `vpx`）                        |
-| 数据库          | SQLite + `bun:sqlite` + Drizzle ORM                  |
+| 工具链          | Vite+（`vp` / `vpr`）                                |
+| 数据库          | SQLite + better-sqlite3 + Drizzle ORM                |
 | 检索            | SQLite FTS5，中文先经 jieba 分词（`@node-rs/jieba`） |
 | 日期            | Luxon（解析与时区计算）；展示使用 `Intl`             |
 | 多语言          | `apps/web/src/i18n`（zh-CN 默认 + en），`x18n` 校验  |
@@ -176,6 +176,7 @@ vpr dev stop           # 停止
 - **页面与 endpoint 只能通过 `@boguan/database/web-read` 读库**，不得取得写库或维护接口。
 - **UA 必须 ASCII**：HTTP header 不能含中文，中文说明放在首页的站名与说明里。
 - 迁移先改 `@boguan/database` 的 schema，再由 Drizzle Kit 生成；Drizzle 生成不了的（如 FTS5 虚拟表）手写迁移。已提交的迁移文件只增不改；由 Ops 命令应用。
+- 脚本一律用 `bun <file>` 运行；`vpx` 走 Node，不用于本项目脚本（`vpr <script>` 只是触发器）。
 - 提交前跑 `vp check`，构建必须通过 `vpr build`。
 
 ---

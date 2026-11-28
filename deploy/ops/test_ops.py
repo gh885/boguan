@@ -72,7 +72,7 @@ echo server > "$3/server/entry.mjs"
 echo html > "$3/client/index.html"
 ''')
         builder.chmod(0o755)
-        crawler = self.app / "node_modules/.bin/vpx"
+        crawler = self.app / "node_modules/.bin/bun"
         crawler.write_text('''#!/usr/bin/env bash
 set -eu
 if [[ ${SCENARIO:-} == crawl-fails && $1 == *crawler* ]]; then exit 1; fi

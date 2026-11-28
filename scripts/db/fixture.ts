@@ -1,4 +1,5 @@
 import {
+  migrateDatabase,
   openDatabase,
   upsertPostFts,
   companies,
@@ -11,7 +12,6 @@ import { titleNorm } from "@boguan/domain";
 import { mkdirSync, rmSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 
 /**
  * 构建用的最小数据集：`vpr db:fixture` → `data/fixture.db`。
@@ -24,7 +24,6 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
  */
 
 const fixturePath = fileURLToPath(new URL("../../data/fixture.db", import.meta.url));
-const migrationsFolder = fileURLToPath(new URL("../../drizzle", import.meta.url));
 
 rmSync(fixturePath, { force: true });
 rmSync(`${fixturePath}-wal`, { force: true });
@@ -32,7 +31,7 @@ rmSync(`${fixturePath}-shm`, { force: true });
 mkdirSync(dirname(fixturePath), { recursive: true });
 
 const db = openDatabase(fixturePath);
-migrate(db, { migrationsFolder });
+migrateDatabase(db);
 
 const meituan = db
   .insert(companies)
