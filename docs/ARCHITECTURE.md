@@ -24,7 +24,7 @@
 ```text
 apps/crawler ──写入──▶ packages/database ──SQLite──▶ apps/web
       │                       ▲                         │
-      ├── packages/domain     │                         └── Astro + Bun
+      ├── packages/domain     │                         └── Astro SSR（Node）
       ├── packages/search ────┘
       ├── packages/catalog
       └── packages/body-store
@@ -35,16 +35,16 @@ apps/ops ──维护──▶ packages/database
 
 ### 工作区包
 
-| 包                    | 职责                                            | 技术栈                                                                         |
-| --------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------ |
-| `apps/web`            | Astro 页面、组件、布局、i18n、SEO，只读查询     | Bun、Astro 7、Bun Astro adapter、CSS、`@astrojs/sitemap`、`@astrojs/rss`、x18n |
-| `apps/crawler`        | 传输、robots、适配器、抓取管道与持久化编排      | Bun、`fetch`、Cheerio、`rss-parser`、`robots-parser`、Drizzle                  |
-| `apps/ops`            | 数据库迁移、种子、fixture、对账、清洗与维护命令 | Bun、Drizzle Kit、Vite+ 命令入口                                               |
-| `packages/catalog`    | 代码管理的公司、数据源、标签别名与采集规则配置  | TypeScript，无运行时依赖                                                       |
-| `packages/domain`     | 纯业务规则与日期/时区能力                       | TypeScript、Luxon                                                              |
-| `packages/search`     | 中文分词与 FTS 查询表达式                       | `@node-rs/jieba`、SQLite FTS5                                                  |
-| `packages/database`   | schema、迁移、读写查询与能力接口                | better-sqlite3、Drizzle ORM、SQLite FTS5                                       |
-| `packages/body-store` | crawler 私有正文的压缩文件存储                  | `node:fs`、`node:zlib`                                                         |
+| 包                    | 职责                                            | 技术栈                                                                                   |
+| --------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `apps/web`            | Astro 页面、组件、布局、i18n、SEO，只读查询     | Astro 7（SSR）、`@astrojs/node`、Bun 构建、CSS、`@astrojs/sitemap`、`@astrojs/rss`、x18n |
+| `apps/crawler`        | 传输、robots、适配器、抓取管道与持久化编排      | Bun、`fetch`、Cheerio、`rss-parser`、`robots-parser`、Drizzle                            |
+| `apps/ops`            | 数据库迁移、种子、fixture、对账、清洗与维护命令 | Bun、Drizzle Kit、Vite+ 命令入口                                                         |
+| `packages/catalog`    | 代码管理的公司、数据源、标签别名与采集规则配置  | TypeScript，无运行时依赖                                                                 |
+| `packages/domain`     | 纯业务规则与日期/时区能力                       | TypeScript、Luxon                                                                        |
+| `packages/search`     | 中文分词与 FTS 查询表达式                       | `@node-rs/jieba`、SQLite FTS5                                                            |
+| `packages/database`   | schema、迁移、读写查询与能力接口                | better-sqlite3、Drizzle ORM、SQLite FTS5                                                 |
+| `packages/body-store` | crawler 私有正文的压缩文件存储                  | `node:fs`、`node:zlib`                                                                   |
 
 ### 依赖边界
 

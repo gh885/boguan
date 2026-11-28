@@ -210,7 +210,7 @@ Docs are local at `node_modules/vite-plus/docs` or online at https://viteplus.de
 
 ## Running Scripts
 
-Run TypeScript and JavaScript files with `vpx <file>`, for example `vpx ./scripts/seed.ts --dry-run`. It handles enums, decorators, JSX, and tsconfig `paths`, so do not add `tsx` or `ts-node` to run scripts. `vpx --watch <file>` reruns the file when a file it uses changes, in place of `tsx watch`. `vp node <file>` runs plain Node.js.
+本项目**不用 `vpx` 跑脚本**：`vpx` 走 Node，而脚本与数据库驱动都在 Bun 上。用 `bun <file>`，例如 `bun apps/ops/src/seed.ts`；`vpr <script>` 只是触发根 `package.json` 里的脚本，不改变运行时。`vp node <file>` 仅用于验证「产物在 Node 上能不能跑」。
 
 ## Tool Versions
 
@@ -222,7 +222,7 @@ release. Add a tool name to select part of the graph. For example, run
 ## Review Checklist
 
 - [ ] Run `vp install` after pulling remote changes and before getting started.
-- [ ] Run `vp check` and `vp test` to format, lint, type check and test changes.
+- [ ] Run `vp check` and `vpr test` to format, lint, type check and test changes.
 - [ ] Check if there are `vite.config.ts` tasks or `package.json` scripts necessary for validation, run via `vp run <script>`.
 - [ ] If setup, runtime, or package-manager behavior looks wrong, run `vp env doctor` and include its output when asking for help.
 

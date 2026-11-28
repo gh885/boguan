@@ -75,26 +75,25 @@ https://boguan.org.cn
 
 ```text
 boguan/
-├── public/                 # 静态资源（favicon 等）
 ├── apps/
 │   ├── crawler/            # 抓取管道：fetch/robots → adapters → normalize → pipeline
 │   ├── ops/                # init / seed / check / curate / metrics / fixture
-│   └── web/                # Astro 站点：pages / components / layouts / lib / styles
+│   └── web/                # Astro 站点：pages / components / layouts / lib / styles / public
 ├── packages/
 │   ├── body-store/         # crawler 私有正文文件
 │   ├── catalog/            # 采集配置
-│   ├── database/           # schema、迁移（drizzle/）与查询
+│   ├── database/           # schema、迁移（drizzle/）与按能力分入口的查询
 │   ├── domain/             # 纯业务规则
 │   └── search/             # 分词与 FTS 查询表达式
 ├── data/                   # 本地 SQLite 与正文文件（不进仓库）
 ├── docs/                   # 架构与决策文档
-├── astro.config.mjs
+├── architecture.test.ts    # 边界规则：谁可以 import 谁、源码零注释
+├── drizzle.config.ts       # 迁移生成配置
 ├── vite.config.ts          # Vite+ 配置：fmt / lint
-├── package.json
-└── AGENTS.md               # 给 AI 助手与协作者的工程约定
+└── package.json            # 只做编排，不含运行时依赖
 ```
 
-目录会随实现推进扩展，规划中的布局见 `docs/ARCHITECTURE.md`。
+各包的技术栈、公开接口与依赖约束见包内 README；仓库根不承载业务代码。
 
 ---
 
@@ -113,9 +112,10 @@ vpr preview        # 本地预览构建产物
 
 ```bash
 vp check           # 格式化 + 校验 + 类型检查
-vpr test           # 运行测试
-bun apps/ops/src/check.ts # 运行 TS 入口（vpx 走 Node，不用）
+vpr test           # 运行测试（bun test）
 ```
+
+脚本与数据库都在 Bun 上，入口一律 `bun <file>`（`vpx` 走 Node，本项目不用）；`vpr <script>` 只是根 `package.json` 的触发器。
 
 抓取管道（独立进程，与 Web 无关）：
 
