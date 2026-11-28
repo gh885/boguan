@@ -3,9 +3,7 @@ import { CompanyCard, PostCard as PostCardData, TagCard } from "@boguan/database
 import { formatCount, localizePath, useTranslations } from "../lib/i18n";
 import { companyDisplayName } from "../lib/i18n/company";
 import type { Locale } from "../lib/i18n/config";
-import { INDEX_PAGE_SIZE } from "../lib/pagination";
-import { searchHref } from "../lib/search-url";
-import type { IndexFacetGroup, IndexRailModule } from "../lib/index-sheet";
+import { INDEX_PAGE_SIZE, searchHref, type IndexFacetGroup, type IndexRailModule } from "../lib/sheet";
 import IndexSheet from "./IndexSheet.astro";
 
 interface Props {

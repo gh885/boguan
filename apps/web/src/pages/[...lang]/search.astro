@@ -4,16 +4,9 @@ export const prerender = false;
 
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import IndexSheet from "../../components/IndexSheet.astro";
-import type {
-	IndexEmptyAction,
-	IndexFacetGroup,
-	IndexFacetItem,
-	IndexRailModule,
-} from "../../lib/index-sheet";
+import { INDEX_PAGE_SIZE, pageCount, pageOffset, searchHref, type IndexEmptyAction, type IndexFacetGroup, type IndexFacetItem, type IndexRailModule } from "../../lib/sheet";
 import { companyDisplayName } from "../../lib/i18n/company";
 import { formatCount, localizePath, resolveLocale, useTranslations } from "../../lib/i18n";
-import { INDEX_PAGE_SIZE, pageCount, pageOffset } from "../../lib/pagination";
-import { searchHref } from "../../lib/search-url";
 
 const locale = resolveLocale(Astro.currentLocale);
 const t = useTranslations(locale);
